@@ -41,12 +41,16 @@ export default function Header() {
           </Link>
 
           <Space>
-            <Button type="default" icon={<UserOutlined />}>
-              登录
-            </Button>
-            <Button type="primary">
-              注册
-            </Button>
+            <Link to="/login">
+              <Button type="default" icon={<UserOutlined />}>
+                登录
+              </Button>
+            </Link>
+            <Link to="/login">
+              <Button type="primary">
+                注册
+              </Button>
+            </Link>
           </Space>
         </div>
       </div>
