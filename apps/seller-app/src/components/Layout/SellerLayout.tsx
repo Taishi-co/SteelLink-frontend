@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, Typography, Space } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, Typography, Space, Button } from 'antd'
 import {
   DashboardOutlined,
   ShopOutlined,
@@ -7,6 +7,7 @@ import {
   SettingOutlined,
   UserOutlined,
   LogoutOutlined,
+  HomeOutlined,
 } from '@ant-design/icons'
 
 const { Sider, Header, Content } = Layout
@@ -50,12 +51,19 @@ export default function SellerLayout() {
       <Layout>
         <Header className="bg-white px-6 flex items-center justify-between shadow-sm h-16">
           <Text className="text-lg font-medium">卖家后台</Text>
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <Space className="cursor-pointer">
-              <Avatar icon={<UserOutlined />} />
-              <Text>管理员</Text>
-            </Space>
-          </Dropdown>
+          <Space size="middle">
+            <a href="/">
+              <Button icon={<HomeOutlined />}>
+                买家首页
+              </Button>
+            </a>
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <Space className="cursor-pointer">
+                <Avatar icon={<UserOutlined />} />
+                <Text>管理员</Text>
+              </Space>
+            </Dropdown>
+          </Space>
         </Header>
         <Content className="m-6 p-6 bg-white rounded-lg min-h-[calc(100vh-112px)]">
           <Outlet />

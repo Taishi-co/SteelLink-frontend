@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Layout, Menu, Space, Badge, Input, Button } from 'antd'
-import { ShoppingCartOutlined, UserOutlined, SearchOutlined } from '@ant-design/icons'
+import { ShoppingCartOutlined, UserOutlined, SearchOutlined, ShopOutlined } from '@ant-design/icons'
 
 const { Header: AntHeader } = Layout
 
@@ -33,6 +33,12 @@ export default function Header() {
             prefix={<SearchOutlined />}
             className="w-64"
           />
+
+          <a href="/seller">
+            <Button icon={<ShopOutlined />}>
+              卖家中心
+            </Button>
+          </a>
 
           <Link to="/cart">
             <Badge count={0} size="small">
