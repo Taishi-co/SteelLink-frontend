@@ -5,7 +5,7 @@ import { ShopOutlined, TeamOutlined } from '@ant-design/icons'
 const { Header: AntHeader } = Layout
 
 const navItems = [
-  { key: '/products', label: '现货商城' },
+  { key: '/mall', label: '现货商城' },
   { key: '/bidding', label: '竞价交易' },
   { key: '/procurement', label: '集采大厅' },
   { key: '/supply', label: '供求信息' },
@@ -37,7 +37,7 @@ export default function HomeHeader() {
 
         {/* Action Buttons */}
         <Space size="middle">
-          <Link to="/products">
+          <Link to="/mall">
             <Button type="primary" icon={<ShopOutlined />}>
               进入商城
             </Button>

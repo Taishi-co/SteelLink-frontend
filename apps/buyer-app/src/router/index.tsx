@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import HomeLayout from '@/components/Layout/HomeLayout'
 import MainLayout from '@/components/Layout/MainLayout'
 import HomePage from '@/pages/Home'
+import MallPage from '@/pages/Mall'
 import ProductsPage from '@/pages/Products'
 import ProductDetailPage from '@/pages/ProductDetail'
 import CartPage from '@/pages/Cart'
@@ -31,6 +32,7 @@ export function AppRouter() {
       {/* Home page - with HomeLayout */}
       <Route path="/" element={<HomeLayout />}>
         <Route index element={<HomePage />} />
+        <Route path="mall" element={<MallPage />} />
         <Route path="bidding" element={<BiddingPage />} />
         <Route path="procurement" element={<ProcurementPage />} />
         <Route path="supply" element={<SupplyPage />} />

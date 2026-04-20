@@ -60,7 +60,7 @@ export default function HomePage() {
                 现货直购 · 竞价交易 · 集采服务 · 一站式钢铁供应链解决方案
               </Paragraph>
               <div className="flex gap-4">
-                <Link to="/products">
+                <Link to="/mall">
                   <Button type="primary" size="large" icon={<ShopOutlined />} className="h-12 px-8">
                     进入商城
                   </Button>
@@ -130,7 +130,7 @@ export default function HomePage() {
                 <Paragraph className="text-gray-500">
                   海量现货资源，一键下单，极速配送
                 </Paragraph>
-                <Link to="/products">立即选购 →</Link>
+                <Link to="/mall">立即选购 →</Link>
               </Card>
             </Col>
             <Col span={6}>
@@ -196,7 +196,7 @@ export default function HomePage() {
             加入 SteelLink，享受专业、高效、安全的钢材交易服务
           </Paragraph>
           <div className="flex justify-center gap-4">
-            <Link to="/products">
+            <Link to="/mall">
               <Button type="primary" size="large" icon={<ShopOutlined />} className="h-12 px-8 bg-white text-primary-600 border-white hover:bg-gray-100">
                 进入商城
               </Button>
