@@ -4,12 +4,30 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Invoke-Pnpm {
+    param(
+        [string[]]$Arguments
+    )
+
+    $pnpmCommand = Get-Command pnpm -ErrorAction SilentlyContinue
+    if ($pnpmCommand) {
+        & $pnpmCommand.Source @Arguments
+        return
+    }
+
+    $corepackCommand = Get-Command corepack -ErrorAction SilentlyContinue
+    if ($corepackCommand) {
+        & $corepackCommand.Source pnpm @Arguments
+        return
+    }
+
+    throw "pnpm not found. Enable it with Corepack (`corepack enable pnpm`) or install pnpm globally."
+}
+
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location -LiteralPath $repoRoot
-
-$env:PATH = "C:\Program Files\nodejs;C:\Program Files\nodejs\node_modules\corepack\shims;$env:PATH"
 
 Write-Host "Starting SteelLink buyer app..." -ForegroundColor Cyan
 Write-Host "Buyer app: http://localhost:$Port" -ForegroundColor DarkGray
 
-cmd /c "pnpm --filter @steellink/buyer-app dev -- --host 0.0.0.0 --strictPort --port $Port"
+Invoke-Pnpm -Arguments @("--filter", "@steellink/buyer-app", "dev", "--", "--host", "0.0.0.0", "--strictPort", "--port", "$Port")
