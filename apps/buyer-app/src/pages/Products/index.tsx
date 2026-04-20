@@ -1,50 +1,113 @@
-import { useState } from 'react'
-import { Row, Col, Card, Input, Select, Pagination, Typography, Space, Tag, Empty } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
+import { Row, Col, Card, Input, Select, Pagination, Typography, Space, Tag, Empty, Spin, message } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import api from '@/services/api'
 
 const { Title, Paragraph } = Typography
 const { Search } = Input
 
-const mockProducts = [
-  { id: 1, name: 'Q235B 热轧板卷 3.0*1500*C', price: 3850, unit: '元/吨', specs: '宝钢', stock: 500, category: '热轧板卷' },
-  { id: 2, name: 'SPCC 冷轧板卷 1.0*1250*C', price: 4200, unit: '元/吨', specs: '鞍钢', stock: 300, category: '冷轧板卷' },
-  { id: 3, name: 'Q345B 中厚板 20*2000*8000', price: 3950, unit: '元/吨', specs: '首钢', stock: 200, category: '中厚板' },
-  { id: 4, name: 'Q235B 工字钢 25#', price: 4100, unit: '元/吨', specs: '马钢', stock: 150, category: '型材' },
-  { id: 5, name: 'Q235B 角钢 50*50*5', price: 3800, unit: '元/吨', specs: '莱钢', stock: 400, category: '型材' },
-  { id: 6, name: 'Q235B 槽钢 10#', price: 3900, unit: '元/吨', specs: '日照', stock: 250, category: '型材' },
-  { id: 7, name: 'Q195 焊管 48*3.0', price: 4150, unit: '元/吨', specs: '友发', stock: 600, category: '管材' },
-  { id: 8, name: 'HRB400E 螺纹钢 Φ20', price: 3750, unit: '元/吨', specs: '沙钢', stock: 800, category: '建材' },
-]
+interface ProductItem {
+  id: number
+  sku_id: string
+  name: string
+  category: string
+  specs: string
+  price: number
+  unit: string
+  stock: number
+  visible_stock: number
+  seller_uid: string
+  seller_name: string
+}
 
-const categories = ['全部', '热轧板卷', '冷轧板卷', '中厚板', '型材', '管材', '建材']
+interface ProductListResponse {
+  list: ProductItem[]
+  total: number
+  page: number
+  page_size: number
+}
+
+const productCategories = ['全部', '热轧板卷', '冷轧板卷', '中厚板', '型材', '管材', '建材']
 
 export default function ProductsPage() {
-  const [searchText, setSearchText] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('全部')
-  const [currentPage, setCurrentPage] = useState(1)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialKeyword = searchParams.get('keyword') ?? ''
+  const initialCategory = searchParams.get('category') ?? '全部'
+  const initialPage = Number(searchParams.get('page') ?? '1')
 
-  const filteredProducts = mockProducts.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchText.toLowerCase())
-    const matchesCategory = selectedCategory === '全部' || product.category === selectedCategory
-    return matchesSearch && matchesCategory
-  })
+  const [searchText, setSearchText] = useState(initialKeyword)
+  const [selectedCategory, setSelectedCategory] = useState(
+    productCategories.includes(initialCategory) ? initialCategory : '全部',
+  )
+  const [currentPage, setCurrentPage] = useState(initialPage > 0 ? initialPage : 1)
+  const [loading, setLoading] = useState(true)
+  const [products, setProducts] = useState<ProductItem[]>([])
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams()
+
+    if (searchText) {
+      nextParams.set('keyword', searchText)
+    }
+    if (selectedCategory !== '全部') {
+      nextParams.set('category', selectedCategory)
+    }
+    if (currentPage > 1) {
+      nextParams.set('page', String(currentPage))
+    }
+
+    setSearchParams(nextParams, { replace: true })
+  }, [currentPage, searchText, selectedCategory, setSearchParams])
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      setLoading(true)
+      try {
+        const response = await api.get<{ code: number; message: string; data: ProductListResponse }>('/products', {
+          params: {
+            page: 1,
+            page_size: 200,
+          },
+        })
+        setProducts(response.data.data.list)
+      } catch (error) {
+        message.error('商品加载失败，请确认后端已启动')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void loadProducts()
+  }, [])
+
+  const filteredProducts = useMemo(
+    () =>
+      products.filter((product) => {
+        const matchesSearch =
+          product.name.toLowerCase().includes(searchText.toLowerCase()) ||
+          product.sku_id.toLowerCase().includes(searchText.toLowerCase())
+        const matchesCategory = selectedCategory === '全部' || product.category === selectedCategory
+        return matchesSearch && matchesCategory
+      }),
+    [products, searchText, selectedCategory],
+  )
 
   const pageSize = 8
   const startIndex = (currentPage - 1) * pageSize
   const paginatedProducts = filteredProducts.slice(startIndex, startIndex + pageSize)
 
   return (
-    <div className="bg-gray-50 min-h-screen py-6">
-      <div className="max-w-7xl mx-auto px-6">
-        {/* Filters */}
+    <div className="min-h-screen bg-gray-50 py-6">
+      <div className="mx-auto max-w-7xl px-6">
         <Card className="mb-6">
           <Space size="large" wrap>
             <Search
-              placeholder="搜索商品名称..."
+              placeholder="搜索商品名称或 SKU..."
+              defaultValue={searchText}
               allowClear
               enterButton={<SearchOutlined />}
-              style={{ width: 300 }}
+              style={{ width: 320 }}
               onSearch={(value) => {
                 setSearchText(value)
                 setCurrentPage(1)
@@ -59,48 +122,56 @@ export default function ProductsPage() {
                   setCurrentPage(1)
                 }}
                 style={{ width: 150 }}
-                options={categories.map((c) => ({ label: c, value: c }))}
+                options={productCategories.map((category) => ({ label: category, value: category }))}
               />
             </Space>
           </Space>
         </Card>
 
-        {/* Product List */}
-        <Row gutter={[16, 16]}>
-          {paginatedProducts.length > 0 ? (
-            paginatedProducts.map((product) => (
-              <Col key={product.id} span={6}>
-                <Link to={`/products/${product.id}`}>
-                  <Card hoverable className="h-full">
-                    <div className="h-40 bg-gray-100 rounded mb-3 flex items-center justify-center">
-                      <span className="text-5xl">🔩</span>
-                    </div>
-                    <Title level={5} className="!mb-2 !text-sm line-clamp-2">
-                      {product.name}
-                    </Title>
-                    <Space className="mb-2">
-                      <Tag color="blue">{product.category}</Tag>
-                      <Tag>{product.specs}</Tag>
-                    </Space>
-                    <Paragraph className="!mb-1 text-gray-500 text-xs">
-                      库存：{product.stock} 吨
-                    </Paragraph>
-                    <div className="text-red-500 font-bold text-lg">
-                      ¥{product.price.toLocaleString()}
-                      <span className="text-xs text-gray-400 ml-1">{product.unit}</span>
-                    </div>
-                  </Card>
-                </Link>
-              </Col>
-            ))
-          ) : (
-            <Col span={24}>
-              <Empty description="暂无符合条件的商品" />
-            </Col>
-          )}
-        </Row>
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <Title level={4} className="!mb-0">
+            审核通过商品
+          </Title>
+          <span className="text-sm text-gray-500">共 {filteredProducts.length} 个商品</span>
+        </div>
 
-        {/* Pagination */}
+        <Spin spinning={loading}>
+          <Row gutter={[16, 16]}>
+            {paginatedProducts.length > 0 ? (
+              paginatedProducts.map((product) => (
+                <Col key={product.id} span={6}>
+                  <Link to={`/products/${product.id}`}>
+                    <Card hoverable className="h-full">
+                      <div className="mb-3 flex h-40 items-center justify-center rounded bg-gray-100">
+                        <span className="text-5xl">🧱</span>
+                      </div>
+                      <Title level={5} className="!mb-2 !text-sm line-clamp-2">
+                        {product.name}
+                      </Title>
+                      <Space className="mb-2" wrap>
+                        <Tag color="blue">{product.category}</Tag>
+                        <Tag>{product.specs}</Tag>
+                      </Space>
+                      <Paragraph className="!mb-1 text-xs text-gray-500">SKU：{product.sku_id}</Paragraph>
+                      <Paragraph className="!mb-1 text-xs text-gray-500">
+                        库存：{product.visible_stock} 吨 · 卖家：{product.seller_name}
+                      </Paragraph>
+                      <div className="text-lg font-bold text-red-500">
+                        ¥{product.price.toLocaleString()}
+                        <span className="ml-1 text-xs text-gray-400">{product.unit}</span>
+                      </div>
+                    </Card>
+                  </Link>
+                </Col>
+              ))
+            ) : (
+              <Col span={24}>
+                <Empty description="暂无符合条件的商品" />
+              </Col>
+            )}
+          </Row>
+        </Spin>
+
         {filteredProducts.length > pageSize && (
           <div className="mt-6 text-center">
             <Pagination
