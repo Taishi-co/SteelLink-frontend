@@ -1,112 +1,214 @@
-import { Carousel, Row, Col, Card, Typography, Divider } from 'antd'
 import { Link } from 'react-router-dom'
+import { Button, Typography, Row, Col, Card } from 'antd'
+import {
+  ShopOutlined,
+  SafetyCertificateOutlined,
+  ThunderboltOutlined,
+  TeamOutlined,
+  RocketOutlined,
+} from '@ant-design/icons'
 
-const { Title, Paragraph } = Typography
+const { Title, Paragraph, Text } = Typography
 
-const bannerItems = [
+const features = [
   {
-    key: '1',
-    title: 'SteelLink B2B钢材交易平台',
-    description: '现货直购 · 询价竞价 · 一站式采购',
-    bgColor: 'bg-primary-600',
+    icon: <ShopOutlined className="text-4xl text-primary-500" />,
+    title: '海量现货',
+    description: '覆盖全国主要钢厂，品种齐全，库存充足，满足各类采购需求',
   },
   {
-    key: '2',
-    title: '海量钢材资源',
-    description: '覆盖全国主要钢厂，品种齐全',
-    bgColor: 'bg-blue-700',
+    icon: <SafetyCertificateOutlined className="text-4xl text-primary-500" />,
+    title: '品质保障',
+    description: '严选优质供应商，全程质量追溯，假一赔十',
   },
   {
-    key: '3',
-    title: '透明定价',
-    description: '实时行情，价格透明',
-    bgColor: 'bg-indigo-600',
+    icon: <ThunderboltOutlined className="text-4xl text-primary-500" />,
+    title: '极速交易',
+    description: '在线下单，快速配货，全国物流直达',
+  },
+  {
+    icon: <TeamOutlined className="text-4xl text-primary-500" />,
+    title: '专业服务',
+    description: '专属客户经理，7×24小时在线，一站式采购解决方案',
   },
 ]
 
-const categories = [
-  { id: 1, name: '热轧板卷', icon: '🔥' },
-  { id: 2, name: '冷轧板卷', icon: '❄️' },
-  { id: 3, name: '中厚板', icon: '📦' },
-  { id: 4, name: '型材', icon: '📐' },
-  { id: 5, name: '管材', icon: '🔧' },
-  { id: 6, name: '建材', icon: '🏗️' },
+const stats = [
+  { value: '5000+', label: '入驻商家' },
+  { value: '10万+', label: 'SKU商品' },
+  { value: '100万+', label: '累计订单' },
+  { value: '50亿+', label: '交易金额' },
 ]
 
-const featuredProducts = [
-  { id: 1, name: 'Q235B 热轧板卷 3.0*1500*C', price: 3850, unit: '元/吨', specs: '宝钢' },
-  { id: 2, name: 'SPCC 冷轧板卷 1.0*1250*C', price: 4200, unit: '元/吨', specs: '鞍钢' },
-  { id: 3, name: 'Q345B 中厚板 20*2000*8000', price: 3950, unit: '元/吨', specs: '首钢' },
-  { id: 4, name: 'Q235B 工字钢 25#', price: 4100, unit: '元/吨', specs: '马钢' },
+const partners = [
+  '宝钢', '鞍钢', '首钢', '马钢', '莱钢', '沙钢',
+  '日照', '本钢', '太钢', '邯钢', '安钢', '济钢',
 ]
 
 export default function HomePage() {
   return (
-    <div className="bg-gray-50">
-      {/* Banner Carousel */}
-      <Carousel autoplay className="bg-white">
-        {bannerItems.map((item) => (
-          <div key={item.key}>
-            <div className={`${item.bgColor} h-80 flex items-center justify-center text-white`}>
-              <div className="text-center">
-                <Title level={2} className="!text-white !mb-2">{item.title}</Title>
-                <Paragraph className="!text-white/80 text-lg">{item.description}</Paragraph>
+    <div className="bg-white">
+      {/* Hero Section */}
+      <section className="relative h-[600px] bg-gradient-to-r from-blue-600 to-indigo-700 flex items-center">
+        <div className="max-w-7xl mx-auto px-8 w-full">
+          <Row gutter={48} align="middle">
+            <Col span={14}>
+              <Title className="!text-white !text-5xl !mb-6">
+                专业B2B钢材交易平台
+              </Title>
+              <Paragraph className="!text-white/90 text-xl mb-8">
+                现货直购 · 竞价交易 · 集采服务 · 一站式钢铁供应链解决方案
+              </Paragraph>
+              <div className="flex gap-4">
+                <Link to="/products">
+                  <Button type="primary" size="large" icon={<ShopOutlined />} className="h-12 px-8">
+                    进入商城
+                  </Button>
+                </Link>
+                <a href="/seller">
+                  <Button size="large" icon={<RocketOutlined />} className="h-12 px-8 bg-white text-primary-600 border-white hover:bg-gray-100">
+                    企业入驻
+                  </Button>
+                </a>
               </div>
-            </div>
-          </div>
-        ))}
-      </Carousel>
-
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Category Navigation */}
-        <Card className="mb-6">
-          <Title level={4} className="!mb-4">品类导航</Title>
-          <Row gutter={[16, 16]}>
-            {categories.map((cat) => (
-              <Col key={cat.id} span={4}>
-                <Link
-                  to={`/products?category=${cat.id}`}
-                  className="block text-center p-4 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div className="text-3xl mb-2">{cat.icon}</div>
-                  <div className="text-gray-700">{cat.name}</div>
-                </Link>
-              </Col>
-            ))}
+            </Col>
+            <Col span={10} className="text-center">
+              <div className="text-9xl">🏭</div>
+            </Col>
           </Row>
-        </Card>
+        </div>
+      </section>
 
-        <Divider />
-
-        {/* Featured Products */}
-        <div className="mt-6">
-          <Title level={4} className="!mb-4">热门商品</Title>
-          <Row gutter={[16, 16]}>
-            {featuredProducts.map((product) => (
-              <Col key={product.id} span={6}>
-                <Link to={`/products/${product.id}`}>
-                  <Card
-                    hoverable
-                    className="h-full"
-                  >
-                    <div className="h-32 bg-gray-100 rounded mb-3 flex items-center justify-center">
-                      <span className="text-4xl">🔩</span>
-                    </div>
-                    <Title level={5} className="!mb-2 !text-sm line-clamp-2">
-                      {product.name}
-                    </Title>
-                    <Paragraph className="!mb-1 text-gray-500 text-xs">{product.specs}</Paragraph>
-                    <div className="text-red-500 font-bold">
-                      ¥{product.price.toLocaleString()}
-                      <span className="text-xs text-gray-400 ml-1">{product.unit}</span>
-                    </div>
-                  </Card>
-                </Link>
+      {/* Stats Section */}
+      <section className="bg-gray-50 py-12">
+        <div className="max-w-7xl mx-auto px-8">
+          <Row gutter={32}>
+            {stats.map((stat, index) => (
+              <Col key={index} span={6} className="text-center">
+                <Text className="text-4xl font-bold text-primary-600">{stat.value}</Text>
+                <p className="text-gray-500 mt-2">{stat.label}</p>
               </Col>
             ))}
           </Row>
         </div>
-      </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-20">
+        <div className="max-w-7xl mx-auto px-8">
+          <div className="text-center mb-16">
+            <Title level={2}>为什么选择 SteelLink</Title>
+            <Paragraph className="text-gray-500 text-lg">
+              专业、高效、安全的钢材交易服务
+            </Paragraph>
+          </div>
+          <Row gutter={32}>
+            {features.map((feature, index) => (
+              <Col key={index} span={6}>
+                <Card className="text-center h-full hover:shadow-lg transition-shadow">
+                  <div className="mb-4">{feature.icon}</div>
+                  <Title level={4}>{feature.title}</Title>
+                  <Paragraph className="text-gray-500">{feature.description}</Paragraph>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </div>
+      </section>
+
+      {/* Services Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-8">
+          <div className="text-center mb-16">
+            <Title level={2}>平台服务</Title>
+          </div>
+          <Row gutter={32}>
+            <Col span={6}>
+              <Card hoverable className="h-full text-center">
+                <div className="text-5xl mb-4">🛒</div>
+                <Title level={4}>现货商城</Title>
+                <Paragraph className="text-gray-500">
+                  海量现货资源，一键下单，极速配送
+                </Paragraph>
+                <Link to="/products">立即选购 →</Link>
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card hoverable className="h-full text-center">
+                <div className="text-5xl mb-4">🎯</div>
+                <Title level={4}>竞价交易</Title>
+                <Paragraph className="text-gray-500">
+                  透明竞价，最优价格，大宗采购首选
+                </Paragraph>
+                <Link to="/bidding">参与竞价 →</Link>
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card hoverable className="h-full text-center">
+                <div className="text-5xl mb-4">📦</div>
+                <Title level={4}>集采大厅</Title>
+                <Paragraph className="text-gray-500">
+                  多家企业联合采购，共享优惠价格
+                </Paragraph>
+                <Link to="/procurement">了解详情 →</Link>
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card hoverable className="h-full text-center">
+                <div className="text-5xl mb-4">📢</div>
+                <Title level={4}>供求信息</Title>
+                <Paragraph className="text-gray-500">
+                  发布供求需求，精准匹配商机
+                </Paragraph>
+                <Link to="/supply">发布信息 →</Link>
+              </Card>
+            </Col>
+          </Row>
+        </div>
+      </section>
+
+      {/* Partners Section */}
+      <section className="py-20">
+        <div className="max-w-7xl mx-auto px-8">
+          <div className="text-center mb-12">
+            <Title level={2}>合作钢厂</Title>
+            <Paragraph className="text-gray-500">与国内知名钢厂建立深度合作</Paragraph>
+          </div>
+          <Row gutter={[24, 24]}>
+            {partners.map((partner, index) => (
+              <Col key={index} span={4}>
+                <Card className="text-center hover:shadow-md transition-shadow">
+                  <Text className="text-lg font-medium text-gray-700">{partner}</Text>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 bg-gradient-to-r from-blue-600 to-indigo-700">
+        <div className="max-w-7xl mx-auto px-8 text-center">
+          <Title level={2} className="!text-white !mb-4">
+            开启您的钢铁采购之旅
+          </Title>
+          <Paragraph className="!text-white/90 text-xl mb-8">
+            加入 SteelLink，享受专业、高效、安全的钢材交易服务
+          </Paragraph>
+          <div className="flex justify-center gap-4">
+            <Link to="/products">
+              <Button type="primary" size="large" icon={<ShopOutlined />} className="h-12 px-8 bg-white text-primary-600 border-white hover:bg-gray-100">
+                进入商城
+              </Button>
+            </Link>
+            <a href="/seller">
+              <Button size="large" icon={<RocketOutlined />} className="h-12 px-8 bg-transparent text-white border-white hover:bg-white/10">
+                企业入驻
+              </Button>
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
