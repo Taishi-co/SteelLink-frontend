@@ -1,0 +1,67 @@
+<h2>卖家端后台布局方案</h2>
+<p class="subtitle">SteelLink 卖家管理系统布局设计</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">方案 A：经典后台布局</div>
+    <div class="mockup-body" style="padding: 8px; height: 280px;">
+      <div style="display: flex; height: 100%;">
+        <div class="mock-sidebar" style="width: 180px;">
+          <div style="padding: 8px; font-weight: bold; border-bottom: 1px solid #ddd;">🏠 SteelLink 卖家</div>
+          <div style="padding: 6px 12px;">📊 数据概览</div>
+          <div style="padding: 6px 12px;">📦 商品管理</div>
+          <div style="padding: 6px 12px;">📋 订单管理</div>
+          <div style="padding: 6px 12px;">🏪 店铺设置</div>
+          <div style="padding: 6px 12px;">💰 财务中心</div>
+          <div style="padding: 6px 12px;">⚙️ 系统设置</div>
+        </div>
+        <div style="flex: 1; padding: 8px;">
+          <div class="mock-nav" style="margin-bottom: 8px;">欢迎，张三 | 通知 | 退出</div>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <div class="placeholder" style="flex: 1; height: 60px;">📈 今日订单：128</div>
+            <div class="placeholder" style="flex: 1; height: 60px;">💰 今日销售额：¥52,000</div>
+            <div class="placeholder" style="flex: 1; height: 60px;">📦 待发货：23</div>
+          </div>
+          <div class="placeholder" style="height: 120px;">数据图表 / 订单列表</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">方案 B：顶部导航布局</div>
+    <div class="mockup-body" style="padding: 8px; height: 280px;">
+      <div class="mock-nav" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span>🏠 SteelLink 卖家中心</span>
+        <span>📊 数据 | 📦 商品 | 📋 订单 | 🏪 店铺 | ⚙️ 设置 | 👤 张三</span>
+      </div>
+      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+        <div class="placeholder" style="flex: 1; height: 80px;">📈 今日订单<br/>128 单</div>
+        <div class="placeholder" style="flex: 1; height: 80px;">💰 销售额<br/>¥52,000</div>
+        <div class="placeholder" style="flex: 1; height: 80px;">📦 待发货<br/>23 单</div>
+        <div class="placeholder" style="flex: 1; height: 80px;">⏰ 待处理询价<br/>5 条</div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <div class="placeholder" style="flex: 2; height: 140px;">📊 销售趋势图</div>
+        <div class="placeholder" style="flex: 1; height: 140px;">🔥 热销商品 TOP5</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>经典后台布局（推荐）</h3>
+      <p>左侧固定菜单，右侧内容区，Ant Design Pro 风格，适合功能复杂的后台</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>顶部导航布局</h3>
+      <p>顶部横向菜单，内容区更宽敞，适合功能较少的轻量后台</p>
+    </div>
+  </div>
+</div>

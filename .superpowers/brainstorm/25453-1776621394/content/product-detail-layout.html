@@ -1,0 +1,66 @@
+<h2>商品详情页布局方案</h2>
+<p class="subtitle">SteelLink 钢材商品详情页设计</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">方案 A：左右分栏布局</div>
+    <div class="mockup-body" style="padding: 12px;">
+      <div style="display: flex; gap: 16px;">
+        <div style="width: 400px;">
+          <div class="placeholder" style="height: 300px; margin-bottom: 8px;">📷 商品图片</div>
+          <div style="display: flex; gap: 4px;">
+            <div class="placeholder" style="width: 60px; height: 60px;">缩略图</div>
+            <div class="placeholder" style="width: 60px; height: 60px;">缩略图</div>
+            <div class="placeholder" style="width: 60px; height: 60px;">缩略图</div>
+          </div>
+        </div>
+        <div style="flex: 1;">
+          <div class="placeholder" style="height: 24px; width: 60%; margin-bottom: 8px;">📝 商品名称：HRB400E 螺纹钢 Φ20</div>
+          <div class="placeholder" style="height: 16px; width: 40%; margin-bottom: 8px;">💰 价格：¥4,280/吨</div>
+          <div class="placeholder" style="height: 16px; width: 50%; margin-bottom: 8px;">规格参数区</div>
+          <div class="placeholder" style="height: 16px; width: 45%; margin-bottom: 8px;">库存：500吨 | 产地：沙钢</div>
+          <div style="display: flex; gap: 8px; margin-top: 16px;">
+            <div class="mock-button" style="padding: 8px 16px; background: #1890ff; color: white;">加入采购车</div>
+            <div class="mock-button" style="padding: 8px 16px; background: #ff4d4f; color: white;">立即询价</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">方案 B：上下布局 + 浮动操作栏</div>
+    <div class="mockup-body" style="padding: 12px;">
+      <div class="placeholder" style="height: 300px; margin-bottom: 8px;">📷 商品图片轮播（全宽）</div>
+      <div style="display: flex; gap: 16px;">
+        <div style="flex: 1;">
+          <div class="placeholder" style="height: 20px; width: 70%; margin-bottom: 6px;">📝 商品名称</div>
+          <div class="placeholder" style="height: 16px; width: 50%; margin-bottom: 6px;">💰 价格 | 📦 库存</div>
+          <div class="placeholder" style="height: 16px; width: 60%; margin-bottom: 6px;">📋 规格参数表格</div>
+          <div class="placeholder" style="height: 100px; margin-top: 8px;">📄 商品详情/描述</div>
+        </div>
+        <div style="width: 280px;">
+          <div class="placeholder" style="height: 200px;">🏢 供应商信息卡片<br/>店铺名称<br/>联系方式<br/>店铺评分</div>
+        </div>
+      </div>
+      <div class="placeholder" style="position: sticky; bottom: 0; height: 40px; margin-top: 8px; background: #f0f0f0;">底部浮动：加入采购车 | 立即询价 | 收藏</div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>左右分栏布局</h3>
+      <p>经典电商风格，信息密度适中，适合 PC 端浏览</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>上下布局 + 浮动操作栏（推荐）</h3>
+      <p>移动端友好，底部操作栏方便采购，供应商信息突出</p>
+    </div>
+  </div>
+</div>

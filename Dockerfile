@@ -13,7 +13,7 @@ COPY apps/seller-app/package.json ./apps/seller-app/
 COPY packages/shared/package.json ./packages/shared/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install -no-frozen-lockfile
 
 # Copy source code
 COPY tsconfig.base.json ./
