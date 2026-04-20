@@ -1,0 +1,31 @@
+{
+  "name": "steellink-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SteelLink B2B 钢材交易平台前端",
+  "scripts": {
+    "dev": "pnpm --filter @steellink/buyer-app dev",
+    "dev:seller": "pnpm --filter @steellink/seller-app dev",
+    "build": "pnpm -r build",
+    "build:buyer": "pnpm --filter @steellink/buyer-app build",
+    "build:seller": "pnpm --filter @steellink/seller-app build",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "clean": "pnpm -r clean",
+    "typecheck": "pnpm -r typecheck",
+    "docker:build": "docker build -t steellink-frontend .",
+    "docker:run": "docker run -p 80:80 steellink-frontend",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "prettier": "^3.2.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - steellink-network
+
+  # 后端服务 (示例，需要替换为实际后端)
+  # backend:
+  #   image: steellink-backend:latest
+  #   ports:
+  #     - "8080:8080"
+  #   networks:
+  #     - steellink-network
+
+networks:
+  steellink-network:
+    driver: bridge

@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+
+# Git
+.git/
+
+# Documentation
+docs/
+
+# Test
+coverage/
+
+# Misc
+.DS_Store
+*.log
+.env*
+!.env.example
