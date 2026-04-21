@@ -29,8 +29,11 @@ RUN pnpm --filter @steellink/seller-app build
 # Production stage
 FROM nginx:alpine
 
-# Copy nginx configuration
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+# Default API upstream for containerized deployments; override at runtime when needed.
+ENV API_UPSTREAM=http://backend:8080
+
+# Copy nginx configuration template
+COPY docker/nginx.conf /etc/nginx/templates/default.conf.template
 
 # Copy built assets
 COPY --from=builder /app/apps/buyer-app/dist /usr/share/nginx/html/buyer
