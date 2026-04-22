@@ -1,16 +1,17 @@
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, Typography, Space, Button } from 'antd'
+import { Avatar, Button, Dropdown, Layout, Menu, Space, Typography } from 'antd'
 import {
   DashboardOutlined,
-  ShopOutlined,
-  ShoppingCartOutlined,
-  SettingOutlined,
-  UserOutlined,
-  LogoutOutlined,
   HomeOutlined,
+  LogoutOutlined,
+  SettingOutlined,
+  ShoppingCartOutlined,
+  ShopOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { clearSellerSession, getSellerUser } from '@/services/auth'
 
-const { Sider, Header, Content } = Layout
+const { Content, Header, Sider } = Layout
 const { Text } = Typography
 
 const menuItems = [
@@ -23,16 +24,24 @@ const menuItems = [
 export default function SellerLayout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const user = getSellerUser()
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
   }
 
   const userMenuItems = [
-    { key: 'profile', label: '个人中心', icon: <UserOutlined /> },
+    { key: 'profile', label: '当前账号', icon: <UserOutlined /> },
     { type: 'divider' as const },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, danger: true },
   ]
+
+  const handleUserMenuClick = ({ key }: { key: string }) => {
+    if (key === 'logout') {
+      clearSellerSession()
+      navigate('/login', { replace: true })
+    }
+  }
 
   return (
     <Layout className="min-h-screen">
@@ -53,14 +62,12 @@ export default function SellerLayout() {
           <Text className="text-lg font-medium">卖家后台</Text>
           <Space size="middle">
             <a href="/">
-              <Button icon={<HomeOutlined />}>
-                买家首页
-              </Button>
+              <Button icon={<HomeOutlined />}>买家首页</Button>
             </a>
-            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+            <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
               <Space className="cursor-pointer">
                 <Avatar icon={<UserOutlined />} />
-                <Text>管理员</Text>
+                <Text>{user?.phone || '卖家账号'}</Text>
               </Space>
             </Dropdown>
           </Space>
