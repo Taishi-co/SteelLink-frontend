@@ -39,10 +39,11 @@ export default function ProductDetailPage() {
       if (!productId) {
         return
       }
+
       setLoading(true)
       try {
-        const response = await api.get<{ code: number; message: string; data: ProductDetail }>(`/products/${productId}`)
-        setProduct(response.data.data)
+        const response = await api.get<ProductDetail, ProductDetail>(`/products/${productId}`)
+        setProduct(response)
       } catch (error) {
         message.error('商品详情加载失败')
       } finally {
@@ -60,11 +61,11 @@ export default function ProductDetailPage() {
 
     setSubmitting(true)
     try {
-      const response = await api.post<{ code: number; message: string; data: OrderInfo }>('/orders', {
+      const response = await api.post<OrderInfo, OrderInfo>('/orders', {
         product_id: product.id,
         quantity,
       })
-      message.success(`下单成功，订单号：${response.data.data.order_id}`)
+      message.success(`下单成功，订单号：${response.order_id}`)
     } catch (error: any) {
       const serverMessage = error?.response?.data?.message
       message.error(serverMessage || '下单失败，请先登录并确认库存')
@@ -91,7 +92,7 @@ export default function ProductDetailPage() {
                 <Row gutter={24}>
                   <Col span={10}>
                     <div className="flex h-96 items-center justify-center rounded-lg bg-gray-100">
-                      <span className="text-8xl">🧱</span>
+                      <span className="text-8xl">钢</span>
                     </div>
                   </Col>
 
@@ -110,7 +111,7 @@ export default function ProductDetailPage() {
                     <div className="mb-4 rounded bg-gray-50 p-4">
                       <Text type="secondary">价格</Text>
                       <div className="text-3xl font-bold text-red-500">
-                        ¥{product.price.toLocaleString()}
+                        ￥{product.price.toLocaleString()}
                         <span className="ml-2 text-base text-gray-400">{product.unit}</span>
                       </div>
                     </div>
@@ -128,7 +129,7 @@ export default function ProductDetailPage() {
                           addonAfter="吨"
                         />
                         <Text type="secondary">
-                          小计：<span className="font-bold text-red-500">¥{(quantity * product.price).toLocaleString()}</span>
+                          小计：<span className="font-bold text-red-500">￥{(quantity * product.price).toLocaleString()}</span>
                         </Text>
                       </Space>
                     </div>
@@ -191,9 +192,9 @@ export default function ProductDetailPage() {
                       label: '交易说明',
                       children: (
                         <div className="text-gray-600">
-                          <Paragraph>1. 仅审核通过商品会进入买家视图。</Paragraph>
+                          <Paragraph>1. 仅审核通过商品会进入买家可见范围。</Paragraph>
                           <Paragraph>2. 提交订单后会生成唯一订单号，并同步扣减可售库存。</Paragraph>
-                          <Paragraph>3. 本地开发环境默认走后端 MySQL 持久化，便于你在数据库工具中直接查看。</Paragraph>
+                          <Paragraph>3. 当前页面已接入真实后端接口，可直接用于本地联调。</Paragraph>
                         </div>
                       ),
                     },

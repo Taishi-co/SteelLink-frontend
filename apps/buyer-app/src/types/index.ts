@@ -70,7 +70,16 @@ export interface Order {
   createdAt: string
 }
 
-export type OrderStatus = 'pending' | 'paid' | 'shipped' | 'completed' | 'cancelled'
+export type OrderStatus =
+  | 'pending'
+  | 'pending_contract'
+  | 'pending_payment'
+  | 'pending_payment_audit'
+  | 'pending_pickup'
+  | 'paid'
+  | 'shipped'
+  | 'completed'
+  | 'cancelled'
 
 export interface OrderItem {
   productId: number

@@ -64,15 +64,15 @@ export default function ProductsPage() {
     const loadProducts = async () => {
       setLoading(true)
       try {
-        const response = await api.get<{ code: number; message: string; data: ProductListResponse }>('/products', {
+        const response = await api.get<ProductListResponse, ProductListResponse>('/products', {
           params: {
             page: 1,
             page_size: 200,
           },
         })
-        setProducts(response.data.data.list)
+        setProducts(response.list)
       } catch (error) {
-        message.error('商品加载失败，请确认后端已启动')
+        message.error('商品加载失败，请确认后端服务已启动')
       } finally {
         setLoading(false)
       }
@@ -103,7 +103,7 @@ export default function ProductsPage() {
         <Card className="mb-6">
           <Space size="large" wrap>
             <Search
-              placeholder="搜索商品名称或 SKU..."
+              placeholder="搜索商品名称或 SKU"
               defaultValue={searchText}
               allowClear
               enterButton={<SearchOutlined />}
@@ -143,7 +143,7 @@ export default function ProductsPage() {
                   <Link to={`/products/${product.id}`}>
                     <Card hoverable className="h-full">
                       <div className="mb-3 flex h-40 items-center justify-center rounded bg-gray-100">
-                        <span className="text-5xl">🧱</span>
+                        <span className="text-5xl">钢</span>
                       </div>
                       <Title level={5} className="!mb-2 !text-sm line-clamp-2">
                         {product.name}
@@ -157,7 +157,7 @@ export default function ProductsPage() {
                         库存：{product.visible_stock} 吨 · 卖家：{product.seller_name}
                       </Paragraph>
                       <div className="text-lg font-bold text-red-500">
-                        ¥{product.price.toLocaleString()}
+                        ￥{product.price.toLocaleString()}
                         <span className="ml-1 text-xs text-gray-400">{product.unit}</span>
                       </div>
                     </Card>
