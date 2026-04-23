@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, Form, Input, Button, Typography, Tabs, message } from 'antd'
 import { UserOutlined, LockOutlined, MobileOutlined } from '@ant-design/icons'
 import { buyerAuthService, normalizeBuyerUser, saveBuyerSession } from '@/services/auth'
 import { useUserStore } from '@/stores'
 
-const { Text } = Typography
+const { Paragraph, Text } = Typography
 
 interface LoginValues {
   account: string
@@ -19,12 +19,12 @@ interface RegisterValues {
 }
 
 export default function LoginPage() {
-  const [activeTab, setActiveTab] = useState('login')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const login = useUserStore((state) => state.login)
-  const redirectTo = (location.state as { from?: string } | null)?.from || '/'
+  const redirectTo = searchParams.get('redirect') || (location.state as { from?: string } | null)?.from || '/'
 
   const handleLogin = async (values: LoginValues) => {
     setLoading(true)
@@ -33,7 +33,6 @@ export default function LoginPage() {
       if (response.code !== 0 || !response.data) {
         throw new Error(response.message || '登录失败')
       }
-
       const { access_token, user } = response.data
       saveBuyerSession(access_token, user)
       login(normalizeBuyerUser(user), access_token)
@@ -54,7 +53,6 @@ export default function LoginPage() {
       if (response.code !== 0 || !response.data) {
         throw new Error(response.message || '注册失败')
       }
-
       const { access_token, user } = response.data
       saveBuyerSession(access_token, user)
       login(normalizeBuyerUser(user), access_token)
@@ -69,66 +67,70 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-      <div className="w-[420px]">
-        <div className="text-center mb-8">
-          <Link to="/" className="text-3xl font-bold text-primary-600 no-underline">
-            SteelLink
-          </Link>
-          <Text type="secondary" className="block mt-2">B2B钢材交易平台</Text>
-        </div>
+    <div className="min-h-screen bg-[linear-gradient(135deg,#f0f5ff_0%,#d6e4ff_48%,#adc6ff_100%)] flex items-center justify-center px-4">
+      <div className="w-full max-w-[1080px] grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8 items-center">
+        <section className="text-slate-900">
+          <div className="inline-flex items-center rounded-full border border-white/70 bg-white/70 px-4 py-1 text-sm font-medium text-blue-700 shadow-sm">
+            SteelLink 采购平台
+          </div>
+          <h1 className="mt-6 text-4xl font-black leading-tight text-slate-900">
+            在线询价、一键下单、全程可追踪
+          </h1>
+          <Paragraph className="mt-5 max-w-[620px] text-base leading-7 text-slate-600">
+            SteelLink 为钢材采购方提供一站式在线交易服务。浏览商品、比价下单、合同签署到提货确认，全流程线上完成。
+          </Paragraph>
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-2xl bg-white/85 p-4 shadow-sm ring-1 ring-white/60">
+              <div className="text-sm text-slate-500">海量商品</div>
+              <div className="mt-2 text-lg font-semibold">多品类钢材现货</div>
+            </div>
+            <div className="rounded-2xl bg-white/85 p-4 shadow-sm ring-1 ring-white/60">
+              <div className="text-sm text-slate-500">透明报价</div>
+              <div className="mt-2 text-lg font-semibold">实时价格可比对</div>
+            </div>
+            <div className="rounded-2xl bg-white/85 p-4 shadow-sm ring-1 ring-white/60">
+              <div className="text-sm text-slate-500">订单追踪</div>
+              <div className="mt-2 text-lg font-semibold">全流程状态可见</div>
+            </div>
+          </div>
+        </section>
 
-        <Card className="shadow-lg">
+        <Card className="rounded-3xl border-0 shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
+          <div className="mb-6">
+            <div className="text-2xl font-bold text-slate-900">买家登录</div>
+            <Text type="secondary">登录后即可浏览商品、下单采购</Text>
+          </div>
+
           <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            centered
+            defaultActiveKey="login"
             items={[
               {
                 key: 'login',
-                label: '密码登录',
+                label: '账号登录',
                 children: (
-                  <Form
-                    layout="vertical"
-                    onFinish={handleLogin}
-                  >
+                  <Form layout="vertical" onFinish={handleLogin} autoComplete="off">
                     <Form.Item
                       name="account"
-                      initialValue="15127431219"
-                      rules={[{ required: true, message: '请输入用户名/手机号' }]}
+                      label="手机号或邮箱"
+                      rules={[{ required: true, message: '请输入手机号或邮箱' }]}
                     >
-                      <Input
-                        prefix={<UserOutlined />}
-                        placeholder="用户名/手机号"
-                        size="large"
-                      />
+                      <Input prefix={<UserOutlined />} placeholder="请输入手机号或邮箱" size="large" />
                     </Form.Item>
                     <Form.Item
                       name="password"
+                      label="密码"
                       rules={[{ required: true, message: '请输入密码' }]}
                     >
-                      <Input.Password
-                        prefix={<LockOutlined />}
-                        placeholder="密码"
-                        size="large"
-                      />
+                      <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" size="large" />
                     </Form.Item>
-                    <Form.Item>
-                      <div className="flex justify-between">
-                        <Link to="#" className="text-primary-600 text-sm">忘记密码？</Link>
-                      </div>
-                    </Form.Item>
-                    <Form.Item>
-                      <Button
-                        type="primary"
-                        htmlType="submit"
-                        size="large"
-                        block
-                        loading={loading}
-                      >
+                    <Form.Item className="mb-3">
+                      <Button type="primary" htmlType="submit" block size="large" loading={loading}>
                         登录
                       </Button>
                     </Form.Item>
+                    <div className="text-right">
+                      <Link to="#" className="text-blue-600 text-sm no-underline">忘记密码？</Link>
+                    </div>
                   </Form>
                 ),
               },
@@ -136,54 +138,36 @@ export default function LoginPage() {
                 key: 'register',
                 label: '注册账号',
                 children: (
-                  <Form
-                    layout="vertical"
-                    onFinish={handleRegister}
-                  >
+                  <Form layout="vertical" onFinish={handleRegister} autoComplete="off">
                     <Form.Item
                       name="phone"
+                      label="手机号"
                       rules={[
                         { required: true, message: '请输入手机号' },
-                        { pattern: /^1\d{10}$/, message: '手机号格式不正确' },
+                        { pattern: /^1\d{10}$/, message: '请输入有效的 11 位手机号' },
                       ]}
                     >
-                      <Input
-                        prefix={<MobileOutlined />}
-                        placeholder="手机号"
-                        size="large"
-                      />
+                      <Input prefix={<MobileOutlined />} placeholder="请输入手机号" size="large" />
                     </Form.Item>
                     <Form.Item
                       name="email"
-                      rules={[{ type: 'email', message: '邮箱格式不正确' }]}
+                      label="邮箱"
+                      rules={[{ type: 'email', message: '请输入有效邮箱地址' }]}
                     >
-                      <Input
-                        prefix={<UserOutlined />}
-                        placeholder="邮箱（选填）"
-                        size="large"
-                      />
+                      <Input prefix={<UserOutlined />} placeholder="选填" size="large" />
                     </Form.Item>
                     <Form.Item
                       name="password"
+                      label="密码"
                       rules={[
                         { required: true, message: '请设置密码' },
-                        { min: 6, message: '密码至少6位' },
+                        { min: 6, message: '密码至少 6 位' },
                       ]}
                     >
-                      <Input.Password
-                        prefix={<LockOutlined />}
-                        placeholder="设置密码"
-                        size="large"
-                      />
+                      <Input.Password prefix={<LockOutlined />} placeholder="请设置密码" size="large" />
                     </Form.Item>
-                    <Form.Item>
-                      <Button
-                        type="primary"
-                        htmlType="submit"
-                        size="large"
-                        block
-                        loading={loading}
-                      >
+                    <Form.Item className="mb-3">
+                      <Button type="primary" htmlType="submit" block size="large" loading={loading}>
                         注册
                       </Button>
                     </Form.Item>
@@ -192,14 +176,20 @@ export default function LoginPage() {
               },
             ]}
           />
-        </Card>
 
-        <div className="text-center mt-4 text-gray-500 text-sm">
-          登录即表示同意
-          <Link to="#" className="text-primary-600 mx-1">《用户协议》</Link>
-          和
-          <Link to="#" className="text-primary-600 mx-1">《隐私政策》</Link>
-        </div>
+          <div className="mt-4 text-center text-sm text-slate-500">
+            登录即表示同意
+            <Link to="#" className="text-blue-600 mx-1 no-underline">《用户协议》</Link>
+            和
+            <Link to="#" className="text-blue-600 mx-1 no-underline">《隐私政策》</Link>
+          </div>
+
+          <div className="mt-3 text-center">
+            <Button type="link" onClick={() => navigate('/')} className="text-slate-400 text-sm">
+              暂不登录，先逛逛 →
+            </Button>
+          </div>
+        </Card>
       </div>
     </div>
   )

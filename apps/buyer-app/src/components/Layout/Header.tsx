@@ -1,16 +1,19 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Layout, Menu, Space, Badge, Input, Button, Dropdown } from 'antd'
-import { ShoppingCartOutlined, UserOutlined, SearchOutlined, HomeOutlined } from '@ant-design/icons'
-import { clearBuyerSession, getBuyerUser } from '@/services/auth'
-import { useUserStore } from '@/stores/userStore'
+import { Layout, Menu, Space, Badge, Input, Button, Dropdown, Avatar } from 'antd'
+import { ShoppingCartOutlined, UserOutlined, SearchOutlined, HomeOutlined, LogoutOutlined } from '@ant-design/icons'
+import { clearBuyerSession } from '@/services/auth'
+import { useUserStore } from '@/stores'
 
 const { Header: AntHeader } = Layout
 
 export default function Header() {
   const location = useLocation()
   const navigate = useNavigate()
-  const user = useUserStore((state) => state.user) || getBuyerUser()
-  const logout = useUserStore((state) => state.logout)
+  const { user, isLoggedIn, logout } = useUserStore()
+
+  const menuItems = [
+    { key: '/products', label: <Link to="/products">商品列表</Link> },
+  ]
 
   const handleLogout = () => {
     clearBuyerSession()
@@ -18,8 +21,10 @@ export default function Header() {
     navigate('/login')
   }
 
-  const menuItems = [
-    { key: '/products', label: <Link to="/products">商品列表</Link> },
+  const userMenuItems = [
+    { key: 'orders', label: '我的订单', onClick: () => navigate('/orders') },
+    { key: 'divider', type: 'divider' as const },
+    { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, onClick: handleLogout },
   ]
 
   return (
@@ -45,9 +50,7 @@ export default function Header() {
           />
 
           <Link to="/">
-            <Button type="text" icon={<HomeOutlined />}>
-              首页
-            </Button>
+            <Button type="text" icon={<HomeOutlined />}>首页</Button>
           </Link>
 
           <Link to="/cart">
@@ -56,30 +59,20 @@ export default function Header() {
             </Badge>
           </Link>
 
-          {user ? (
-            <Dropdown
-              menu={{
-                items: [
-                  { key: 'orders', label: <Link to="/orders">我的订单</Link> },
-                  { key: 'logout', label: '退出登录', onClick: handleLogout },
-                ],
-              }}
-            >
-              <Button type="default" icon={<UserOutlined />}>
-                {user.mobile || user.username}
-              </Button>
+          {isLoggedIn ? (
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <div className="flex items-center gap-2 cursor-pointer px-3 py-1 rounded-lg hover:bg-gray-50">
+                <Avatar size="small" icon={<UserOutlined />} />
+                <span className="text-sm text-gray-700">{user?.username || user?.mobile || '用户'}</span>
+              </div>
             </Dropdown>
           ) : (
             <Space>
               <Link to="/login">
-                <Button type="default" icon={<UserOutlined />}>
-                  登录
-                </Button>
+                <Button type="default" icon={<UserOutlined />}>登录</Button>
               </Link>
               <Link to="/login">
-                <Button type="primary">
-                  注册
-                </Button>
+                <Button type="primary">注册</Button>
               </Link>
             </Space>
           )}
