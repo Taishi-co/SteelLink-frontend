@@ -57,6 +57,13 @@ export default function ProductDetailPage() {
       return
     }
 
+    const token = localStorage.getItem('token')
+    if (!token) {
+      message.warning('请先登录后再下单')
+      navigate('/login')
+      return
+    }
+
     setSubmitting(true)
     try {
       const response = await orderService.create({
