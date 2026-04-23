@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Spin, Steps, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined, CarOutlined, CheckCircleOutlined, UploadOutlined } from '@ant-design/icons'
 import { orderService } from '@/services/orderService'
+import { productService } from '@/services/productService'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -13,6 +14,7 @@ const statusMap: Record<number, { label: string; color: string }> = {
   4: { label: '已支付', color: 'blue' },
   5: { label: '待提货', color: 'cyan' },
   6: { label: '配送中', color: 'processing' },
+  7: { label: '已送达', color: 'green' },
   8: { label: '已完成', color: 'green' },
   9: { label: '已取消', color: 'red' },
 }
@@ -27,10 +29,47 @@ const orderSteps = [
 
 function getCurrentStep(status: number) {
   if (status <= 3) return 1
-  if (status === 5) return 2
-  if (status === 6) return 3
+  if (status === 4 || status === 5) return 2
+  if (status === 6 || status === 7) return 3
   if (status >= 8) return 4
   return 0
+}
+
+function getStatusNotice(status: number, hasPaymentVoucher: boolean, hasDeliveryInfo: boolean) {
+  if (status === 3) {
+    return {
+      type: hasPaymentVoucher ? 'info' as const : 'warning' as const,
+      message: hasPaymentVoucher ? '支付凭证已上传，等待卖家确认收款。' : '当前待支付，请先上传支付凭证。',
+    }
+  }
+  if (status === 4) {
+    return {
+      type: 'info' as const,
+      message: '卖家已确认收款，订单即将进入提货准备阶段。',
+    }
+  }
+  if (status === 5) {
+    return {
+      type: hasDeliveryInfo ? 'info' as const : 'warning' as const,
+      message: hasDeliveryInfo ? '提货信息已录入，等待卖家确认出库。' : '当前待提货，请先录入提货信息。',
+    }
+  }
+  if (status === 6 || status === 7) {
+    return {
+      type: 'info' as const,
+      message: '订单已进入配送阶段，确认签收后订单会完成归档。',
+    }
+  }
+  if (status === 8) {
+    return {
+      type: 'success' as const,
+      message: '订单已完成，支付、提货和签收信息已归档。',
+    }
+  }
+  return {
+    type: 'info' as const,
+    message: '订单状态已更新。',
+  }
 }
 
 function isValidHttpUrl(value?: string) {
@@ -79,7 +118,20 @@ export default function OrderDetailPage() {
 
   const order = data
   const item = order?.items?.[0]
+  const { data: productDetail } = useQuery({
+    queryKey: ['order-product-detail', item?.product_id],
+    queryFn: async () => (await productService.getProduct(Number(item?.product_id))).data,
+    enabled: Boolean(item?.product_id),
+  })
   const status = statusMap[order?.status || 0] || { label: `状态${order?.status ?? '-'}`, color: 'default' }
+  const statusNotice = getStatusNotice(order?.status || 0, Boolean(order?.payment_info?.voucher_url), Boolean(order?.delivery_info))
+  const pickupWarehouseName = productDetail?.warehouseInfo?.warehouse_name || order?.delivery_info?.warehouse_name || ''
+  const pickupWarehouseId = productDetail?.warehouseInfo?.warehouse_id || 0
+  const pickupWarehouseAddress = productDetail?.warehouseInfo?.address || ''
+  const pickupWarehouseCode = productDetail?.warehouseInfo?.warehouse_code || ''
+  const pickupWarehouseRegion = [productDetail?.warehouseInfo?.province, productDetail?.warehouseInfo?.city, productDetail?.warehouseInfo?.district]
+    .filter(Boolean)
+    .join(' ')
 
   const handleUploadVoucher = async () => {
     try {
@@ -103,10 +155,15 @@ export default function OrderDetailPage() {
     try {
       const values = await deliveryForm.validateFields()
       setSavingDelivery(true)
-      await orderService.setDeliveryInfo(Number(id), values)
+      await orderService.setDeliveryInfo(Number(id), {
+        ...values,
+        warehouse_id: pickupWarehouseId,
+        warehouse_name: pickupWarehouseName,
+      })
       message.success('提货信息已保存，提货码已生成')
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+      deliveryForm.resetFields()
       setDeliveryOpen(false)
     } catch (error: any) {
       if (error?.errorFields) return
@@ -122,7 +179,6 @@ export default function OrderDetailPage() {
       driver_phone: order?.delivery_info?.driver_phone,
       driver_id_card: order?.delivery_info?.driver_id_card,
       plate_number: order?.delivery_info?.plate_number,
-      warehouse_name: order?.delivery_info?.warehouse_name || '',
       address: order?.delivery_info?.address,
       estimated_time: order?.delivery_info?.estimated_time,
     })
@@ -181,11 +237,11 @@ export default function OrderDetailPage() {
             </Card>
 
             <Alert
-              type="info"
+              type={statusNotice.type}
               showIcon
               className="mt-6"
-              message="当前为第一版订单流程"
-              description="订单已创建并锁定库存。后续会继续补合同签署、支付凭证、提货和签收流程。"
+              message="订单状态提示"
+              description={statusNotice.message}
             />
 
             <Card title="订单商品" className="mt-6">
@@ -246,11 +302,14 @@ export default function OrderDetailPage() {
                     <Descriptions.Item label="司机身份证">{order.delivery_info.driver_id_card || '-'}</Descriptions.Item>
                     <Descriptions.Item label="车牌号">{order.delivery_info.plate_number}</Descriptions.Item>
                     <Descriptions.Item label="提货仓库">{order.delivery_info.warehouse_name}</Descriptions.Item>
+                    <Descriptions.Item label="仓库编码">{pickupWarehouseCode || '-'}</Descriptions.Item>
                     <Descriptions.Item label="提货码">
-                      <Text strong>{order.delivery_info.pickup_code}</Text>
+                      <Text strong copyable>{order.delivery_info.pickup_code}</Text>
                     </Descriptions.Item>
+                    <Descriptions.Item label="仓库地区">{pickupWarehouseRegion || '-'}</Descriptions.Item>
                     <Descriptions.Item label="预计提货时间">{order.delivery_info.estimated_time || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="收货地址">{order.delivery_info.address}</Descriptions.Item>
+                    <Descriptions.Item label="仓库地址">{pickupWarehouseAddress || '-'}</Descriptions.Item>
+                    <Descriptions.Item label="送达地址" span={2}>{order.delivery_info.address}</Descriptions.Item>
                   </Descriptions>
                 ) : (
                   <Empty description="待录入提货信息" />
@@ -334,25 +393,35 @@ export default function OrderDetailPage() {
               confirmLoading={savingDelivery}
             >
               <Form form={deliveryForm} layout="vertical">
+                <Alert
+                  showIcon
+                  type="info"
+                  className="mb-4"
+                  message="提货仓库由卖家商品仓库自动带出"
+                  description={pickupWarehouseName ? `${pickupWarehouseName}${pickupWarehouseCode ? `（${pickupWarehouseCode}）` : ''}${pickupWarehouseRegion ? `，${pickupWarehouseRegion}` : ''}` : '当前未获取到仓库信息，请联系卖家确认后再继续。'}
+                />
                 <Form.Item name="driver_name" label="司机姓名" rules={[{ required: true }]}>
-                  <Input />
+                  <Input placeholder="例如：张师傅" />
                 </Form.Item>
                 <Form.Item name="driver_phone" label="司机电话" rules={[{ required: true }]}>
-                  <Input />
+                  <Input placeholder="例如：13800000000" />
                 </Form.Item>
                 <Form.Item name="driver_id_card" label="司机身份证">
-                  <Input />
+                  <Input placeholder="例如：110101199001011234" />
                 </Form.Item>
                 <Form.Item name="plate_number" label="车牌号" rules={[{ required: true }]}>
-                  <Input />
+                  <Input placeholder="例如：冀A12345" />
                 </Form.Item>
-                <Form.Item name="warehouse_name" label="提货仓库" rules={[{ required: true }]}>
-                  <Input placeholder="例如：唐山仓库A区" />
+                <Form.Item label="提货仓库">
+                  <Input value={pickupWarehouseName || '未提供提货仓库'} disabled />
+                </Form.Item>
+                <Form.Item label="仓库编码">
+                  <Input value={pickupWarehouseCode || '未提供仓库编码'} disabled />
                 </Form.Item>
                 <Form.Item name="estimated_time" label="预计提货时间">
                   <Input placeholder="例如：2026-04-23 10:00" />
                 </Form.Item>
-                <Form.Item name="address" label="收货地址" rules={[{ required: true }]}>
+                <Form.Item name="address" label="送达地址" rules={[{ required: true }]}>
                   <Input.TextArea rows={3} />
                 </Form.Item>
               </Form>

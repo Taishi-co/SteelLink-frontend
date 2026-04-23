@@ -1,103 +1,217 @@
-import { useState } from 'react'
-import { Card, Table, Tag, Space, Button, Input, Select, Modal, Descriptions, message } from 'antd'
-import { SearchOutlined, EyeOutlined } from '@ant-design/icons'
+import { useEffect, useMemo, useState } from 'react'
+import { Alert, Button, Card, Descriptions, Input, Modal, Select, Space, Spin, Table, Tag, message } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
+import { EyeOutlined } from '@ant-design/icons'
+import { sellerOrderService, type SellerOrderInfo } from '@/services/orderService'
 
 const { Search } = Input
 
-interface Order {
-  id: number
-  orderNo: string
-  customer: string
-  products: string
-  amount: number
-  weight: number
-  status: 'pending' | 'paid' | 'shipped' | 'completed' | 'cancelled'
-  createdAt: string
-  address?: string
-}
-
-const mockOrders: Order[] = [
-  { id: 1, orderNo: 'SO202404200001', customer: '上海建筑公司', products: 'Q235B 热轧板卷', amount: 38500, weight: 10, status: 'pending', createdAt: '2024-04-20 10:30', address: '上海市浦东新区张江路100号' },
-  { id: 2, orderNo: 'SO202404200002', customer: '江苏制造厂', products: 'SPCC 冷轧板卷', amount: 42000, weight: 10, status: 'paid', createdAt: '2024-04-20 11:15', address: '江苏省南京市江宁区科技园' },
-  { id: 3, orderNo: 'SO202404200003', customer: '浙江钢构公司', products: 'Q345B 中厚板', amount: 79000, weight: 20, status: 'shipped', createdAt: '2024-04-20 14:20', address: '浙江省杭州市余杭区工业园' },
-  { id: 4, orderNo: 'SO202404200004', customer: '安徽机械厂', products: 'Q235B 工字钢', amount: 19500, weight: 5, status: 'completed', createdAt: '2024-04-20 15:45', address: '安徽省合肥市高新区' },
-  { id: 5, orderNo: 'SO202404200005', customer: '山东管业公司', products: 'Q195 焊管', amount: 83000, weight: 20, status: 'paid', createdAt: '2024-04-20 16:30', address: '山东省济南市历下区' },
-]
-
-const statusColors: Record<string, string> = {
-  pending: 'orange',
-  paid: 'blue',
-  shipped: 'cyan',
-  completed: 'green',
-  cancelled: 'red',
-}
-
-const statusText: Record<string, string> = {
-  pending: '待付款',
-  paid: '已付款',
-  shipped: '已发货',
-  completed: '已完成',
-  cancelled: '已取消',
+const statusMeta: Record<number, { color: string; text: string }> = {
+  3: { color: 'orange', text: '待支付' },
+  4: { color: 'blue', text: '已支付' },
+  5: { color: 'cyan', text: '待提货' },
+  6: { color: 'processing', text: '配送中' },
+  7: { color: 'green', text: '已送达' },
+  8: { color: 'success', text: '已完成' },
+  9: { color: 'red', text: '已取消' },
 }
 
 const statusOptions = [
-  { label: '全部', value: 'all' },
-  { label: '待付款', value: 'pending' },
-  { label: '已付款', value: 'paid' },
-  { label: '已发货', value: 'shipped' },
-  { label: '已完成', value: 'completed' },
-  { label: '已取消', value: 'cancelled' },
+  { label: '全部状态', value: 'all' },
+  { label: '待支付', value: 3 },
+  { label: '已支付', value: 4 },
+  { label: '待提货', value: 5 },
+  { label: '配送中', value: 6 },
+  { label: '已送达', value: 7 },
+  { label: '已完成', value: 8 },
+  { label: '已取消', value: 9 },
 ]
 
+function formatCurrency(amount: number) {
+  return `¥${amount.toLocaleString()}`
+}
+
+function formatStatus(status: number) {
+  return statusMeta[status] ?? { color: 'default', text: `状态${status}` }
+}
+
+function formatDate(value?: string) {
+  if (!value) {
+    return '-'
+  }
+  return value.replace('T', ' ').slice(0, 19)
+}
+
+function getPrimaryProduct(order: SellerOrderInfo) {
+  return order.items[0]
+}
+
 export default function OrdersPage() {
-  const [orders] = useState(mockOrders)
+  const [loading, setLoading] = useState(false)
+  const [orders, setOrders] = useState<SellerOrderInfo[]>([])
   const [searchText, setSearchText] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string | number>('all')
+  const [selectedOrder, setSelectedOrder] = useState<SellerOrderInfo | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
 
-  const filteredOrders = orders.filter((o) => {
-    const matchesSearch = o.orderNo.includes(searchText) || o.customer.includes(searchText)
-    const matchesStatus = statusFilter === 'all' || o.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
-
-  const handleShip = (_orderId: number) => {
-    message.success('已确认发货')
+  async function loadOrders() {
+    setLoading(true)
+    try {
+      const list = await sellerOrderService.list()
+      setOrders(list)
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || error?.message || '订单加载失败')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const columns = [
-    { title: '订单号', dataIndex: 'orderNo', key: 'orderNo' },
-    { title: '客户', dataIndex: 'customer', key: 'customer' },
-    { title: '商品', dataIndex: 'products', key: 'products' },
-    { title: '金额', dataIndex: 'amount', key: 'amount', render: (v: number) => `¥${v.toLocaleString()}` },
-    { title: '重量', dataIndex: 'weight', key: 'weight', render: (v: number) => `${v} 吨` },
+  useEffect(() => {
+    void loadOrders()
+  }, [])
+
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const primary = getPrimaryProduct(order)
+      const matchesSearch =
+        !searchText ||
+        order.order_no.includes(searchText) ||
+        order.buyer_name.includes(searchText) ||
+        primary?.product_name?.includes(searchText)
+      const matchesStatus = statusFilter === 'all' || order.status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+  }, [orders, searchText, statusFilter])
+
+  async function openOrderDetail(order: SellerOrderInfo) {
+    setActionLoading(true)
+    try {
+      const detail = await sellerOrderService.getById(order.id)
+      setSelectedOrder(detail)
+      setIsModalOpen(true)
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || error?.message || '订单详情加载失败')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleConfirmPayment(order: SellerOrderInfo) {
+    setActionLoading(true)
+    try {
+      const detail = await sellerOrderService.confirmPayment(order.id)
+      message.success('已确认收款，订单进入待提货')
+      setSelectedOrder(detail)
+      setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+      setIsModalOpen(true)
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || error?.message || '确认收款失败')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleConfirmOutbound(order: SellerOrderInfo) {
+    setActionLoading(true)
+    try {
+      const detail = await sellerOrderService.confirmOutbound(order.id)
+      message.success('已确认出库，订单进入配送中')
+      setSelectedOrder(detail)
+      setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+      setIsModalOpen(true)
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || error?.message || '确认出库失败')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const columns: ColumnsType<SellerOrderInfo> = [
+    {
+      title: '订单号',
+      dataIndex: 'order_no',
+      key: 'order_no',
+      width: 220,
+    },
+    {
+      title: '买家企业',
+      dataIndex: 'buyer_name',
+      key: 'buyer_name',
+      width: 180,
+    },
+    {
+      title: '商品',
+      key: 'product',
+      render: (_, record) => {
+        const product = getPrimaryProduct(record)
+        if (!product) {
+          return '-'
+        }
+        return (
+          <div>
+            <div>{product.product_name}</div>
+            <div style={{ color: '#8c8c8c', fontSize: 12 }}>
+              {product.steel_mill || '未填写钢厂'} / {product.bundle_no || '未填捆包号'}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      title: '数量',
+      dataIndex: 'total_quantity',
+      key: 'total_quantity',
+      width: 120,
+      render: (value: number) => `${value} 吨`,
+    },
+    {
+      title: '金额',
+      dataIndex: 'total_amount',
+      key: 'total_amount',
+      width: 140,
+      render: (value: number) => formatCurrency(value),
+    },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => <Tag color={statusColors[status]}>{statusText[status]}</Tag>,
+      width: 120,
+      render: (status: number) => {
+        const meta = formatStatus(status)
+        return <Tag color={meta.color}>{meta.text}</Tag>
+      },
     },
-    { title: '下单时间', dataIndex: 'createdAt', key: 'createdAt' },
+    {
+      title: '支付凭证',
+      key: 'payment',
+      width: 120,
+      render: (_, record) => (record.payment_info?.voucher_url ? <Tag color="blue">已上传</Tag> : <Tag>未上传</Tag>),
+    },
+    {
+      title: '下单时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 180,
+      render: (value: string) => formatDate(value),
+    },
     {
       title: '操作',
       key: 'action',
-      render: (_: unknown, record: Order) => (
+      width: 180,
+      render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => {
-              setSelectedOrder(record)
-              setIsModalOpen(true)
-            }}
-          >
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => void openOrderDetail(record)}>
             详情
           </Button>
-          {record.status === 'paid' && (
-            <Button type="link" size="small" onClick={() => handleShip(record.id)}>
-              发货
+          {record.status === 3 && record.payment_info?.voucher_url && (
+            <Button type="link" size="small" onClick={() => void handleConfirmPayment(record)}>
+              确认收款
+            </Button>
+          )}
+          {record.status === 5 && record.delivery_info?.pickup_code && (
+            <Button type="link" size="small" onClick={() => void handleConfirmOutbound(record)}>
+              确认出库
             </Button>
           )}
         </Space>
@@ -105,26 +219,31 @@ export default function OrdersPage() {
     },
   ]
 
+  const selectedPrimaryProduct = selectedOrder ? getPrimaryProduct(selectedOrder) : null
+  const selectedStatus = selectedOrder ? formatStatus(selectedOrder.status) : null
+
   return (
     <div>
       <Card title="订单管理">
-        <Space className="mb-4">
+        <Space className="mb-4" wrap>
           <Search
-            placeholder="搜索订单号/客户"
+            placeholder="搜索订单号 / 买家企业 / 商品名"
             allowClear
-            style={{ width: 250 }}
+            style={{ width: 280 }}
             onSearch={setSearchText}
-            prefix={<SearchOutlined />}
+            onChange={(event) => setSearchText(event.target.value)}
+            value={searchText}
           />
           <Select
             value={statusFilter}
             onChange={setStatusFilter}
-            style={{ width: 120 }}
+            style={{ width: 160 }}
             options={statusOptions}
           />
         </Space>
 
         <Table
+          loading={loading}
           columns={columns}
           dataSource={filteredOrders}
           rowKey="id"
@@ -140,23 +259,72 @@ export default function OrdersPage() {
           <Button key="close" onClick={() => setIsModalOpen(false)}>
             关闭
           </Button>,
+          selectedOrder?.status === 3 && selectedOrder.payment_info?.voucher_url ? (
+            <Button key="confirm" type="primary" loading={actionLoading} onClick={() => void handleConfirmPayment(selectedOrder)}>
+              确认收款
+            </Button>
+          ) : null,
+          selectedOrder?.status === 5 && selectedOrder.delivery_info?.pickup_code ? (
+            <Button key="outbound" type="primary" loading={actionLoading} onClick={() => void handleConfirmOutbound(selectedOrder)}>
+              确认出库
+            </Button>
+          ) : null,
         ]}
-        width={600}
+        width={860}
       >
-        {selectedOrder && (
-          <Descriptions bordered column={2}>
-            <Descriptions.Item label="订单号" span={2}>{selectedOrder.orderNo}</Descriptions.Item>
-            <Descriptions.Item label="客户">{selectedOrder.customer}</Descriptions.Item>
-            <Descriptions.Item label="状态">
-              <Tag color={statusColors[selectedOrder.status]}>{statusText[selectedOrder.status]}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="商品">{selectedOrder.products}</Descriptions.Item>
-            <Descriptions.Item label="重量">{selectedOrder.weight} 吨</Descriptions.Item>
-            <Descriptions.Item label="金额">¥{selectedOrder.amount.toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="下单时间">{selectedOrder.createdAt}</Descriptions.Item>
-            <Descriptions.Item label="收货地址" span={2}>{selectedOrder.address}</Descriptions.Item>
-          </Descriptions>
-        )}
+        {selectedOrder ? (
+          <Spin spinning={actionLoading}>
+            <Descriptions bordered column={2} size="middle">
+              <Descriptions.Item label="订单号" span={2}>{selectedOrder.order_no}</Descriptions.Item>
+              <Descriptions.Item label="买家企业">{selectedOrder.buyer_name}</Descriptions.Item>
+              <Descriptions.Item label="状态">
+                {selectedStatus ? <Tag color={selectedStatus.color}>{selectedStatus.text}</Tag> : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="商品名称">{selectedPrimaryProduct?.product_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="钢厂 / 捆包号">
+                {selectedPrimaryProduct ? `${selectedPrimaryProduct.steel_mill || '未填钢厂'} / ${selectedPrimaryProduct.bundle_no || '未填捆包号'}` : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="数量">{selectedOrder.total_quantity} 吨</Descriptions.Item>
+              <Descriptions.Item label="订单金额">{formatCurrency(selectedOrder.total_amount)}</Descriptions.Item>
+              <Descriptions.Item label="下单时间">{formatDate(selectedOrder.created_at)}</Descriptions.Item>
+              <Descriptions.Item label="过期时间">{formatDate(selectedOrder.expires_at)}</Descriptions.Item>
+            </Descriptions>
+
+            <div style={{ marginTop: 16 }}>
+              <Alert
+                type={selectedOrder.payment_info?.voucher_url ? 'info' : 'warning'}
+                showIcon
+                message={selectedOrder.payment_info?.voucher_url ? '买家已上传支付凭证，可确认收款。' : '买家尚未上传支付凭证。'}
+              />
+            </div>
+
+            <Descriptions bordered column={2} size="middle" style={{ marginTop: 16 }}>
+              <Descriptions.Item label="交易流水号">{selectedOrder.payment_info?.transaction_no || '-'}</Descriptions.Item>
+              <Descriptions.Item label="支付时间">{formatDate(selectedOrder.payment_info?.payment_time)}</Descriptions.Item>
+              <Descriptions.Item label="付款账户">{selectedOrder.payment_info?.payer_account || '-'}</Descriptions.Item>
+              <Descriptions.Item label="收款账户">{selectedOrder.payment_info?.payee_account || '-'}</Descriptions.Item>
+              <Descriptions.Item label="支付凭证" span={2}>
+                {selectedOrder.payment_info?.voucher_url ? (
+                  <a href={selectedOrder.payment_info.voucher_url} target="_blank" rel="noreferrer">
+                    查看支付凭证
+                  </a>
+                ) : (
+                  '-'
+                )}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <Descriptions bordered column={2} size="middle" style={{ marginTop: 16 }}>
+              <Descriptions.Item label="提货司机">{selectedOrder.delivery_info?.driver_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="联系电话">{selectedOrder.delivery_info?.driver_phone || '-'}</Descriptions.Item>
+              <Descriptions.Item label="车牌号">{selectedOrder.delivery_info?.plate_number || '-'}</Descriptions.Item>
+              <Descriptions.Item label="提货码">{selectedOrder.delivery_info?.pickup_code || '-'}</Descriptions.Item>
+              <Descriptions.Item label="仓库名称">{selectedOrder.delivery_info?.warehouse_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="预计时间">{selectedOrder.delivery_info?.estimated_time || '-'}</Descriptions.Item>
+              <Descriptions.Item label="提货地址" span={2}>{selectedOrder.delivery_info?.address || '-'}</Descriptions.Item>
+            </Descriptions>
+          </Spin>
+        ) : null}
       </Modal>
     </div>
   )

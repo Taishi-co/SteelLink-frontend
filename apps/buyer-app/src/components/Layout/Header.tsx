@@ -1,11 +1,22 @@
-import { Link, useLocation } from 'react-router-dom'
-import { Layout, Menu, Space, Badge, Input, Button } from 'antd'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Layout, Menu, Space, Badge, Input, Button, Dropdown } from 'antd'
 import { ShoppingCartOutlined, UserOutlined, SearchOutlined, HomeOutlined } from '@ant-design/icons'
+import { clearBuyerSession, getBuyerUser } from '@/services/auth'
+import { useUserStore } from '@/stores/userStore'
 
 const { Header: AntHeader } = Layout
 
 export default function Header() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const user = useUserStore((state) => state.user) || getBuyerUser()
+  const logout = useUserStore((state) => state.logout)
+
+  const handleLogout = () => {
+    clearBuyerSession()
+    logout()
+    navigate('/login')
+  }
 
   const menuItems = [
     { key: '/products', label: <Link to="/products">商品列表</Link> },
@@ -45,18 +56,33 @@ export default function Header() {
             </Badge>
           </Link>
 
-          <Space>
-            <Link to="/login">
+          {user ? (
+            <Dropdown
+              menu={{
+                items: [
+                  { key: 'orders', label: <Link to="/orders">我的订单</Link> },
+                  { key: 'logout', label: '退出登录', onClick: handleLogout },
+                ],
+              }}
+            >
               <Button type="default" icon={<UserOutlined />}>
-                登录
+                {user.mobile || user.username}
               </Button>
-            </Link>
-            <Link to="/login">
-              <Button type="primary">
-                注册
-              </Button>
-            </Link>
-          </Space>
+            </Dropdown>
+          ) : (
+            <Space>
+              <Link to="/login">
+                <Button type="default" icon={<UserOutlined />}>
+                  登录
+                </Button>
+              </Link>
+              <Link to="/login">
+                <Button type="primary">
+                  注册
+                </Button>
+              </Link>
+            </Space>
+          )}
         </div>
       </div>
     </AntHeader>
