@@ -7,6 +7,9 @@ import ProductsPage from '@/pages/Products'
 import ProductDetailPage from '@/pages/ProductDetail'
 import CartPage from '@/pages/Cart'
 import LoginPage from '@/pages/Login'
+import CheckoutPage from '@/pages/Checkout'
+import OrderDetailPage from '@/pages/OrderDetail'
+import OrdersPage from '@/pages/Orders'
 
 // Placeholder pages
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -44,6 +47,9 @@ export function AppRouter() {
         <Route path="products" element={<ProductsPage />} />
         <Route path="products/:id" element={<ProductDetailPage />} />
         <Route path="cart" element={<CartPage />} />
+        <Route path="checkout" element={<CheckoutPage />} />
+        <Route path="orders" element={<OrdersPage />} />
+        <Route path="orders/:id" element={<OrderDetailPage />} />
       </Route>
     </Routes>
   )

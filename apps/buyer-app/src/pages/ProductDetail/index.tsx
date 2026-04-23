@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Card, Row, Col, Typography, Button, InputNumber, Space, Divider, Descriptions, Tabs, message, Spin } from 'antd'
 import { ShoppingCartOutlined, HeartOutlined, ShareAltOutlined } from '@ant-design/icons'
 import api from '@/services/api'
+import { orderService } from '@/services/orderService'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -22,12 +23,9 @@ interface ProductDetail {
   seller_uid: string
 }
 
-interface OrderInfo {
-  order_id: string
-}
-
 export default function ProductDetailPage() {
   const { id: productId } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [quantity, setQuantity] = useState(10)
   const [activeTab, setActiveTab] = useState('specs')
   const [loading, setLoading] = useState(true)
@@ -61,11 +59,12 @@ export default function ProductDetailPage() {
 
     setSubmitting(true)
     try {
-      const response = await api.post<OrderInfo, OrderInfo>('/orders', {
+      const response = await orderService.create({
         product_id: product.id,
         quantity,
       })
-      message.success(`下单成功，订单号：${response.order_id}`)
+      message.success('下单成功')
+      navigate(`/orders/${response.id}`)
     } catch (error: any) {
       const serverMessage = error?.response?.data?.message
       message.error(serverMessage || '下单失败，请先登录并确认库存')

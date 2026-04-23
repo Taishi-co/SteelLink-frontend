@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Card, Table, Button, InputNumber, Space, Typography, Empty, Divider, message } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
 
@@ -21,6 +21,7 @@ const mockCartItems: CartItem[] = [
 ]
 
 export default function CartPage() {
+  const navigate = useNavigate()
   const [cartItems, setCartItems] = useState<CartItem[]>(mockCartItems)
 
   const updateQuantity = (id: number, quantity: number) => {
@@ -132,7 +133,7 @@ export default function CartPage() {
                       ¥{totalPrice.toLocaleString()}
                     </Text>
                   </div>
-                  <Button type="primary" size="large">
+                  <Button type="primary" size="large" onClick={() => navigate('/checkout')}>
                     去结算
                   </Button>
                 </Space>
