@@ -13,30 +13,54 @@ export interface PaginatedResponse<T> {
 }
 
 // Product Types
+export interface ProductSpec {
+  material: string
+  spec: string
+  thickness?: string
+  width?: string
+  length?: string
+  surface?: string
+  edge?: string
+  processing?: string
+}
+
+export interface WarehouseInfo {
+  warehouse_id: number
+  warehouse_name: string
+  warehouse_code: string
+  address: string
+  province: string
+  city: string
+  district: string
+}
+
 export interface Product {
   id: number
+  productNo: string
   name: string
   category: string
-  specs: string
-  price: number
-  unit: string
-  stock: number
+  subCategory: string
+  steelMill: string
+  spec: ProductSpec
+  warehouseInfo: WarehouseInfo
+  bundleNo: string
+  quantity: number
+  availableQty: number
+  lockedQty: number
+  unitPrice: number
+  minOrderQty: number
+  currency: string
+  taxIncluded: boolean
+  taxRate: number
+  status: number
+  enterpriseId: number
+  qualityCert?: string
+  images: string[]
   description?: string
-  parameters?: ProductParameter[]
-  seller?: Seller
-}
-
-export interface ProductParameter {
-  label: string
-  value: string
-}
-
-// Seller Types
-export interface Seller {
-  id: number
-  name: string
-  location: string
-  rating: number
+  deliveryDays: number
+  quoteValidity: number
+  createdAt: string
+  updatedAt: string
 }
 
 // Cart Types

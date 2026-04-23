@@ -1,5 +1,9 @@
 import { create } from 'zustand'
 import type { User } from '@/types'
+import { clearBuyerSession, getBuyerToken, getBuyerUser } from '@/services/auth'
+
+const initialUser = getBuyerUser()
+const initialToken = getBuyerToken()
 
 interface UserState {
   user: User | null
@@ -10,12 +14,18 @@ interface UserState {
 }
 
 export const useUserStore = create<UserState>((set) => ({
-  user: null,
-  token: null,
-  isLoggedIn: false,
-  login: (user, token) => set({ user, token, isLoggedIn: true }),
+  user: initialUser,
+  token: initialToken,
+  isLoggedIn: Boolean(initialUser && initialToken),
+  login: (user, token) => {
+    localStorage.setItem('token', token)
+    sessionStorage.setItem('token', token)
+    localStorage.setItem('buyer_user', JSON.stringify(user))
+    sessionStorage.setItem('buyer_user', JSON.stringify(user))
+    set({ user, token, isLoggedIn: true })
+  },
   logout: () => {
-    localStorage.removeItem('token')
+    clearBuyerSession()
     set({ user: null, token: null, isLoggedIn: false })
   },
 }))

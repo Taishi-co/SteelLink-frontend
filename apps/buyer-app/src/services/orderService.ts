@@ -1,4 +1,5 @@
 import api from './api'
+import type { ApiResponse } from '@/types'
 
 export interface CreateOrderPayload {
   product_id: number
@@ -58,9 +59,18 @@ export interface OrderInfo {
 }
 
 export const orderService = {
-  create: (payload: CreateOrderPayload) => api.post<OrderInfo, OrderInfo>('/orders', payload),
-  getById: (id: number) => api.get<OrderInfo, OrderInfo>(`/orders/${id}`),
-  list: () => api.get<{ list: OrderInfo[] }, { list: OrderInfo[] }>('/orders'),
+  create: async (payload: CreateOrderPayload) => {
+    const response = await api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>('/orders', payload)
+    return response.data
+  },
+  getById: async (id: number) => {
+    const response = await api.get<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}`)
+    return response.data
+  },
+  list: async () => {
+    const response = await api.get<ApiResponse<{ list: OrderInfo[] }>, ApiResponse<{ list: OrderInfo[] }>>('/orders')
+    return response.data
+  },
   uploadPaymentVoucher: (
     id: number,
     payload: {
@@ -69,7 +79,7 @@ export const orderService = {
       payer_account?: string
       payee_account?: string
     },
-  ) => api.post<OrderInfo, OrderInfo>(`/orders/${id}/payment-voucher`, payload),
+  ) => api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`orders/${id}/payment-voucher`, payload).then((response) => response.data),
   setDeliveryInfo: (
     id: number,
     payload: {
@@ -82,7 +92,7 @@ export const orderService = {
       address: string
       estimated_time?: string
     },
-  ) => api.post<OrderInfo, OrderInfo>(`/orders/${id}/delivery-info`, payload),
+  ) => api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/delivery-info`, payload).then((response) => response.data),
   confirmReceipt: (id: number, payload: { receipt_voucher: string }) =>
-    api.post<OrderInfo, OrderInfo>(`/orders/${id}/confirm-receipt`, payload),
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/confirm-receipt`, payload).then((response) => response.data),
 }
