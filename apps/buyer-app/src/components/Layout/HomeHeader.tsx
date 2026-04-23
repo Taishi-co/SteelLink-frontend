@@ -1,6 +1,8 @@
-import { Link, useLocation } from 'react-router-dom'
-import { Layout, Menu, Button, Space } from 'antd'
-import { ShopOutlined, TeamOutlined } from '@ant-design/icons'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Layout, Menu, Button, Space, Dropdown } from 'antd'
+import { LoginOutlined, ShopOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
+import { getBuyerUser, clearBuyerSession } from '@/services/auth'
+import { useUserStore } from '@/stores/userStore'
 
 const { Header: AntHeader } = Layout
 
@@ -14,6 +16,15 @@ const navItems = [
 
 export default function HomeHeader() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const user = useUserStore((state) => state.user) || getBuyerUser()
+  const logout = useUserStore((state) => state.logout)
+
+  const handleLogout = () => {
+    clearBuyerSession()
+    logout()
+    navigate('/login')
+  }
 
   return (
     <AntHeader className="bg-white shadow-sm flex items-center px-8 h-16 fixed top-0 left-0 right-0 z-50">
@@ -37,11 +48,31 @@ export default function HomeHeader() {
 
         {/* Action Buttons */}
         <Space size="middle">
-          <Link to="/mall">
-            <Button type="primary" icon={<ShopOutlined />}>
-              进入商城
-            </Button>
-          </Link>
+          {user ? (
+            <>
+              <Link to="/products">
+                <Button type="primary" icon={<ShopOutlined />}>
+                  进入商城
+                </Button>
+              </Link>
+              <Dropdown
+                menu={{
+                  items: [
+                    { key: 'orders', label: <Link to="/orders">我的订单</Link> },
+                    { key: 'logout', label: '退出登录', onClick: handleLogout },
+                  ],
+                }}
+              >
+                <Button icon={<UserOutlined />}>{user.mobile || user.username}</Button>
+              </Dropdown>
+            </>
+          ) : (
+            <Link to="/login">
+              <Button type="primary" icon={<LoginOutlined />}>
+                买家登录
+              </Button>
+            </Link>
+          )}
           <a href="/seller">
             <Button icon={<TeamOutlined />}>
               企业入驻
