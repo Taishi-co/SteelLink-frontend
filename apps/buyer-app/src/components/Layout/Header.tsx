@@ -1,14 +1,28 @@
-import { Link, useLocation } from 'react-router-dom'
-import { Layout, Menu, Space, Badge, Input, Button } from 'antd'
-import { ShoppingCartOutlined, UserOutlined, SearchOutlined, HomeOutlined } from '@ant-design/icons'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Layout, Menu, Space, Badge, Input, Button, Dropdown, Avatar } from 'antd'
+import { ShoppingCartOutlined, UserOutlined, SearchOutlined, HomeOutlined, LogoutOutlined } from '@ant-design/icons'
+import { useUserStore } from '@/stores'
 
 const { Header: AntHeader } = Layout
 
 export default function Header() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, isLoggedIn, logout } = useUserStore()
 
   const menuItems = [
     { key: '/products', label: <Link to="/products">商品列表</Link> },
+  ]
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
+  const userMenuItems = [
+    { key: 'orders', label: '我的订单', onClick: () => navigate('/orders') },
+    { key: 'divider', type: 'divider' as const },
+    { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, onClick: handleLogout },
   ]
 
   return (
@@ -34,9 +48,7 @@ export default function Header() {
           />
 
           <Link to="/">
-            <Button type="text" icon={<HomeOutlined />}>
-              首页
-            </Button>
+            <Button type="text" icon={<HomeOutlined />}>首页</Button>
           </Link>
 
           <Link to="/cart">
@@ -45,18 +57,23 @@ export default function Header() {
             </Badge>
           </Link>
 
-          <Space>
-            <Link to="/login">
-              <Button type="default" icon={<UserOutlined />}>
-                登录
-              </Button>
-            </Link>
-            <Link to="/login">
-              <Button type="primary">
-                注册
-              </Button>
-            </Link>
-          </Space>
+          {isLoggedIn ? (
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <div className="flex items-center gap-2 cursor-pointer px-3 py-1 rounded-lg hover:bg-gray-50">
+                <Avatar size="small" icon={<UserOutlined />} />
+                <span className="text-sm text-gray-700">{user?.username || user?.mobile || '用户'}</span>
+              </div>
+            </Dropdown>
+          ) : (
+            <Space>
+              <Link to="/login">
+                <Button type="default" icon={<UserOutlined />}>登录</Button>
+              </Link>
+              <Link to="/login">
+                <Button type="primary">注册</Button>
+              </Link>
+            </Space>
+          )}
         </div>
       </div>
     </AntHeader>
