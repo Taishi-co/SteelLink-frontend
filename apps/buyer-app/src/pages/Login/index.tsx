@@ -1,32 +1,71 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Card, Form, Input, Button, Typography, Tabs, Space, message } from 'antd'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Card, Form, Input, Button, Typography, Tabs, message } from 'antd'
 import { UserOutlined, LockOutlined, MobileOutlined } from '@ant-design/icons'
+import { buyerAuthService, normalizeBuyerUser, saveBuyerSession } from '@/services/auth'
+import { useUserStore } from '@/stores'
 
 const { Text } = Typography
 
+interface LoginValues {
+  account: string
+  password: string
+}
+
+interface RegisterValues {
+  phone: string
+  email?: string
+  password: string
+}
+
 export default function LoginPage() {
-  const [activeTab, setActiveTab] = useState('password')
+  const [activeTab, setActiveTab] = useState('login')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+  const login = useUserStore((state) => state.login)
+  const redirectTo = (location.state as { from?: string } | null)?.from || '/'
 
-  const handleLogin = async () => {
+  const handleLogin = async (values: LoginValues) => {
     setLoading(true)
-    // Mock login
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      const response = await buyerAuthService.login(values)
+      if (response.code !== 0 || !response.data) {
+        throw new Error(response.message || '登录失败')
+      }
+
+      const { access_token, user } = response.data
+      saveBuyerSession(access_token, user)
+      login(normalizeBuyerUser(user), access_token)
       message.success('登录成功')
-      navigate('/')
-    }, 1000)
+      navigate(redirectTo, { replace: true })
+    } catch (error: any) {
+      const serverMessage = error?.response?.data?.message || error?.message
+      message.error(serverMessage || '登录失败，请检查账号密码')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleRegister = async () => {
+  const handleRegister = async (values: RegisterValues) => {
     setLoading(true)
-    setTimeout(() => {
+    try {
+      const response = await buyerAuthService.register(values)
+      if (response.code !== 0 || !response.data) {
+        throw new Error(response.message || '注册失败')
+      }
+
+      const { access_token, user } = response.data
+      saveBuyerSession(access_token, user)
+      login(normalizeBuyerUser(user), access_token)
+      message.success('注册成功，已自动登录')
+      navigate(redirectTo, { replace: true })
+    } catch (error: any) {
+      const serverMessage = error?.response?.data?.message || error?.message
+      message.error(serverMessage || '注册失败，请确认手机号未被占用')
+    } finally {
       setLoading(false)
-      message.success('注册成功，请登录')
-      setActiveTab('password')
-    }, 1000)
+    }
   }
 
   return (
@@ -46,7 +85,7 @@ export default function LoginPage() {
             centered
             items={[
               {
-                key: 'password',
+                key: 'login',
                 label: '密码登录',
                 children: (
                   <Form
@@ -54,7 +93,8 @@ export default function LoginPage() {
                     onFinish={handleLogin}
                   >
                     <Form.Item
-                      name="username"
+                      name="account"
+                      initialValue="15127431219"
                       rules={[{ required: true, message: '请输入用户名/手机号' }]}
                     >
                       <Input
@@ -93,50 +133,6 @@ export default function LoginPage() {
                 ),
               },
               {
-                key: 'sms',
-                label: '短信登录',
-                children: (
-                  <Form
-                    layout="vertical"
-                    onFinish={handleLogin}
-                  >
-                    <Form.Item
-                      name="mobile"
-                      rules={[
-                        { required: true, message: '请输入手机号' },
-                        { pattern: /^1\d{10}$/, message: '手机号格式不正确' },
-                      ]}
-                    >
-                      <Input
-                        prefix={<MobileOutlined />}
-                        placeholder="手机号"
-                        size="large"
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      name="code"
-                      rules={[{ required: true, message: '请输入验证码' }]}
-                    >
-                      <Space className="w-full">
-                        <Input placeholder="验证码" size="large" className="flex-1" />
-                        <Button size="large">获取验证码</Button>
-                      </Space>
-                    </Form.Item>
-                    <Form.Item>
-                      <Button
-                        type="primary"
-                        htmlType="submit"
-                        size="large"
-                        block
-                        loading={loading}
-                      >
-                        登录
-                      </Button>
-                    </Form.Item>
-                  </Form>
-                ),
-              },
-              {
                 key: 'register',
                 label: '注册账号',
                 children: (
@@ -145,7 +141,7 @@ export default function LoginPage() {
                     onFinish={handleRegister}
                   >
                     <Form.Item
-                      name="mobile"
+                      name="phone"
                       rules={[
                         { required: true, message: '请输入手机号' },
                         { pattern: /^1\d{10}$/, message: '手机号格式不正确' },
@@ -158,12 +154,12 @@ export default function LoginPage() {
                       />
                     </Form.Item>
                     <Form.Item
-                      name="companyName"
-                      rules={[{ required: true, message: '请输入企业名称' }]}
+                      name="email"
+                      rules={[{ type: 'email', message: '邮箱格式不正确' }]}
                     >
                       <Input
                         prefix={<UserOutlined />}
-                        placeholder="企业名称"
+                        placeholder="邮箱（选填）"
                         size="large"
                       />
                     </Form.Item>
@@ -179,15 +175,6 @@ export default function LoginPage() {
                         placeholder="设置密码"
                         size="large"
                       />
-                    </Form.Item>
-                    <Form.Item
-                      name="code"
-                      rules={[{ required: true, message: '请输入验证码' }]}
-                    >
-                      <Space className="w-full">
-                        <Input placeholder="验证码" size="large" className="flex-1" />
-                        <Button size="large">获取验证码</Button>
-                      </Space>
                     </Form.Item>
                     <Form.Item>
                       <Button

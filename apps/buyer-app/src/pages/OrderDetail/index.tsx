@@ -33,6 +33,30 @@ function getCurrentStep(status: number) {
   return 0
 }
 
+function isValidHttpUrl(value?: string) {
+  if (!value) {
+    return false
+  }
+
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const httpUrlRule = {
+  validator: async (_: unknown, value?: string) => {
+    if (!value) {
+      throw new Error('请输入凭证地址')
+    }
+    if (!isValidHttpUrl(value)) {
+      throw new Error('请输入完整的 http/https 地址')
+    }
+  },
+}
+
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -201,9 +225,13 @@ export default function OrderDetailPage() {
                   <Descriptions.Item label="付款账户">{order.payment_info.payer_account || '-'}</Descriptions.Item>
                   <Descriptions.Item label="收款账户">{order.payment_info.payee_account || '-'}</Descriptions.Item>
                   <Descriptions.Item label="支付凭证">
-                    <a href={order.payment_info.voucher_url} target="_blank" rel="noreferrer">
-                      查看支付凭证
-                    </a>
+                    {isValidHttpUrl(order.payment_info.voucher_url) ? (
+                      <a href={order.payment_info.voucher_url} target="_blank" rel="noreferrer">
+                        查看支付凭证
+                      </a>
+                    ) : (
+                      <Text type="secondary">凭证地址无效</Text>
+                    )}
                   </Descriptions.Item>
                 </Descriptions>
               </Card>
@@ -237,7 +265,7 @@ export default function OrderDetailPage() {
                     {order.receipt_at ? new Date(order.receipt_at).toLocaleString() : '-'}
                   </Descriptions.Item>
                   <Descriptions.Item label="签收凭证">
-                    {order.receipt_voucher ? (
+                    {isValidHttpUrl(order.receipt_voucher) ? (
                       <a href={order.receipt_voucher} target="_blank" rel="noreferrer">
                         查看签收凭证
                       </a>
@@ -283,8 +311,8 @@ export default function OrderDetailPage() {
               confirmLoading={uploading}
             >
               <Form form={form} layout="vertical">
-                <Form.Item name="voucher_url" label="凭证地址" rules={[{ required: true }]}>
-                  <Input placeholder="先填一个可访问的凭证 URL" />
+                <Form.Item name="voucher_url" label="凭证地址" rules={[httpUrlRule]}>
+                  <Input placeholder="例如：https://example.com/payment-voucher.jpg" />
                 </Form.Item>
                 <Form.Item name="transaction_no" label="交易流水号">
                   <Input />
@@ -338,8 +366,8 @@ export default function OrderDetailPage() {
               confirmLoading={confirmingReceipt}
             >
               <Form form={receiptForm} layout="vertical">
-                <Form.Item name="receipt_voucher" label="签收凭证地址" rules={[{ required: true }]}>
-                  <Input placeholder="先填一个可访问的签收凭证 URL" />
+                <Form.Item name="receipt_voucher" label="签收凭证地址" rules={[httpUrlRule]}>
+                  <Input placeholder="例如：https://example.com/receipt-voucher.jpg" />
                 </Form.Item>
               </Form>
             </Modal>

@@ -2,27 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { Carousel, Row, Col, Card, Typography, Divider, Empty, Spin, message } from 'antd'
 import { Link } from 'react-router-dom'
-import api from '@/services/api'
+import { productService } from '@/services/productService'
+import type { Product } from '@/types'
 
 const { Title, Paragraph } = Typography
-
-interface ProductItem {
-  id: number
-  sku_id: string
-  name: string
-  category: string
-  specs: string
-  price: number
-  unit: string
-  visible_stock: number
-}
-
-interface ProductListResponse {
-  list: ProductItem[]
-  total: number
-  page: number
-  page_size: number
-}
 
 interface MallCategory {
   id: string
@@ -66,19 +49,17 @@ function getCategoryIcon(category: string) {
 
 export default function MallPage() {
   const [loading, setLoading] = useState(true)
-  const [products, setProducts] = useState<ProductItem[]>([])
+  const [products, setProducts] = useState<Product[]>([])
 
   useEffect(() => {
     const loadProducts = async () => {
       setLoading(true)
       try {
-        const response = await api.get<ProductListResponse, ProductListResponse>('/products', {
-          params: {
-            page: 1,
-            page_size: 12,
-          },
+        const response = await productService.getProducts({
+          page: 1,
+          page_size: 12,
         })
-        setProducts(response.list)
+        setProducts(response.data.list)
       } catch (error) {
         message.error('商城首页商品加载失败，请确认后端服务已启动')
       } finally {
@@ -170,11 +151,11 @@ export default function MallPage() {
                         <Title level={5} className="!mb-2 !text-sm line-clamp-2">
                           {product.name}
                         </Title>
-                        <Paragraph className="!mb-1 text-xs text-gray-500">{product.specs}</Paragraph>
-                        <Paragraph className="!mb-1 text-xs text-gray-500">库存：{product.visible_stock} 吨</Paragraph>
+                        <Paragraph className="!mb-1 text-xs text-gray-500">{product.spec?.spec || '-'}</Paragraph>
+                        <Paragraph className="!mb-1 text-xs text-gray-500">库存：{product.availableQty} 吨</Paragraph>
                         <div className="font-bold text-red-500">
-                          ￥{product.price.toLocaleString()}
-                          <span className="ml-1 text-xs text-gray-400">{product.unit}</span>
+                          ￥{product.unitPrice.toLocaleString()}
+                          <span className="ml-1 text-xs text-gray-400">/吨</span>
                         </div>
                       </Card>
                     </Link>
