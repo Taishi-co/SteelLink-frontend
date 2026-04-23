@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Button, Space, Dropdown, Avatar } from 'antd'
 import { ShopOutlined, TeamOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons'
+import { clearBuyerSession } from '@/services/auth'
 import { useUserStore } from '@/stores'
 
 const { Header: AntHeader } = Layout
@@ -19,6 +20,7 @@ export default function HomeHeader() {
   const { user, isLoggedIn, logout } = useUserStore()
 
   const handleLogout = () => {
+    clearBuyerSession()
     logout()
     navigate('/login')
   }
