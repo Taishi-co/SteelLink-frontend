@@ -59,7 +59,7 @@ export default function ProductDetailPage() {
     } catch (error: any) {
       if (error?.response?.status === 401) {
         message.warning('请先登录后再下单')
-        navigate('/login', { state: { from: `/products/${product.id}` } })
+        navigate(`/login?redirect=${encodeURIComponent(`/products/${product.id}`)}`)
         return
       }
       const serverMessage = error?.response?.data?.message
