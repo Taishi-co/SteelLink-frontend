@@ -76,3 +76,11 @@ export interface OrderItem {
   price: number
   quantity: number
 }
+
+export interface OrderTimelineItem {
+  key: string
+  label: string
+  status: 'completed' | 'current' | 'pending' | 'skipped' | string
+  time?: string
+  description?: string
+}

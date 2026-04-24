@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Spin, Steps, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Spin, Steps, Tag, Timeline, Typography, message } from 'antd'
 import { ArrowLeftOutlined, CarOutlined, CheckCircleOutlined, UploadOutlined } from '@ant-design/icons'
+import { timelineColor } from '@steellink/shared/utils'
 import { orderService } from '@/services/orderService'
 import { productService } from '@/services/productService'
 
 const { Title, Paragraph, Text } = Typography
 
 const statusMap: Record<number, { label: string; color: string }> = {
+  0: { label: '草稿', color: 'default' },
+  1: { label: '待确认', color: 'orange' },
   2: { label: '待签合同', color: 'gold' },
   3: { label: '待支付', color: 'orange' },
   4: { label: '待卖家确认收款', color: 'blue' },
@@ -17,6 +20,8 @@ const statusMap: Record<number, { label: string; color: string }> = {
   7: { label: '已送达', color: 'green' },
   8: { label: '已完成', color: 'green' },
   9: { label: '已取消', color: 'red' },
+  10: { label: '已冻结', color: 'volcano' },
+  11: { label: '异常', color: 'magenta' },
 }
 
 const orderSteps = [
@@ -83,6 +88,10 @@ function isValidHttpUrl(value?: string) {
   } catch {
     return false
   }
+}
+
+function formatTimelineTime(value?: string) {
+  return value ? new Date(value).toLocaleString() : ''
 }
 
 const httpUrlRule = {
@@ -234,6 +243,25 @@ export default function OrderDetailPage() {
 
             <Card className="mt-6">
               <Steps current={getCurrentStep(order.status)} items={orderSteps} />
+            </Card>
+
+            <Card title="订单时间线" className="mt-6">
+              <Timeline
+                items={(order.timeline || []).map((item) => ({
+                  color: timelineColor(item.status),
+                  children: (
+                    <div>
+                      <div className="font-medium">{item.label}</div>
+                      {item.time && <Text type="secondary">{formatTimelineTime(item.time)}</Text>}
+                      {item.description && (
+                        <Paragraph className="!mb-0" type="secondary">
+                          {item.description}
+                        </Paragraph>
+                      )}
+                    </div>
+                  ),
+                }))}
+              />
             </Card>
 
             <Alert
