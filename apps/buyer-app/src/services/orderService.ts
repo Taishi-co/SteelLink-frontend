@@ -71,6 +71,8 @@ export const orderService = {
     const response = await api.get<ApiResponse<{ list: OrderInfo[] }>, ApiResponse<{ list: OrderInfo[] }>>('/orders')
     return response.data
   },
+  cancel: (id: number) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/cancel`).then((response) => response.data),
   uploadPaymentVoucher: (
     id: number,
     payload: {
