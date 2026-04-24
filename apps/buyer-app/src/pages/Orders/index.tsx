@@ -8,18 +8,33 @@ const { Title, Text } = Typography
 
 const statusMap: Record<number, { label: string; color: string }> = {
   3: { label: '待支付', color: 'orange' },
+  4: { label: '待卖家确认收款', color: 'blue' },
   5: { label: '待提货', color: 'cyan' },
   6: { label: '配送中', color: 'blue' },
   8: { label: '已完成', color: 'green' },
   9: { label: '已取消', color: 'red' },
 }
 
-const statusActionMap: Record<number, string> = {
-  3: '待上传支付凭证',
-  5: '待录入提货信息',
-  6: '待确认收货',
-  8: '已完成',
-  9: '已取消',
+function getStatusAction(order: { status: number; payment_info?: { voucher_url?: string }; delivery_info?: { pickup_code?: string } }) {
+  if (order.status === 3) {
+    return '待买家上传支付凭证'
+  }
+  if (order.status === 4) {
+    return '待卖家确认收款'
+  }
+  if (order.status === 5) {
+    return order.delivery_info?.pickup_code ? '待卖家确认出库' : '待买家录入提货信息'
+  }
+  if (order.status === 6) {
+    return '待买家确认收货'
+  }
+  if (order.status === 8) {
+    return '已完成'
+  }
+  if (order.status === 9) {
+    return '已取消'
+  }
+  return `状态${order.status}`
 }
 
 export default function OrdersPage() {
@@ -87,20 +102,17 @@ export default function OrdersPage() {
                 const status = statusMap[order.status] || { label: `状态${order.status}`, color: 'default' }
                 return (
                   <List.Item
-                    className="cursor-pointer hover:bg-gray-50 px-4 rounded"
-                    onClick={() => navigate(`/orders/${order.id}`)}
+                    className="hover:bg-gray-50 px-4 rounded"
                   >
                     <div className="w-full flex justify-between items-start gap-4">
-                      <div>
+                      <div className="cursor-pointer flex-1" onClick={() => navigate(`/orders/${order.id}`)}>
                         <Title level={5} className="!mb-1">{order.order_no}</Title>
                         <Text className="block">{item?.product_name || '-'}</Text>
                         <Text type="secondary">
                           {item?.quantity || 0} 吨 · {order.seller_name}
                         </Text>
                         <div className="mt-2">
-                          <Text type="secondary">
-                            当前动作：{statusActionMap[order.status] || `状态${order.status}`}
-                          </Text>
+                          <Text type="secondary">当前动作：{getStatusAction(order)}</Text>
                         </div>
                       </div>
                       <div className="text-right">

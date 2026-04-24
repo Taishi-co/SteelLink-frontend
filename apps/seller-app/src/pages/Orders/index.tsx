@@ -8,7 +8,7 @@ const { Search } = Input
 
 const statusMeta: Record<number, { color: string; text: string }> = {
   3: { color: 'orange', text: '待支付' },
-  4: { color: 'blue', text: '已支付' },
+  4: { color: 'blue', text: '待确认收款' },
   5: { color: 'cyan', text: '待提货' },
   6: { color: 'processing', text: '配送中' },
   7: { color: 'green', text: '已送达' },
@@ -19,7 +19,7 @@ const statusMeta: Record<number, { color: string; text: string }> = {
 const statusOptions = [
   { label: '全部状态', value: 'all' },
   { label: '待支付', value: 3 },
-  { label: '已支付', value: 4 },
+  { label: '待确认收款', value: 4 },
   { label: '待提货', value: 5 },
   { label: '配送中', value: 6 },
   { label: '已送达', value: 7 },
@@ -218,7 +218,7 @@ export default function OrdersPage() {
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => void openOrderDetail(record)}>
             详情
           </Button>
-          {record.status === 3 && record.payment_info?.voucher_url && (
+          {record.status === 4 && record.payment_info?.voucher_url && (
             <Button type="link" size="small" onClick={() => void handleConfirmPayment(record)}>
               确认收款
             </Button>
@@ -273,8 +273,8 @@ export default function OrdersPage() {
           <Button key="close" onClick={() => setIsModalOpen(false)}>
             关闭
           </Button>,
-          selectedOrder?.status === 3 && selectedOrder.payment_info?.voucher_url ? (
-            <Button key="confirm" type="primary" onClick={() => handleConfirmPayment(selectedOrder)}>
+          selectedOrder?.status === 4 && selectedOrder.payment_info?.voucher_url ? (
+            <Button key="confirm" type="primary" loading={actionLoading} onClick={() => void handleConfirmPayment(selectedOrder)}>
               确认收款
             </Button>
           ) : null,

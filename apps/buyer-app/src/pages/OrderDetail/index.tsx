@@ -11,7 +11,7 @@ const { Title, Paragraph, Text } = Typography
 const statusMap: Record<number, { label: string; color: string }> = {
   2: { label: '待签合同', color: 'gold' },
   3: { label: '待支付', color: 'orange' },
-  4: { label: '已支付', color: 'blue' },
+  4: { label: '待卖家确认收款', color: 'blue' },
   5: { label: '待提货', color: 'cyan' },
   6: { label: '配送中', color: 'processing' },
   7: { label: '已送达', color: 'green' },
@@ -45,7 +45,7 @@ function getStatusNotice(status: number, hasPaymentVoucher: boolean, hasDelivery
   if (status === 4) {
     return {
       type: 'info' as const,
-      message: '卖家已确认收款，订单即将进入提货准备阶段。',
+      message: '买家已上传支付凭证，等待卖家确认收款。',
     }
   }
   if (status === 5) {
