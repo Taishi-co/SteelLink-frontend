@@ -1,12 +1,13 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Button, Space, Dropdown, Avatar } from 'antd'
-import { ShopOutlined, TeamOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons'
+import { TeamOutlined, UserOutlined, LogoutOutlined, ShoppingCartOutlined, OrderedListOutlined } from '@ant-design/icons'
 import { clearBuyerSession } from '@/services/auth'
 import { useUserStore } from '@/stores'
 
 const { Header: AntHeader } = Layout
 
 const navItems = [
+  { key: '/', label: '首页' },
   { key: '/mall', label: '现货商城' },
   { key: '/bidding', label: '竞价交易' },
   { key: '/procurement', label: '集采大厅' },
@@ -25,45 +26,46 @@ export default function HomeHeader() {
     navigate('/login')
   }
 
+  const selectedKey = navItems.find(item => item.key !== '/' && location.pathname.startsWith(item.key))?.key
+    || (location.pathname === '/' ? '/' : '')
+
   const userMenuItems = [
-    { key: 'orders', label: '我的订单', onClick: () => navigate('/orders') },
+    { key: 'orders', label: '我的订单', icon: <OrderedListOutlined />, onClick: () => navigate('/orders') },
+    { key: 'cart', label: '购物车', icon: <ShoppingCartOutlined />, onClick: () => navigate('/cart') },
     { key: 'divider', type: 'divider' as const },
-    { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, onClick: handleLogout },
+    { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, danger: true, onClick: handleLogout },
   ]
 
   return (
     <AntHeader className="bg-white shadow-sm flex items-center px-8 h-16 fixed top-0 left-0 right-0 z-50">
       <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
-        <Link to="/" className="text-2xl font-bold text-primary-600 no-underline">
+        <Link to="/" className="text-2xl font-bold text-primary-600 no-underline flex-shrink-0">
           SteelLink
         </Link>
 
         <Menu
           mode="horizontal"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[selectedKey]}
           items={navItems.map(item => ({
             key: item.key,
-            label: <Link to={item.key} className="text-gray-700 hover:text-primary-600">{item.label}</Link>
+            label: <Link to={item.key}>{item.label}</Link>
           }))}
           className="border-none flex-1 justify-center"
-          style={{ minWidth: 400 }}
+          style={{ minWidth: 420 }}
         />
 
-        <Space size="middle">
-          <Link to="/mall">
-            <Button type="primary" icon={<ShopOutlined />}>进入商城</Button>
-          </Link>
+        <Space size="middle" className="flex-shrink-0">
           {isLoggedIn ? (
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-              <div className="flex items-center gap-2 cursor-pointer px-3 py-1 rounded-lg hover:bg-gray-50">
-                <Avatar size="small" icon={<UserOutlined />} />
+              <div className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                <Avatar size="small" icon={<UserOutlined />} className="bg-blue-500" />
                 <span className="text-sm text-gray-700">{user?.username || user?.mobile || '用户'}</span>
               </div>
             </Dropdown>
           ) : (
             <>
               <Link to="/login">
-                <Button icon={<UserOutlined />}>登录</Button>
+                <Button type="primary">登录 / 注册</Button>
               </Link>
               <a href="/seller">
                 <Button icon={<TeamOutlined />}>企业入驻</Button>

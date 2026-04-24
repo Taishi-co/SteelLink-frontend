@@ -60,7 +60,7 @@ export interface SellerOrderInfo {
 
 export const sellerOrderService = {
   async list() {
-    const response = await api.get<ApiResponse<{ list: SellerOrderInfo[] }>>('/orders')
+    const response = await api.get<ApiResponse<{ list: SellerOrderInfo[] }>>('/orders?role=seller')
     return response.data.data.list
   },
   async getById(id: number) {

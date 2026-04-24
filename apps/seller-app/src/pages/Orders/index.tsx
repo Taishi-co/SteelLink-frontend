@@ -54,6 +54,8 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<SellerOrderInfo | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<{ type: 'payment' | 'outbound'; order: SellerOrderInfo } | null>(null)
+  const [confirmInput, setConfirmInput] = useState('')
 
   async function loadOrders() {
     setLoading(true)
@@ -98,30 +100,42 @@ export default function OrdersPage() {
   }
 
   async function handleConfirmPayment(order: SellerOrderInfo) {
-    setActionLoading(true)
-    try {
-      const detail = await sellerOrderService.confirmPayment(order.id)
-      message.success('已确认收款，订单进入待提货')
-      setSelectedOrder(detail)
-      setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
-      setIsModalOpen(true)
-    } catch (error: any) {
-      message.error(error?.response?.data?.message || error?.message || '确认收款失败')
-    } finally {
-      setActionLoading(false)
-    }
+    setConfirmAction({ type: 'payment', order })
+    setConfirmInput('')
   }
 
   async function handleConfirmOutbound(order: SellerOrderInfo) {
+    setConfirmAction({ type: 'outbound', order })
+    setConfirmInput('')
+  }
+
+  async function executeConfirmAction() {
+    if (!confirmAction) return
+    const { type, order } = confirmAction
+    const lastFour = order.order_no.slice(-4)
+    if (confirmInput !== lastFour) {
+      message.error(`请输入订单号后 4 位「${lastFour}」以确认操作`)
+      return
+    }
     setActionLoading(true)
     try {
-      const detail = await sellerOrderService.confirmOutbound(order.id)
-      message.success('已确认出库，订单进入配送中')
-      setSelectedOrder(detail)
-      setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
-      setIsModalOpen(true)
+      if (type === 'payment') {
+        const detail = await sellerOrderService.confirmPayment(order.id)
+        message.success('已确认收款，订单进入待提货')
+        setSelectedOrder(detail)
+        setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+        setIsModalOpen(true)
+      } else {
+        const detail = await sellerOrderService.confirmOutbound(order.id)
+        message.success('已确认出库，订单进入配送中')
+        setSelectedOrder(detail)
+        setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+        setIsModalOpen(true)
+      }
+      setConfirmAction(null)
+      setConfirmInput('')
     } catch (error: any) {
-      message.error(error?.response?.data?.message || error?.message || '确认出库失败')
+      message.error(error?.response?.data?.message || error?.message || '操作失败')
     } finally {
       setActionLoading(false)
     }
@@ -260,12 +274,12 @@ export default function OrdersPage() {
             关闭
           </Button>,
           selectedOrder?.status === 3 && selectedOrder.payment_info?.voucher_url ? (
-            <Button key="confirm" type="primary" loading={actionLoading} onClick={() => void handleConfirmPayment(selectedOrder)}>
+            <Button key="confirm" type="primary" onClick={() => handleConfirmPayment(selectedOrder)}>
               确认收款
             </Button>
           ) : null,
           selectedOrder?.status === 5 && selectedOrder.delivery_info?.pickup_code ? (
-            <Button key="outbound" type="primary" loading={actionLoading} onClick={() => void handleConfirmOutbound(selectedOrder)}>
+            <Button key="outbound" type="primary" onClick={() => handleConfirmOutbound(selectedOrder)}>
               确认出库
             </Button>
           ) : null,
@@ -325,6 +339,47 @@ export default function OrdersPage() {
             </Descriptions>
           </Spin>
         ) : null}
+      </Modal>
+
+      <Modal
+        title={confirmAction?.type === 'payment' ? '确认收款' : '确认出库'}
+        open={confirmAction !== null}
+        onCancel={() => { setConfirmAction(null); setConfirmInput('') }}
+        onOk={() => void executeConfirmAction()}
+        okText="确认执行"
+        okButtonProps={{ danger: true, loading: actionLoading, disabled: !confirmInput }}
+        destroyOnHidden
+      >
+        {confirmAction && (
+          <div>
+            <Descriptions bordered column={1} size="small" style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="订单号">{confirmAction.order.order_no}</Descriptions.Item>
+              <Descriptions.Item label="买家企业">{confirmAction.order.buyer_name}</Descriptions.Item>
+              <Descriptions.Item label="订单金额">{formatCurrency(confirmAction.order.total_amount)}</Descriptions.Item>
+              <Descriptions.Item label="操作">
+                <Tag color="red">{confirmAction.type === 'payment' ? '确认收款' : '确认出库'}</Tag>
+              </Descriptions.Item>
+            </Descriptions>
+            <Alert
+              type="warning"
+              showIcon
+              message="此操作不可撤销，请仔细核对订单信息"
+              style={{ marginBottom: 16 }}
+            />
+            <div>
+              <div style={{ marginBottom: 8, fontWeight: 500 }}>
+                请输入订单号后 4 位以确认操作：<strong>{confirmAction.order.order_no.slice(-4)}</strong>
+              </div>
+              <Input
+                placeholder="输入订单号后 4 位"
+                value={confirmInput}
+                onChange={(e) => setConfirmInput(e.target.value)}
+                maxLength={4}
+                style={{ width: 200 }}
+              />
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )
