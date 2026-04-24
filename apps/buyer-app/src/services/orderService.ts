@@ -68,7 +68,7 @@ export const orderService = {
     return response.data
   },
   list: async () => {
-    const response = await api.get<ApiResponse<{ list: OrderInfo[] }>, ApiResponse<{ list: OrderInfo[] }>>('/orders')
+    const response = await api.get<ApiResponse<{ list: OrderInfo[] }>, ApiResponse<{ list: OrderInfo[] }>>('/orders?role=buyer')
     return response.data
   },
   uploadPaymentVoucher: (

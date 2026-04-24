@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { Layout } from 'antd'
-import Header from './Header'
+import HomeHeader from './HomeHeader'
 import Footer from './Footer'
 
 const { Content } = Layout
@@ -8,8 +8,8 @@ const { Content } = Layout
 export default function MainLayout() {
   return (
     <Layout className="min-h-screen">
-      <Header />
-      <Content className="bg-gray-50">
+      <HomeHeader />
+      <Content className="bg-gray-50 mt-16">
         <Outlet />
       </Content>
       <Footer />
