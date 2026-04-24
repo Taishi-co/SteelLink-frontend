@@ -37,6 +37,7 @@ export interface SellerOrderInfo {
   created_at: string
   receipt_voucher?: string
   receipt_at?: string
+  timeline?: SellerOrderTimelineItem[]
   payment_info?: {
     payment_method: string
     payment_time: string
@@ -56,6 +57,14 @@ export interface SellerOrderInfo {
     address: string
     estimated_time: string
   }
+}
+
+export interface SellerOrderTimelineItem {
+  key: string
+  label: string
+  status: 'completed' | 'current' | 'pending' | 'skipped' | string
+  time?: string
+  description?: string
 }
 
 export const sellerOrderService = {

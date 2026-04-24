@@ -7,12 +7,18 @@ import { orderService } from '@/services/orderService'
 const { Title, Text } = Typography
 
 const statusMap: Record<number, { label: string; color: string }> = {
+  0: { label: '草稿', color: 'default' },
+  1: { label: '待确认', color: 'orange' },
+  2: { label: '待签合同', color: 'gold' },
   3: { label: '待支付', color: 'orange' },
   4: { label: '待卖家确认收款', color: 'blue' },
   5: { label: '待提货', color: 'cyan' },
   6: { label: '配送中', color: 'blue' },
+  7: { label: '已送达', color: 'green' },
   8: { label: '已完成', color: 'green' },
   9: { label: '已取消', color: 'red' },
+  10: { label: '已冻结', color: 'volcano' },
+  11: { label: '异常', color: 'magenta' },
 }
 
 function getStatusAction(order: { status: number; payment_info?: { voucher_url?: string }; delivery_info?: { pickup_code?: string } }) {

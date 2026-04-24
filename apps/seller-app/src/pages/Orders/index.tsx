@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Descriptions, Input, Modal, Select, Space, Spin, Table, Tag, message } from 'antd'
+import { Alert, Button, Card, Descriptions, Input, Modal, Select, Space, Spin, Table, Tag, Timeline, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { EyeOutlined } from '@ant-design/icons'
+import { timelineColor } from '@steellink/shared/utils'
 import { sellerOrderService, type SellerOrderInfo } from '@/services/orderService'
 
 const { Search } = Input
+const { Text, Paragraph } = Typography
 
 const statusMeta: Record<number, { color: string; text: string }> = {
+  0: { color: 'default', text: '草稿' },
+  1: { color: 'orange', text: '待确认' },
+  2: { color: 'gold', text: '待签合同' },
   3: { color: 'orange', text: '待支付' },
   4: { color: 'blue', text: '待确认收款' },
   5: { color: 'cyan', text: '待提货' },
@@ -14,6 +19,8 @@ const statusMeta: Record<number, { color: string; text: string }> = {
   7: { color: 'green', text: '已送达' },
   8: { color: 'success', text: '已完成' },
   9: { color: 'red', text: '已取消' },
+  10: { color: 'volcano', text: '已冻结' },
+  11: { color: 'magenta', text: '异常' },
 }
 
 const statusOptions = [
@@ -337,6 +344,25 @@ export default function OrdersPage() {
               <Descriptions.Item label="预计时间">{selectedOrder.delivery_info?.estimated_time || '-'}</Descriptions.Item>
               <Descriptions.Item label="提货地址" span={2}>{selectedOrder.delivery_info?.address || '-'}</Descriptions.Item>
             </Descriptions>
+
+            <Card title="订单时间线" size="small" style={{ marginTop: 16 }}>
+              <Timeline
+                items={(selectedOrder.timeline || []).map((item) => ({
+                  color: timelineColor(item.status),
+                  children: (
+                    <div>
+                      <div style={{ fontWeight: 500 }}>{item.label}</div>
+                      {item.time ? <Text type="secondary">{formatDate(item.time)}</Text> : null}
+                      {item.description ? (
+                        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                          {item.description}
+                        </Paragraph>
+                      ) : null}
+                    </div>
+                  ),
+                }))}
+              />
+            </Card>
           </Spin>
         ) : null}
       </Modal>
