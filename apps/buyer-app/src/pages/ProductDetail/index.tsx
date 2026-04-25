@@ -8,6 +8,29 @@ import { productService } from '@/services/productService'
 
 const { Title, Paragraph, Text } = Typography
 
+function getErrorStatus(error: unknown) {
+  if (typeof error === 'object' && error !== null) {
+    const response = 'response' in error ? error.response : undefined
+    if (typeof response === 'object' && response !== null && 'status' in response && typeof response.status === 'number') {
+      return response.status
+    }
+  }
+  return undefined
+}
+
+function getErrorMessage(error: unknown) {
+  if (typeof error === 'object' && error !== null) {
+    const response = 'response' in error ? error.response : undefined
+    if (typeof response === 'object' && response !== null && 'data' in response) {
+      const data = response.data
+      if (typeof data === 'object' && data !== null && 'message' in data && typeof data.message === 'string') {
+        return data.message
+      }
+    }
+  }
+  return undefined
+}
+
 export default function ProductDetailPage() {
   const { id: productId } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -56,13 +79,13 @@ export default function ProductDetailPage() {
       })
       message.success('下单成功')
       navigate(`/orders/${response.id}`)
-    } catch (error: any) {
-      if (error?.response?.status === 401) {
+    } catch (error: unknown) {
+      if (getErrorStatus(error) === 401) {
         message.warning('请先登录后再下单')
         navigate(`/login?redirect=${encodeURIComponent(`/products/${product.id}`)}`)
         return
       }
-      const serverMessage = error?.response?.data?.message
+      const serverMessage = getErrorMessage(error)
       message.error(serverMessage || '下单失败，请先登录并确认库存')
     } finally {
       setSubmitting(false)

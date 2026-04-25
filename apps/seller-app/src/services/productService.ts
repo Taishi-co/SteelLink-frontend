@@ -160,7 +160,7 @@ function mapStatus(status: number): ProductStatus {
   }
 }
 
-function parseJwtPayload(token: string | null): Record<string, any> | null {
+function parseJwtPayload(token: string | null): Record<string, unknown> | null {
   if (!token) return null
   const parts = token.split('.')
   if (parts.length < 2) return null

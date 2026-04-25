@@ -79,9 +79,9 @@ function removeStorageItem(key: string) {
 
 export const buyerAuthService = {
   login: (payload: BuyerLoginPayload) =>
-    api.post<any, ApiResponse<LoginResponse>>('/auth/login', payload),
+    api.post<unknown, ApiResponse<LoginResponse>>('/auth/login', payload),
   register: (payload: BuyerRegisterPayload) =>
-    api.post<any, ApiResponse<LoginResponse>>('/auth/register', payload),
+    api.post<unknown, ApiResponse<LoginResponse>>('/auth/register', payload),
 }
 
 export function normalizeBuyerUser(profile: BuyerProfile): User {

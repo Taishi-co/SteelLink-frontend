@@ -127,6 +127,19 @@ function normalizeUploadList(fileList?: string[]) {
   }))
 }
 
+function getErrorMessage(error: unknown) {
+  if (typeof error === 'object' && error !== null) {
+    const response = 'response' in error ? error.response : undefined
+    if (typeof response === 'object' && response !== null && 'data' in response) {
+      const data = response.data
+      if (typeof data === 'object' && data !== null && 'message' in data && typeof data.message === 'string') {
+        return data.message
+      }
+    }
+  }
+  return undefined
+}
+
 function toPayload(values: ProductFormValues) {
   return {
     name: values.name,
@@ -248,8 +261,8 @@ export default function ProductsPage() {
       message.success(editingProduct ? '商品已重新提交审核' : '商品已提交审核，请等待平台处理')
       closeModal()
       await loadProducts()
-    } catch (error: any) {
-      const serverMessage = error?.response?.data?.message
+    } catch (error: unknown) {
+      const serverMessage = getErrorMessage(error)
       message.error(serverMessage || '提交失败，请确认后端服务正常且当前账号已登录')
     } finally {
       setSubmitting(false)
