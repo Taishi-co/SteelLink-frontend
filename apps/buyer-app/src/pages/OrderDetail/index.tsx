@@ -105,6 +105,23 @@ const httpUrlRule = {
   },
 }
 
+function hasFormErrorFields(error: unknown) {
+  return typeof error === 'object' && error !== null && 'errorFields' in error
+}
+
+function getErrorMessage(error: unknown) {
+  if (typeof error === 'object' && error !== null) {
+    const response = 'response' in error ? error.response : undefined
+    if (typeof response === 'object' && response !== null && 'data' in response) {
+      const data = response.data
+      if (typeof data === 'object' && data !== null && 'message' in data && typeof data.message === 'string') {
+        return data.message
+      }
+    }
+  }
+  return undefined
+}
+
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -152,9 +169,9 @@ export default function OrderDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       form.resetFields()
       setOpen(false)
-    } catch (error: any) {
-      if (error?.errorFields) return
-      message.error(error?.response?.data?.message || '上传失败')
+    } catch (error: unknown) {
+      if (hasFormErrorFields(error)) return
+      message.error(getErrorMessage(error) || '上传失败')
     } finally {
       setUploading(false)
     }
@@ -174,9 +191,9 @@ export default function OrderDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       deliveryForm.resetFields()
       setDeliveryOpen(false)
-    } catch (error: any) {
-      if (error?.errorFields) return
-      message.error(error?.response?.data?.message || '保存失败')
+    } catch (error: unknown) {
+      if (hasFormErrorFields(error)) return
+      message.error(getErrorMessage(error) || '保存失败')
     } finally {
       setSavingDelivery(false)
     }
@@ -204,9 +221,9 @@ export default function OrderDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       receiptForm.resetFields()
       setReceiptOpen(false)
-    } catch (error: any) {
-      if (error?.errorFields) return
-      message.error(error?.response?.data?.message || '确认收货失败')
+    } catch (error: unknown) {
+      if (hasFormErrorFields(error)) return
+      message.error(getErrorMessage(error) || '确认收货失败')
     } finally {
       setConfirmingReceipt(false)
     }
