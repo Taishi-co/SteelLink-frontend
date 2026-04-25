@@ -19,6 +19,7 @@ export default function HomeFooter() {
             <Text className="text-white font-medium block mb-4">平台服务</Text>
             <Space direction="vertical" className="text-gray-400">
               <Link to="/products" className="text-gray-400 hover:text-white">现货商城</Link>
+              <Link to="/matching" className="text-gray-400 hover:text-white">信息撮合</Link>
               <Link to="/bidding" className="text-gray-400 hover:text-white">竞价交易</Link>
               <Link to="/procurement" className="text-gray-400 hover:text-white">集采大厅</Link>
               <Link to="/supply" className="text-gray-400 hover:text-white">供求信息</Link>
