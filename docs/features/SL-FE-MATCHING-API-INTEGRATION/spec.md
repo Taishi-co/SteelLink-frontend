@@ -44,7 +44,7 @@
   - `POST /api/v1/supply-demands`
 - 请求/响应变化: 无，复用后端现有契约。
 - 环境变量变化: 无，继续使用 `VITE_API_URL` 或默认 `/api/v1`。
-- 生产环境检查: `http://117.72.123.14/api/v1/supply-demands/stats` 返回成功，说明供求信息路由和数据库表当前可用；直接 SSH 因当前环境缺少可用凭据失败。
+- 生产环境检查: `http://117.72.123.14/api/v1/supply-demands/stats` 返回成功；已通过 SSH 核验 `steellink.supply_demand_posts` 存在，字段与后端 GORM 实体匹配。
 
 ## 权限影响
 

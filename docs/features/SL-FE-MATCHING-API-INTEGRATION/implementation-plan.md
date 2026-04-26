@@ -17,11 +17,13 @@
 curl http://117.72.123.14/api/v1/supply-demands/stats
 ```
 
-返回 `code=0`，说明当前生产 API 和表结构可用。当前环境没有可用 SSH 凭据，无法直接登录服务器执行 `SHOW CREATE TABLE`；如需人工核验，可在服务器执行：
+返回 `code=0`。同时已通过 SSH 登录生产机并在 `steellink` 库执行：
 
 ```sql
 SHOW CREATE TABLE supply_demand_posts;
 ```
+
+确认 `supply_demand_posts` 已存在，包含 `post_no`、`type`、`title`、`category`、`quantity`、`target_price`、`tags`、`match_count`、`match_amount`、`status`、`enterprise_id`、`created_by`、`deleted_at` 等字段和后端实体所需索引，因此无需手动新增表。
 
 ## 风险与回滚
 
