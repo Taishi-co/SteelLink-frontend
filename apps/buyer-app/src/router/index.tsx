@@ -16,6 +16,7 @@ import AboutPage from '@/pages/About'
 import ProcurementPage from '@/pages/Procurement'
 import BiddingPage from '@/pages/Bidding'
 import BiddingModulePage from '@/pages/BiddingModule'
+import ProcurementDetailPage from '@/pages/ProcurementDetail'
 
 // Placeholder pages
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -44,6 +45,7 @@ export function AppRouter() {
         <Route path="bidding" element={<BiddingPage />} />
         <Route path="bidding/:module" element={<BiddingModulePage />} />
         <Route path="procurement" element={<ProcurementPage />} />
+        <Route path="procurement/:id" element={<ProcurementDetailPage />} />
         <Route path="supply" element={<SupplyPage />} />
         <Route path="about" element={<AboutPage />} />
       </Route>
