@@ -28,9 +28,11 @@ import {
   ReloadOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
+import { getErrorMessage } from '@steellink/shared/utils'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { sellerProductService, type SellerProductRecord } from '@/services/productService'
+import { uploadService, type UploadPurpose } from '@/services/uploadService'
 
 const { Search } = Input
 const { Paragraph, Text } = Typography
@@ -127,20 +129,25 @@ function normalizeUploadList(fileList?: string[]) {
   }))
 }
 
-function getErrorMessage(error: unknown) {
-  if (typeof error === 'object' && error !== null) {
-    const response = 'response' in error ? error.response : undefined
-    if (typeof response === 'object' && response !== null && 'data' in response) {
-      const data = response.data
-      if (typeof data === 'object' && data !== null && 'message' in data && typeof data.message === 'string') {
-        return data.message
-      }
+async function resolveUploadedURLs(fileList: UploadFile[] = [], purpose: UploadPurpose) {
+  const urls: string[] = []
+
+  for (const file of fileList) {
+    if (file.url) {
+      urls.push(file.url)
+      continue
     }
+    if (!file.originFileObj) {
+      continue
+    }
+    const uploaded = await uploadService.upload(file.originFileObj, purpose)
+    urls.push(uploaded.url)
   }
-  return undefined
+
+  return urls
 }
 
-function toPayload(values: ProductFormValues) {
+function toPayload(values: ProductFormValues, imageURLs: string[], qualificationURLs: string[]) {
   return {
     name: values.name,
     category: values.category,
@@ -162,6 +169,8 @@ function toPayload(values: ProductFormValues) {
     quantity: values.quantity,
     unit_price: values.unitPrice,
     min_order_qty: values.minOrderQty,
+    images: imageURLs,
+    quality_cert: qualificationURLs[0] || '',
     description: values.description,
     delivery_days: values.deliveryDays,
     quote_validity: values.quoteValidity,
@@ -257,13 +266,14 @@ export default function ProductsPage() {
     const values = await form.validateFields()
     setSubmitting(true)
     try {
-      await sellerProductService.create(toPayload(values))
+      const imageURLs = await resolveUploadedURLs(values.imageFiles, 'product_image')
+      const qualificationURLs = await resolveUploadedURLs(values.qualificationFiles, 'product_qualification')
+      await sellerProductService.create(toPayload(values, imageURLs, qualificationURLs))
       message.success(editingProduct ? '商品已重新提交审核' : '商品已提交审核，请等待平台处理')
       closeModal()
       await loadProducts()
     } catch (error: unknown) {
-      const serverMessage = getErrorMessage(error)
-      message.error(serverMessage || '提交失败，请确认后端服务正常且当前账号已登录')
+      message.error(getErrorMessage(error, '提交失败，请确认后端服务正常且当前账号已登录'))
     } finally {
       setSubmitting(false)
     }
@@ -515,7 +525,7 @@ export default function ProductsPage() {
               <InputNumber min={1} className="w-60" placeholder="请输入报价有效期" />
             </Form.Item>
           </Space>
-          <Form.Item extra="当前后端真实提交的关键字段是钢厂、仓库信息、捆包号、起订量、交货周期和报价有效期。附件上传后续再接对象存储。">
+          <Form.Item extra="提交审核前会先上传商品主图和审核资料，后端保存真实对象存储 URL。">
             <></>
           </Form.Item>
           <Form.Item name="description" label="商品说明" rules={[{ required: true, message: '请输入商品说明' }]}>
@@ -536,7 +546,7 @@ export default function ProductsPage() {
                 },
               },
             ]}
-            extra="当前本地开发环境会把文件名写入数据库，后续可再接入对象存储。"
+            extra="商品主图上传到公开桶，用于买家端商城展示。"
           >
             <Upload beforeUpload={() => false} listType="picture" maxCount={5}>
               <Button icon={<CloudUploadOutlined />}>上传主图</Button>
@@ -557,7 +567,7 @@ export default function ProductsPage() {
                 },
               },
             ]}
-            extra="建议上传材质证明、质保书、出厂单等材料。"
+            extra="建议上传材质证明、质保书、出厂单等材料，文件会上传到私有资料桶。"
           >
             <Upload beforeUpload={() => false} maxCount={8}>
               <Button icon={<CloudUploadOutlined />}>上传审核资料</Button>

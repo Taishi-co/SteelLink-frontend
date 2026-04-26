@@ -10,10 +10,10 @@
 
 ## 文档与脚本约束
 
-- 当前仓库优先维护文档和 shell 脚本，不要虚构不存在的应用目录结构
+- 当前仓库包含真实前端应用；修改 `apps/` 或 `packages/` 时必须同步 feature 文档并执行应用级验证
 - 权限改动必须同步核对 `docs/domain/role-permission-matrix.md`，并注明配套前端应用仓中的落点文件
 - 新增脚本、配置、流程变更时优先更新文档再改脚本
-- 若当前工作区包含真实应用工程，再补充应用级 lint/build/测试验证
+- 修改真实应用工程时，补充对应 `pnpm --filter <app> build`、lint 或测试验证
 
 ## 命令约束
 
@@ -35,7 +35,7 @@
 1. `./harness/verify.sh`
 2. feature 文档四件套完整
 3. 变更说明覆盖影响范围、外部依赖与回滚关注点
-4. 若当前工作区存在 `package.json`，补充 `npm run lint` 与 `npm run build`
+4. 若当前工作区存在 `package.json`，补充对应 pnpm workspace 的 lint/build 验证
 5. 分支名、PR base branch 与 merge 方式符合 `docs/ai/git-workflow.md`
 
 ## 禁止事项

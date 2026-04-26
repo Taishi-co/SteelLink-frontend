@@ -145,8 +145,12 @@ export default function MallPage() {
                   <Col key={product.id} span={6}>
                     <Link to={`/products/${product.id}`}>
                       <Card hoverable className="h-full">
-                        <div className="mb-3 flex h-32 items-center justify-center rounded bg-gray-100">
-                          <span className="text-4xl">钢</span>
+                        <div className="mb-3 flex h-32 items-center justify-center overflow-hidden rounded bg-gray-100">
+                          {product.images?.[0] ? (
+                            <img src={product.images[0]} alt={product.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="text-4xl">钢</span>
+                          )}
                         </div>
                         <Title level={5} className="!mb-2 !text-sm line-clamp-2">
                           {product.name}

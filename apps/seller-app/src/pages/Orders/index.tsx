@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Descriptions, Input, Modal, Select, Space, Spin, Table, Tag, Timeline, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { EyeOutlined } from '@ant-design/icons'
-import { timelineColor } from '@steellink/shared/utils'
+import { getErrorMessage, timelineColor } from '@steellink/shared/utils'
 import { sellerOrderService, type SellerOrderInfo } from '@/services/orderService'
 
 const { Search } = Input
@@ -53,19 +53,6 @@ function getPrimaryProduct(order: SellerOrderInfo) {
   return order.items[0]
 }
 
-function getErrorMessage(error: unknown) {
-  if (typeof error === 'object' && error !== null) {
-    const response = 'response' in error ? error.response : undefined
-    if (typeof response === 'object' && response !== null && 'data' in response) {
-      const data = response.data
-      if (typeof data === 'object' && data !== null && 'message' in data && typeof data.message === 'string') {
-        return data.message
-      }
-    }
-  }
-  return error instanceof Error ? error.message : undefined
-}
-
 export default function OrdersPage() {
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState<SellerOrderInfo[]>([])
@@ -83,7 +70,7 @@ export default function OrdersPage() {
       const list = await sellerOrderService.list()
       setOrders(list)
     } catch (error: unknown) {
-      message.error(getErrorMessage(error) || '订单加载失败')
+      message.error(getErrorMessage(error, '订单加载失败'))
     } finally {
       setLoading(false)
     }
@@ -113,7 +100,7 @@ export default function OrdersPage() {
       setSelectedOrder(detail)
       setIsModalOpen(true)
     } catch (error: unknown) {
-      message.error(getErrorMessage(error) || '订单详情加载失败')
+      message.error(getErrorMessage(error, '订单详情加载失败'))
     } finally {
       setActionLoading(false)
     }
@@ -155,7 +142,7 @@ export default function OrdersPage() {
       setConfirmAction(null)
       setConfirmInput('')
     } catch (error: unknown) {
-      message.error(getErrorMessage(error) || '操作失败')
+      message.error(getErrorMessage(error, '操作失败'))
     } finally {
       setActionLoading(false)
     }
