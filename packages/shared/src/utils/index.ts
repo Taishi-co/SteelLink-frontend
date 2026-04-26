@@ -82,3 +82,36 @@ export function timelineColor(status: string): string {
   if (status === 'skipped') return 'gray'
   return 'gray'
 }
+
+interface HttpLikeError {
+  response?: {
+    status?: number
+    data?: {
+      message?: string
+    }
+  }
+  message?: string
+  errorFields?: unknown
+}
+
+function isHttpLikeError(error: unknown): error is HttpLikeError {
+  return typeof error === 'object' && error !== null
+}
+
+export function getErrorMessage(error: unknown, fallback: string): string {
+  if (!isHttpLikeError(error)) {
+    return fallback
+  }
+  return error.response?.data?.message || error.message || fallback
+}
+
+export function getErrorStatus(error: unknown): number | undefined {
+  if (!isHttpLikeError(error)) {
+    return undefined
+  }
+  return error.response?.status
+}
+
+export function hasFormErrorFields(error: unknown): boolean {
+  return isHttpLikeError(error) && Boolean(error.errorFields)
+}

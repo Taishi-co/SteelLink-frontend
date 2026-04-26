@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, Card, Form, Input, Tabs, Typography, message } from 'antd'
 import { LockOutlined, MobileOutlined, UserOutlined } from '@ant-design/icons'
+import { getErrorMessage } from '@steellink/shared/utils'
 import { saveSellerSession, sellerAuthService } from '@/services/auth'
 
 const { Paragraph, Text } = Typography
@@ -15,19 +16,6 @@ interface RegisterValues {
   phone: string
   password: string
   email?: string
-}
-
-function getErrorMessage(error: unknown) {
-  if (typeof error === 'object' && error !== null) {
-    const response = 'response' in error ? error.response : undefined
-    if (typeof response === 'object' && response !== null && 'data' in response) {
-      const data = response.data
-      if (typeof data === 'object' && data !== null && 'message' in data && typeof data.message === 'string') {
-        return data.message
-      }
-    }
-  }
-  return error instanceof Error ? error.message : undefined
 }
 
 export default function LoginPage() {
@@ -46,8 +34,7 @@ export default function LoginPage() {
       message.success('卖家登录成功')
       navigate('/dashboard', { replace: true })
     } catch (error: unknown) {
-      const serverMessage = getErrorMessage(error)
-      message.error(serverMessage || '登录失败，请检查账号密码或确认后端服务是否正常')
+      message.error(getErrorMessage(error, '登录失败，请检查账号密码或确认后端服务是否正常'))
     } finally {
       setLoading(false)
     }
@@ -65,8 +52,7 @@ export default function LoginPage() {
       message.success('注册成功，已自动登录')
       navigate('/dashboard', { replace: true })
     } catch (error: unknown) {
-      const serverMessage = getErrorMessage(error)
-      message.error(serverMessage || '注册失败，请确认手机号未被占用')
+      message.error(getErrorMessage(error, '注册失败，请确认手机号未被占用'))
     } finally {
       setLoading(false)
     }

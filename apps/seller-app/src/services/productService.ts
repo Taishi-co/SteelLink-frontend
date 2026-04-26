@@ -138,6 +138,8 @@ export interface UpsertProductPayload {
   quantity: number
   unit_price: number
   min_order_qty: number
+  images: string[]
+  quality_cert?: string
   description: string
   delivery_days: number
   quote_validity: number

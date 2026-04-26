@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Spin, Steps, Tag, Timeline, Typography, message } from 'antd'
+import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Spin, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
 import { ArrowLeftOutlined, CarOutlined, CheckCircleOutlined, UploadOutlined } from '@ant-design/icons'
-import { timelineColor } from '@steellink/shared/utils'
+import type { UploadFile } from 'antd/es/upload/interface'
+import { getErrorMessage, hasFormErrorFields, timelineColor } from '@steellink/shared/utils'
 import { orderService } from '@/services/orderService'
 import { productService } from '@/services/productService'
+import { uploadService } from '@/services/uploadService'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -94,32 +96,12 @@ function formatTimelineTime(value?: string) {
   return value ? new Date(value).toLocaleString() : ''
 }
 
-const httpUrlRule = {
-  validator: async (_: unknown, value?: string) => {
-    if (!value) {
-      throw new Error('请输入凭证地址')
-    }
-    if (!isValidHttpUrl(value)) {
-      throw new Error('请输入完整的 http/https 地址')
-    }
-  },
-}
-
-function hasFormErrorFields(error: unknown) {
-  return typeof error === 'object' && error !== null && 'errorFields' in error
-}
-
-function getErrorMessage(error: unknown) {
-  if (typeof error === 'object' && error !== null) {
-    const response = 'response' in error ? error.response : undefined
-    if (typeof response === 'object' && response !== null && 'data' in response) {
-      const data = response.data
-      if (typeof data === 'object' && data !== null && 'message' in data && typeof data.message === 'string') {
-        return data.message
-      }
-    }
+function getUploadFile(fileList?: UploadFile[]) {
+  const file = fileList?.[0]?.originFileObj
+  if (!file) {
+    throw new Error('请先选择凭证文件')
   }
-  return undefined
+  return file
 }
 
 export default function OrderDetailPage() {
@@ -163,7 +145,13 @@ export default function OrderDetailPage() {
     try {
       const values = await form.validateFields()
       setUploading(true)
-      await orderService.uploadPaymentVoucher(Number(id), values)
+      const uploaded = await uploadService.upload(getUploadFile(values.voucher_file), 'payment_voucher')
+      await orderService.uploadPaymentVoucher(Number(id), {
+        voucher_url: uploaded.url,
+        transaction_no: values.transaction_no,
+        payer_account: values.payer_account,
+        payee_account: values.payee_account,
+      })
       message.success('支付凭证已上传')
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
@@ -171,7 +159,7 @@ export default function OrderDetailPage() {
       setOpen(false)
     } catch (error: unknown) {
       if (hasFormErrorFields(error)) return
-      message.error(getErrorMessage(error) || '上传失败')
+      message.error(getErrorMessage(error, '上传失败'))
     } finally {
       setUploading(false)
     }
@@ -193,7 +181,7 @@ export default function OrderDetailPage() {
       setDeliveryOpen(false)
     } catch (error: unknown) {
       if (hasFormErrorFields(error)) return
-      message.error(getErrorMessage(error) || '保存失败')
+      message.error(getErrorMessage(error, '保存失败'))
     } finally {
       setSavingDelivery(false)
     }
@@ -215,7 +203,10 @@ export default function OrderDetailPage() {
     try {
       const values = await receiptForm.validateFields()
       setConfirmingReceipt(true)
-      await orderService.confirmReceipt(Number(id), values)
+      const uploaded = await uploadService.upload(getUploadFile(values.receipt_file), 'receipt_voucher')
+      await orderService.confirmReceipt(Number(id), {
+        receipt_voucher: uploaded.url,
+      })
       message.success('已确认收货，订单已完成')
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
@@ -223,7 +214,7 @@ export default function OrderDetailPage() {
       setReceiptOpen(false)
     } catch (error: unknown) {
       if (hasFormErrorFields(error)) return
-      message.error(getErrorMessage(error) || '确认收货失败')
+      message.error(getErrorMessage(error, '确认收货失败'))
     } finally {
       setConfirmingReceipt(false)
     }
@@ -415,8 +406,16 @@ export default function OrderDetailPage() {
               confirmLoading={uploading}
             >
               <Form form={form} layout="vertical">
-                <Form.Item name="voucher_url" label="凭证地址" rules={[httpUrlRule]}>
-                  <Input placeholder="例如：https://example.com/payment-voucher.jpg" />
+                <Form.Item
+                  name="voucher_file"
+                  label="支付凭证文件"
+                  valuePropName="fileList"
+                  getValueFromEvent={(event) => event?.fileList ?? []}
+                  rules={[{ required: true, message: '请上传支付凭证文件' }]}
+                >
+                  <Upload beforeUpload={() => false} maxCount={1}>
+                    <Button icon={<UploadOutlined />}>选择文件</Button>
+                  </Upload>
                 </Form.Item>
                 <Form.Item name="transaction_no" label="交易流水号">
                   <Input />
@@ -480,8 +479,16 @@ export default function OrderDetailPage() {
               confirmLoading={confirmingReceipt}
             >
               <Form form={receiptForm} layout="vertical">
-                <Form.Item name="receipt_voucher" label="签收凭证地址" rules={[httpUrlRule]}>
-                  <Input placeholder="例如：https://example.com/receipt-voucher.jpg" />
+                <Form.Item
+                  name="receipt_file"
+                  label="签收凭证文件"
+                  valuePropName="fileList"
+                  getValueFromEvent={(event) => event?.fileList ?? []}
+                  rules={[{ required: true, message: '请上传签收凭证文件' }]}
+                >
+                  <Upload beforeUpload={() => false} maxCount={1}>
+                    <Button icon={<UploadOutlined />}>选择文件</Button>
+                  </Upload>
                 </Form.Item>
               </Form>
             </Modal>
