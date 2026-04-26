@@ -11,6 +11,10 @@ interface BuyerProfile {
   phone: string
   qq: string
   email: string
+  real_name: string
+  id_card: string
+  identity_status: number
+  identity_reject: string
   status: number
   created_at: string
   updated_at: string
@@ -91,6 +95,10 @@ export function normalizeBuyerUser(profile: BuyerProfile): User {
     mobile: profile.phone,
     companyName: profile.enterprise_code || '个人用户',
     role: 'buyer',
+    realName: profile.real_name || '',
+    identityStatus: profile.identity_status || 0,
+    identityReject: profile.identity_reject || '',
+    enterpriseCode: profile.enterprise_code || '',
   }
 }
 

@@ -13,6 +13,8 @@ import OrdersPage from '@/pages/Orders'
 import MatchingPage from '@/pages/Matching'
 import AiProcurementPage from '@/pages/AiProcurement'
 import AboutPage from '@/pages/About'
+import IdentityPage from '@/pages/Identity'
+import EnterprisePage from '@/pages/Enterprise'
 import ProcurementPage from '@/pages/Procurement'
 import BiddingPage from '@/pages/Bidding'
 import BiddingModulePage from '@/pages/BiddingModule'
@@ -48,6 +50,8 @@ export function AppRouter() {
         <Route path="procurement/:id" element={<ProcurementDetailPage />} />
         <Route path="supply" element={<SupplyPage />} />
         <Route path="about" element={<AboutPage />} />
+        <Route path="identity" element={<IdentityPage />} />
+        <Route path="enterprise" element={<EnterprisePage />} />
       </Route>
 
       {/* Buyer pages - with MainLayout */}

@@ -1,7 +1,8 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Button, Space, Dropdown, Avatar } from 'antd'
-import { TeamOutlined, UserOutlined, LogoutOutlined, ShoppingCartOutlined, OrderedListOutlined } from '@ant-design/icons'
+import { TeamOutlined, UserOutlined, LogoutOutlined, ShoppingCartOutlined, OrderedListOutlined, SafetyCertificateOutlined, BankOutlined } from '@ant-design/icons'
 import { clearBuyerSession } from '@/services/auth'
+import { getIdentityStatusLabel } from '@/services/certificationService'
 import { useUserStore } from '@/stores'
 
 const { Header: AntHeader } = Layout
@@ -31,6 +32,8 @@ export default function HomeHeader() {
     || (location.pathname === '/' ? '/' : '')
 
   const userMenuItems = [
+    { key: 'identity', label: `实名认证 (${getIdentityStatusLabel(user?.identityStatus ?? 0)})`, icon: <SafetyCertificateOutlined />, onClick: () => navigate('/identity') },
+    { key: 'enterprise', label: user?.enterpriseCode ? '企业信息' : '企业入驻', icon: <BankOutlined />, onClick: () => navigate('/enterprise') },
     { key: 'orders', label: '我的订单', icon: <OrderedListOutlined />, onClick: () => navigate('/orders') },
     { key: 'cart', label: '购物车', icon: <ShoppingCartOutlined />, onClick: () => navigate('/cart') },
     { key: 'divider', type: 'divider' as const },
@@ -68,9 +71,9 @@ export default function HomeHeader() {
               <Link to="/login">
                 <Button type="primary">登录 / 注册</Button>
               </Link>
-              <a href="/seller">
+              <Link to="/enterprise">
                 <Button icon={<TeamOutlined />}>企业入驻</Button>
-              </a>
+              </Link>
             </>
           )}
         </Space>
