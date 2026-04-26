@@ -29,7 +29,7 @@ export default function HomeFooter() {
             <Text className="text-white font-medium block mb-4">关于我们</Text>
             <Space direction="vertical" className="text-gray-400">
               <Link to="/about" className="text-gray-400 hover:text-white">平台介绍</Link>
-              <Link to="/contact" className="text-gray-400 hover:text-white">联系我们</Link>
+              <Link to="/about#contact" className="text-gray-400 hover:text-white">联系我们</Link>
               <Link to="/help" className="text-gray-400 hover:text-white">帮助中心</Link>
             </Space>
           </Col>
