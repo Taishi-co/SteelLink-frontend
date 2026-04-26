@@ -9,10 +9,10 @@ const { Header: AntHeader } = Layout
 const navItems = [
   { key: '/', label: '首页' },
   { key: '/mall', label: '现货商城' },
-  { key: '/matching', label: '信息撮合' },
+  { key: '/matching', label: '供求信息' },
+  { key: '/ai-procurement', label: 'AI采购' },
   { key: '/bidding', label: '竞价交易' },
   { key: '/procurement', label: '集采大厅' },
-  { key: '/supply', label: '供求信息' },
   { key: '/about', label: '平台介绍' },
 ]
 

@@ -11,6 +11,7 @@ import CheckoutPage from '@/pages/Checkout'
 import OrderDetailPage from '@/pages/OrderDetail'
 import OrdersPage from '@/pages/Orders'
 import MatchingPage from '@/pages/Matching'
+import AiProcurementPage from '@/pages/AiProcurement'
 
 // Placeholder pages
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -38,6 +39,7 @@ export function AppRouter() {
         <Route index element={<HomePage />} />
         <Route path="mall" element={<MallPage />} />
         <Route path="matching" element={<MatchingPage />} />
+        <Route path="ai-procurement" element={<AiProcurementPage />} />
         <Route path="bidding" element={<BiddingPage />} />
         <Route path="procurement" element={<ProcurementPage />} />
         <Route path="supply" element={<SupplyPage />} />

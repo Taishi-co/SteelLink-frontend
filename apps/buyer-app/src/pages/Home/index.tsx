@@ -6,6 +6,7 @@ import {
   ThunderboltOutlined,
   TeamOutlined,
   RocketOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 
 const { Title, Paragraph, Text } = Typography
@@ -57,7 +58,7 @@ export default function HomePage() {
                 专业B2B钢材交易平台
               </Title>
               <Paragraph className="!text-white/90 text-xl mb-8">
-                现货直购 · 信息撮合 · 竞价交易 · 集采服务 · 一站式钢铁供应链解决方案
+                现货直购 · 供求信息 · AI采购 · 竞价交易 · 一站式钢铁供应链解决方案
               </Paragraph>
               <div className="flex gap-4">
                 <Link to="/mall">
@@ -136,11 +137,21 @@ export default function HomePage() {
             <Col flex="1 1 200px">
               <Card hoverable className="h-full text-center">
                 <div className="text-5xl mb-4">🤝</div>
-                <Title level={4}>信息撮合</Title>
+                <Title level={4}>供求信息</Title>
                 <Paragraph className="text-gray-500">
                   供需线索智能连接，快速发现合适商机
                 </Paragraph>
-                <Link to="/matching">查看撮合 →</Link>
+                <Link to="/matching">查看供求 →</Link>
+              </Card>
+            </Col>
+            <Col flex="1 1 200px">
+              <Card hoverable className="h-full text-center">
+                <RobotOutlined className="text-5xl mb-4 text-primary-500" />
+                <Title level={4}>AI采购</Title>
+                <Paragraph className="text-gray-500">
+                  对话式采购助手，自动解析需求并生成采购流程
+                </Paragraph>
+                <Link to="/ai-procurement">开始采购 →</Link>
               </Card>
             </Col>
             <Col flex="1 1 200px">
@@ -161,16 +172,6 @@ export default function HomePage() {
                   多家企业联合采购，共享优惠价格
                 </Paragraph>
                 <Link to="/procurement">了解详情 →</Link>
-              </Card>
-            </Col>
-            <Col flex="1 1 200px">
-              <Card hoverable className="h-full text-center">
-                <div className="text-5xl mb-4">📢</div>
-                <Title level={4}>供求信息</Title>
-                <Paragraph className="text-gray-500">
-                  发布供求需求，精准匹配商机
-                </Paragraph>
-                <Link to="/supply">发布信息 →</Link>
               </Card>
             </Col>
           </Row>
