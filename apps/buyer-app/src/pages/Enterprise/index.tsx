@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Form, Input, Button, Typography, Select, Upload, Spin, message, Divider } from 'antd'
+import { Card, Form, Input, Button, Typography, Select, Upload, Spin, message, Divider, Descriptions, Tag } from 'antd'
 import { BankOutlined, UploadOutlined, ArrowLeftOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons'
 import { certificationService } from '@/services/certificationService'
 import { uploadService } from '@/services/uploadService'
@@ -15,6 +15,7 @@ export default function EnterprisePage() {
   const [mode, setMode] = useState<'create' | 'join' | null>(null)
   const [fetching, setFetching] = useState(true)
   const [hasEnterprise, setHasEnterprise] = useState(false)
+  const [enterpriseInfo, setEnterpriseInfo] = useState<any>(null)
   const [licenseUrl, setLicenseUrl] = useState('')
   const navigate = useNavigate()
   const user = useUserStore((s) => s.user)
@@ -28,6 +29,10 @@ export default function EnterprisePage() {
       const res = await certificationService.getMyEnterprise()
       if (res.code === 0 && res.data) {
         setHasEnterprise(true)
+        const list = Array.isArray(res.data) ? res.data : [res.data]
+        if (list.length > 0) {
+          setEnterpriseInfo(list[0])
+        }
       }
     } catch {
     } finally {
@@ -112,11 +117,29 @@ export default function EnterprisePage() {
           </div>
 
           {hasEnterprise ? (
-            <div className="text-center py-8">
-              <TeamOutlined className="text-6xl text-green-400 mb-4" />
-              <Title level={4}>您已加入企业</Title>
-              <Paragraph type="secondary">您可以正常使用平台交易功能</Paragraph>
-              <Button type="primary" onClick={() => navigate('/mall')}>进入商城</Button>
+            <div>
+              <div className="text-center mb-6">
+                <TeamOutlined className="text-5xl text-green-400 mb-3" />
+                <Title level={4}>您已加入企业</Title>
+              </div>
+              {enterpriseInfo && (
+                <Descriptions bordered column={1} size="small" className="mb-6">
+                  <Descriptions.Item label="企业名称">{enterpriseInfo.name}</Descriptions.Item>
+                  <Descriptions.Item label="企业编码">{enterpriseInfo.enterprise_code}</Descriptions.Item>
+                  <Descriptions.Item label="企业角色">
+                    <Tag color="blue">{enterpriseInfo.enterprise_role}</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="统一社会信用代码">{enterpriseInfo.credit_code}</Descriptions.Item>
+                  <Descriptions.Item label="认证状态">
+                    <Tag color={enterpriseInfo.status === 1 ? 'success' : enterpriseInfo.status === 0 ? 'processing' : 'error'}>
+                      {enterpriseInfo.status === 1 ? '已认证' : enterpriseInfo.status === 0 ? '待审核' : '已驳回'}
+                    </Tag>
+                  </Descriptions.Item>
+                </Descriptions>
+              )}
+              <div className="text-center">
+                <Button type="primary" onClick={() => navigate('/mall')}>进入商城</Button>
+              </div>
             </div>
           ) : user?.identityStatus !== 2 ? (
             <div className="text-center py-8">
