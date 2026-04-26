@@ -8,7 +8,7 @@ import {
   SafetyCertificateOutlined,
   BankOutlined,
   DollarOutlined,
-  HomeOutlined,
+  ShopOutlined,
   LineChartOutlined,
   LogoutOutlined,
   UserOutlined,
@@ -25,7 +25,7 @@ const navItems = [
   { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
   { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单' },
   { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资' },
-  { key: '/dashboard/logistics', icon: <HomeOutlined />, label: '仓储物流' },
+  { key: '/dashboard/logistics', icon: <ShopOutlined />, label: '仓储物流' },
 ]
 
 const accountItems = [

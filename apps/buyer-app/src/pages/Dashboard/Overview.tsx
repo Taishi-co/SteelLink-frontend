@@ -34,11 +34,6 @@ interface RecentOrder {
   product_name: string
 }
 
-interface DashboardResponse {
-  stats: DashboardStats
-  recent_orders: RecentOrder[]
-}
-
 const ORDER_STATUS_MAP: Record<number, { label: string; color: string }> = {
   1: { label: '待确认', color: 'default' },
   2: { label: '待签合同', color: 'default' },
@@ -79,10 +74,24 @@ export default function DashboardOverview() {
   const fetchDashboard = async () => {
     try {
       setLoading(true)
-      const res = await api.get<any, { code: number; data: DashboardResponse }>('/users/me/dashboard')
+      const res = await api.get<any, { code: number; data: any }>('/users/me/dashboard')
       if (res.code === 0 && res.data) {
-        setStats(res.data.stats)
-        setRecentOrders(res.data.recent_orders || [])
+        const raw = res.data
+        setStats({
+          inTransitAmount: raw.stats?.in_transit_amount || raw.stats?.inTransitAmount || 0,
+          pendingPaymentCount: raw.stats?.pending_payment_count || raw.stats?.pendingPaymentCount || 0,
+          monthlyPurchaseAmount: raw.stats?.monthly_purchase_amount || raw.stats?.monthlyPurchaseAmount || 0,
+          stockQuantity: raw.stats?.stock_quantity || raw.stats?.stockQuantity || 0,
+        })
+        const orders = (raw.recent_orders || []).map((o: any) => ({
+          id: o.id,
+          order_no: o.order_no,
+          status: o.status,
+          total_amount: o.total_amount,
+          created_at: o.created_at,
+          product_name: o.product_name,
+        }))
+        setRecentOrders(orders)
       }
     } catch {
     } finally {
@@ -117,7 +126,7 @@ export default function DashboardOverview() {
       value: `${stats.stockQuantity} 吨`,
       icon: <InboxOutlined />,
       accent: '#6366f1',
-      sub: '仓库在库总量',
+      sub: '平台可购总量',
     },
   ]
 
@@ -211,7 +220,7 @@ export default function DashboardOverview() {
                     <div
                       key={order.id}
                       className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/orders/${order.id}`)}
+                      onClick={() => navigate(`/dashboard/orders/${order.id}`)}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">

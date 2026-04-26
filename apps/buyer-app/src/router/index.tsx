@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import HomeLayout from '@/components/Layout/HomeLayout'
 import MainLayout from '@/components/Layout/MainLayout'
 import DashboardLayout from '@/components/Layout/DashboardLayout'
+import RequireAuth from '@/components/RequireAuth'
 import HomePage from '@/pages/Home'
 import MallPage from '@/pages/Mall'
 import ProductsPage from '@/pages/Products'
@@ -61,7 +62,7 @@ export function AppRouter() {
         <Route path="orders/:id" element={<OrderDetailPage />} />
       </Route>
 
-      <Route path="/dashboard" element={<DashboardLayout />}>
+      <Route path="/dashboard" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
         <Route index element={<DashboardOverview />} />
         <Route path="market" element={<DashboardMarket />} />
         <Route path="orders" element={<OrdersPage />} />
