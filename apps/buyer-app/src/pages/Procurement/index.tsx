@@ -1,4 +1,4 @@
-import { Button, Card, Col, Form, Input, InputNumber, Row, Segmented, Select, Space, Statistic, Steps, Tag, Timeline, Typography, Upload } from 'antd'
+import { Button, Card, Col, Form, Input, InputNumber, Progress, Row, Segmented, Select, Space, Statistic, Steps, Tag, Timeline, Typography, Upload } from 'antd'
 import {
   AuditOutlined,
   BankOutlined,
@@ -15,6 +15,80 @@ import {
 } from '@ant-design/icons'
 
 const { Title, Paragraph, Text } = Typography
+
+const hallStats = [
+  { label: '进行中集采', value: 12, suffix: '场' },
+  { label: '累计参采企业', value: 386, suffix: '家' },
+  { label: '归集采购金额', value: 28.6, suffix: '亿' },
+  { label: '平均降本率', value: 6.8, suffix: '%' },
+]
+
+const procurementActivities = [
+  {
+    id: 'GP20240115001',
+    title: '2024年第一季度电解铜联合采购',
+    leader: '华东有色金属集采联盟',
+    status: '筹备中',
+    statusColor: 'gold',
+    category: '大宗商品',
+    target: '5,000 吨',
+    budget: '¥1.0亿',
+    stage: '集采筹备',
+    progress: 8,
+    companies: 0,
+    quotes: 0,
+    region: '上海 / 江苏 / 浙江',
+    openDate: '2024-01-15',
+  },
+  {
+    id: 'GP20240108006',
+    title: '华南制造业螺纹钢联合采购',
+    leader: '华南工程材料联合体',
+    status: '企业报名',
+    statusColor: 'blue',
+    category: '建筑钢材',
+    target: '12,000 吨',
+    budget: '¥4,600万',
+    stage: '企业报名',
+    progress: 22,
+    companies: 18,
+    quotes: 0,
+    region: '广州 / 深圳 / 佛山',
+    openDate: '2024-01-08',
+  },
+  {
+    id: 'GP20231228003',
+    title: '长三角冷轧卷板年度框架集采',
+    leader: '长三角汽车零部件采购联盟',
+    status: '竞价报价',
+    statusColor: 'purple',
+    category: '工业品',
+    target: '8,000 吨',
+    budget: '¥3,200万',
+    stage: '竞价报价',
+    progress: 38,
+    companies: 26,
+    quotes: 9,
+    region: '苏州 / 无锡 / 宁波',
+    openDate: '2023-12-28',
+  },
+  {
+    id: 'GP20231215002',
+    title: '西南基建项目中厚板集采',
+    leader: '西南基建供应链协同组',
+    status: '评审定标',
+    statusColor: 'cyan',
+    category: '大宗商品',
+    target: '6,500 吨',
+    budget: '¥2,900万',
+    stage: '评审定标',
+    progress: 48,
+    companies: 14,
+    quotes: 7,
+    region: '成都 / 重庆 / 贵阳',
+    openDate: '2023-12-15',
+  },
+]
 
 const processStages = [
   { title: '集采筹备', icon: <FormOutlined /> },
@@ -54,10 +128,115 @@ const activityLogs = [
 ]
 
 export default function ProcurementPage() {
+  const featuredActivity = procurementActivities[0]
+
   return (
     <div className="min-h-screen bg-gray-50">
       <section className="bg-white py-10">
         <div className="mx-auto max-w-7xl px-8">
+          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <Title level={1} className="!mb-3">集采大厅</Title>
+              <Paragraph className="text-lg text-gray-500 !mb-0">
+                汇聚牵头方发起的联合采购活动，企业可报名拼单，供应商可参与报价，平台运营负责审核、评审与归档。
+              </Paragraph>
+            </div>
+            <Space>
+              <Button>查看我的报名</Button>
+              <Button type="primary" icon={<FormOutlined />}>发起集采</Button>
+            </Space>
+          </div>
+
+          <Row gutter={[16, 16]} className="mb-8">
+            {hallStats.map((item) => (
+              <Col key={item.label} xs={24} sm={12} lg={6}>
+                <Card>
+                  <Statistic title={item.label} value={item.value} suffix={item.suffix} precision={item.label.includes('率') ? 1 : 0} />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+
+          <Card className="mb-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <Space wrap>
+                <Segmented options={['全部', '筹备中', '企业报名', '竞价报价', '评审定标', '合同签约']} defaultValue="全部" />
+                <Select
+                  defaultValue="全部品类"
+                  style={{ width: 140 }}
+                  options={[
+                    { label: '全部品类', value: '全部品类' },
+                    { label: '大宗商品', value: '大宗商品' },
+                    { label: '工业品', value: '工业品' },
+                    { label: '建筑钢材', value: '建筑钢材' },
+                  ]}
+                />
+              </Space>
+              <Input.Search placeholder="搜索集采活动、编号、牵头方" allowClear style={{ maxWidth: 360 }} />
+            </div>
+          </Card>
+
+          <Row gutter={[24, 24]} className="mb-10">
+            {procurementActivities.map((activity) => (
+              <Col key={activity.id} xs={24} lg={12}>
+                <Card hoverable className={`h-full ${activity.id === featuredActivity.id ? 'border-primary-300' : ''}`}>
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <div>
+                      <Space className="mb-3" size="small">
+                        <Tag color={activity.statusColor}>{activity.status}</Tag>
+                        <Text type="secondary">{activity.id}</Text>
+                      </Space>
+                      <Title level={4} className="!mb-2">{activity.title}</Title>
+                      <Text type="secondary">牵头方：{activity.leader}</Text>
+                    </div>
+                    <Button type={activity.id === featuredActivity.id ? 'primary' : 'default'}>查看详情</Button>
+                  </div>
+                  <Row gutter={[16, 16]}>
+                    <Col span={8}>
+                      <Text type="secondary">品类</Text>
+                      <div className="mt-1 font-semibold">{activity.category}</div>
+                    </Col>
+                    <Col span={8}>
+                      <Text type="secondary">目标数量</Text>
+                      <div className="mt-1 font-semibold">{activity.target}</div>
+                    </Col>
+                    <Col span={8}>
+                      <Text type="secondary">预算</Text>
+                      <div className="mt-1 font-semibold">{activity.budget}</div>
+                    </Col>
+                    <Col span={8}>
+                      <Text type="secondary">参采企业</Text>
+                      <div className="mt-1 font-semibold">{activity.companies} 家</div>
+                    </Col>
+                    <Col span={8}>
+                      <Text type="secondary">收到报价</Text>
+                      <div className="mt-1 font-semibold">{activity.quotes} 份</div>
+                    </Col>
+                    <Col span={8}>
+                      <Text type="secondary">区域</Text>
+                      <div className="mt-1 font-semibold">{activity.region}</div>
+                    </Col>
+                  </Row>
+                  <div className="mt-5">
+                    <div className="mb-2 flex justify-between text-sm text-gray-500">
+                      <span>当前阶段：{activity.stage}</span>
+                      <span>发起日期：{activity.openDate}</span>
+                    </div>
+                    <Progress percent={activity.progress} size="small" />
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+
+          <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <Title level={2} className="!mb-2">活动工作台</Title>
+              <Text type="secondary">当前展示选中活动的牵头方筹备工作台。</Text>
+            </div>
+            <Tag color="blue" className="w-fit px-3 py-1">当前选中：{featuredActivity.id}</Tag>
+          </div>
+
           <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <Space className="mb-4" size="small">
@@ -66,7 +245,7 @@ export default function ProcurementPage() {
                 <Tag color="purple">平</Tag>
                 <Text type="secondary">平台运营</Text>
               </Space>
-              <Title level={1} className="!mb-3">2024年第一季度电解铜联合采购</Title>
+              <Title level={2} className="!mb-3">2024年第一季度电解铜联合采购</Title>
               <Paragraph className="text-lg text-gray-500 !mb-0">
                 编号：GP20240115001 | 牵头方：华东有色金属集采联盟
               </Paragraph>
