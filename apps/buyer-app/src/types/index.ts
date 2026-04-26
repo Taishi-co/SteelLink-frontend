@@ -81,6 +81,10 @@ export interface User {
   mobile: string
   companyName: string
   role: 'buyer' | 'seller'
+  realName: string
+  identityStatus: number
+  identityReject: string
+  enterpriseCode: string
 }
 
 // Order Types

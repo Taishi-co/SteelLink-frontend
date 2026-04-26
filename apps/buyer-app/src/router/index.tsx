@@ -13,6 +13,8 @@ import OrdersPage from '@/pages/Orders'
 import MatchingPage from '@/pages/Matching'
 import AiProcurementPage from '@/pages/AiProcurement'
 import AboutPage from '@/pages/About'
+import IdentityPage from '@/pages/Identity'
+import EnterprisePage from '@/pages/Enterprise'
 
 // Placeholder pages
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -44,6 +46,8 @@ export function AppRouter() {
         <Route path="procurement" element={<ProcurementPage />} />
         <Route path="supply" element={<SupplyPage />} />
         <Route path="about" element={<AboutPage />} />
+        <Route path="identity" element={<IdentityPage />} />
+        <Route path="enterprise" element={<EnterprisePage />} />
       </Route>
 
       {/* Buyer pages - with MainLayout */}
