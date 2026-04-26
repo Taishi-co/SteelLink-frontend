@@ -9,6 +9,7 @@ const { Header: AntHeader } = Layout
 const navItems = [
   { key: '/', label: '首页' },
   { key: '/mall', label: '现货商城' },
+  { key: '/matching', label: '信息撮合' },
   { key: '/bidding', label: '竞价交易' },
   { key: '/procurement', label: '集采大厅' },
   { key: '/supply', label: '供求信息' },
@@ -51,7 +52,7 @@ export default function HomeHeader() {
             label: <Link to={item.key}>{item.label}</Link>
           }))}
           className="border-none flex-1 justify-center"
-          style={{ minWidth: 420 }}
+          style={{ minWidth: 560 }}
         />
 
         <Space size="middle" className="flex-shrink-0">

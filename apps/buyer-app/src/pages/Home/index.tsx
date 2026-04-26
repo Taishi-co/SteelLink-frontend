@@ -57,7 +57,7 @@ export default function HomePage() {
                 专业B2B钢材交易平台
               </Title>
               <Paragraph className="!text-white/90 text-xl mb-8">
-                现货直购 · 竞价交易 · 集采服务 · 一站式钢铁供应链解决方案
+                现货直购 · 信息撮合 · 竞价交易 · 集采服务 · 一站式钢铁供应链解决方案
               </Paragraph>
               <div className="flex gap-4">
                 <Link to="/mall">
@@ -122,8 +122,8 @@ export default function HomePage() {
           <div className="text-center mb-16">
             <Title level={2}>平台服务</Title>
           </div>
-          <Row gutter={32}>
-            <Col span={6}>
+          <Row gutter={[32, 32]}>
+            <Col flex="1 1 200px">
               <Card hoverable className="h-full text-center">
                 <div className="text-5xl mb-4">🛒</div>
                 <Title level={4}>现货商城</Title>
@@ -133,7 +133,17 @@ export default function HomePage() {
                 <Link to="/mall">立即选购 →</Link>
               </Card>
             </Col>
-            <Col span={6}>
+            <Col flex="1 1 200px">
+              <Card hoverable className="h-full text-center">
+                <div className="text-5xl mb-4">🤝</div>
+                <Title level={4}>信息撮合</Title>
+                <Paragraph className="text-gray-500">
+                  供需线索智能连接，快速发现合适商机
+                </Paragraph>
+                <Link to="/matching">查看撮合 →</Link>
+              </Card>
+            </Col>
+            <Col flex="1 1 200px">
               <Card hoverable className="h-full text-center">
                 <div className="text-5xl mb-4">🎯</div>
                 <Title level={4}>竞价交易</Title>
@@ -143,7 +153,7 @@ export default function HomePage() {
                 <Link to="/bidding">参与竞价 →</Link>
               </Card>
             </Col>
-            <Col span={6}>
+            <Col flex="1 1 200px">
               <Card hoverable className="h-full text-center">
                 <div className="text-5xl mb-4">📦</div>
                 <Title level={4}>集采大厅</Title>
@@ -153,7 +163,7 @@ export default function HomePage() {
                 <Link to="/procurement">了解详情 →</Link>
               </Card>
             </Col>
-            <Col span={6}>
+            <Col flex="1 1 200px">
               <Card hoverable className="h-full text-center">
                 <div className="text-5xl mb-4">📢</div>
                 <Title level={4}>供求信息</Title>
