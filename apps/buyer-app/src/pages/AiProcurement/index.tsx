@@ -1,100 +1,232 @@
-import { Button, Card, Col, Input, Progress, Row, Space, Steps, Tag, Timeline, Typography } from 'antd'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { Button, Card, Col, Empty, Input, Progress, Row, Space, Spin, Steps, Tag, Timeline, Typography, message } from 'antd'
 import {
   AuditOutlined,
   BankOutlined,
   CheckCircleOutlined,
+  ClockCircleOutlined,
   FileSearchOutlined,
+  LoginOutlined,
   MessageOutlined,
   RobotOutlined,
   ShoppingCartOutlined,
 } from '@ant-design/icons'
+import { getBuyerToken } from '@/services/auth'
+import { aiProcurementService } from '@/services/aiProcurementService'
+import type { AIProcurementInfo, AIProcurementParseResult, AIProcurementStageCode, StageInfo } from '@/services/aiProcurementService'
 
 const { Title, Paragraph, Text } = Typography
 const { TextArea } = Input
 
-const procurementPrompt = '帮我采购100套工业轴承，用于设备维修，需要申请订单融资'
+const stageIcons: Record<AIProcurementStageCode, ReactNode> = {
+  instruction_parsing: <MessageOutlined />,
+  product_matching: <FileSearchOutlined />,
+  order_generation: <ShoppingCartOutlined />,
+  financing_matching: <BankOutlined />,
+  review_submission: <AuditOutlined />,
+}
 
-const workflowSteps = [
-  {
-    title: '指令解析',
-    description: '识别采购品类、数量、用途、融资诉求和交付约束',
-    icon: <MessageOutlined />,
-  },
-  {
-    title: '商品匹配',
-    description: '匹配现货商品、可替代型号、供应商能力和价格区间',
-    icon: <FileSearchOutlined />,
-  },
-  {
-    title: '订单生成',
-    description: '生成采购清单、交付计划、合同要素和付款节点',
-    icon: <ShoppingCartOutlined />,
-  },
-  {
-    title: '融资匹配',
-    description: '按订单金额、企业资质和账期匹配订单融资方案',
-    icon: <BankOutlined />,
-  },
-  {
-    title: '审核提交',
-    description: '汇总采购订单、融资申请和风控材料提交审核',
-    icon: <AuditOutlined />,
-  },
+const stageOrder: AIProcurementStageCode[] = [
+  'instruction_parsing',
+  'product_matching',
+  'order_generation',
+  'financing_matching',
+  'review_submission',
 ]
 
-const parsedFields = [
-  { label: '采购物品', value: '工业轴承' },
-  { label: '采购数量', value: '100 套' },
-  { label: '业务用途', value: '设备维修' },
-  { label: '金融需求', value: '订单融资' },
+const defaultStages: StageInfo[] = [
+  { code: 'instruction_parsing', name: '指令解析', status: 'pending', description: '识别采购品类、数量、用途和融资意图' },
+  { code: 'product_matching', name: '商品匹配', status: 'pending', description: '按商品、库存、价格和供应商能力匹配' },
+  { code: 'order_generation', name: '订单生成', status: 'pending', description: '生成订单草稿和交易要素' },
+  { code: 'financing_matching', name: '融资匹配', status: 'pending', description: '匹配订单融资和备选金融产品' },
+  { code: 'review_submission', name: '审核提交', status: 'pending', description: '提交平台审核并进入后续履约' },
 ]
 
-const matchedProducts = [
-  { name: 'SKF 深沟球轴承 6208-2RS', supplier: '华东工业备件供应商', price: '¥128 / 套', match: 96 },
-  { name: 'NSK 工业轴承 6208DDU', supplier: '上海机械配件中心', price: '¥136 / 套', match: 91 },
-  { name: '国产高精度轴承 6208', supplier: '江苏轴承直供仓', price: '¥86 / 套', match: 84 },
-]
+function formatMoney(value?: number) {
+  if (!value) {
+    return '待计算'
+  }
+  return `¥${value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`
+}
 
-const orderSummary = [
-  { label: '推荐订单金额', value: '¥12,800' },
-  { label: '预计交付', value: '3-5 个工作日' },
-  { label: '供应商', value: '华东工业备件供应商' },
-  { label: '账期建议', value: '30 天' },
-]
+function formatRate(value: number) {
+  if (!value) {
+    return '按授信评估'
+  }
+  return `年化 ${value.toFixed(1)}%`
+}
 
-const financePlans = [
-  { title: '订单融资快审', amount: '最高 ¥10,000', rate: '年化 6.8%', status: '推荐' },
-  { title: '采购账期融资', amount: '最高 ¥12,000', rate: '年化 7.2%', status: '备选' },
-  { title: '企业信用额度', amount: '最高 ¥30,000', rate: '按授信评估', status: '需补资料' },
-]
+function normalizeStages(stages?: StageInfo[]) {
+  if (!stages?.length) {
+    return defaultStages
+  }
+  const stageMap = new Map(stages.map((stage) => [stage.code, stage]))
+  return stageOrder.map((code) => stageMap.get(code) || defaultStages.find((stage) => stage.code === code)!)
+}
 
-const auditItems = [
-  '采购需求解析结果已生成',
-  '商品匹配与报价已锁定',
-  '订单草稿与融资方案已关联',
-  '企业资质与付款资料待提交',
-]
+function getCurrentStageIndex(stages: StageInfo[]) {
+  const processingIndex = stages.findIndex((stage) => stage.status === 'processing')
+  if (processingIndex >= 0) {
+    return processingIndex
+  }
+  const completedCount = stages.filter((stage) => stage.status === 'completed').length
+  return Math.max(0, Math.min(completedCount, stages.length - 1))
+}
+
+function getResultFromProcurement(procurement: AIProcurementInfo): AIProcurementParseResult {
+  return {
+    parsed: procurement.parsed_instruction,
+    matched_products: procurement.matched_products,
+    order_draft: procurement.order_draft,
+    finance_plans: procurement.finance_plans,
+    audit_items: procurement.audit_items,
+    stages: procurement.stages,
+  }
+}
 
 export default function AiProcurementPage() {
+  const [prompt, setPrompt] = useState('')
+  const [parsing, setParsing] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [loadingMine, setLoadingMine] = useState(false)
+  const [result, setResult] = useState<AIProcurementParseResult | null>(null)
+  const [currentProcurement, setCurrentProcurement] = useState<AIProcurementInfo | null>(null)
+  const [mine, setMine] = useState<AIProcurementInfo[]>([])
+  const isLoggedIn = Boolean(getBuyerToken())
+
+  const loadMine = useCallback(async () => {
+    if (!isLoggedIn) {
+      setMine([])
+      return
+    }
+    setLoadingMine(true)
+    try {
+      const response = await aiProcurementService.listMine({ page: 1, page_size: 5 })
+      setMine(response.list)
+    } catch (error) {
+      message.error('AI采购记录加载失败')
+    } finally {
+      setLoadingMine(false)
+    }
+  }, [isLoggedIn])
+
+  useEffect(() => {
+    void loadMine()
+  }, [loadMine])
+
+  const stages = useMemo(() => normalizeStages(result?.stages), [result?.stages])
+  const currentStep = useMemo(() => getCurrentStageIndex(stages), [stages])
+
+  const handleParse = async () => {
+    const value = prompt.trim()
+    if (!isLoggedIn) {
+      message.warning('请先登录后再使用AI采购')
+      return
+    }
+    if (!value) {
+      message.warning('请先输入采购需求')
+      return
+    }
+    setParsing(true)
+    try {
+      const parseResult = await aiProcurementService.parse(value)
+      setResult(parseResult)
+      setCurrentProcurement(null)
+      message.success('采购指令解析完成')
+    } catch (error) {
+      message.error('采购指令解析失败')
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  const handleCreate = async () => {
+    const value = prompt.trim()
+    if (!isLoggedIn) {
+      message.warning('请先登录后再发起AI采购')
+      return
+    }
+    if (!value) {
+      message.warning('请先输入采购需求')
+      return
+    }
+    setCreating(true)
+    try {
+      const procurement = await aiProcurementService.create(value)
+      setCurrentProcurement(procurement)
+      setResult(getResultFromProcurement(procurement))
+      await loadMine()
+      message.success('AI采购单已创建')
+    } catch (error) {
+      message.error('AI采购单创建失败，请确认企业账号已完成认证')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleSubmitReview = async () => {
+    if (!currentProcurement) {
+      message.warning('请先创建AI采购单')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const procurement = await aiProcurementService.submitReview(currentProcurement.id)
+      setCurrentProcurement(procurement)
+      setResult(getResultFromProcurement(procurement))
+      await loadMine()
+      message.success('已提交审核')
+    } catch (error) {
+      message.error('提交审核失败')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const selectedResult = result
+
   return (
     <div className="min-h-screen bg-gray-50">
       <section className="bg-white py-10">
-        <div className="max-w-7xl mx-auto px-8">
+        <div className="mx-auto max-w-7xl px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <Title level={1} className="!mb-3">AI采购</Title>
-              <Paragraph className="text-gray-500 text-lg !mb-0">
+              <Paragraph className="text-lg text-gray-500 !mb-0">
                 用自然语言描述采购目标，系统自动完成需求解析、商品匹配、订单生成、融资匹配与审核提交。
               </Paragraph>
             </div>
-            <Button type="primary" icon={<RobotOutlined />}>发起 AI 采购</Button>
+            {!isLoggedIn ? (
+              <Link to="/login">
+                <Button type="primary" icon={<LoginOutlined />}>登录后使用</Button>
+              </Link>
+            ) : (
+              <Button type="primary" icon={<RobotOutlined />} onClick={handleCreate} loading={creating}>
+                发起 AI 采购
+              </Button>
+            )}
           </div>
 
           <Card className="mt-8">
             <Text strong>采购对话</Text>
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_220px]">
-              <TextArea value={procurementPrompt} autoSize={{ minRows: 3, maxRows: 4 }} />
-              <Button type="primary" size="large" icon={<MessageOutlined />} className="h-full min-h-[96px]">
+              <TextArea
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                placeholder="例如：帮我采购100套工业轴承，用于设备维修，需要申请订单融资"
+                autoSize={{ minRows: 3, maxRows: 4 }}
+              />
+              <Button
+                type="primary"
+                size="large"
+                icon={<MessageOutlined />}
+                className="h-full min-h-[96px]"
+                onClick={handleParse}
+                loading={parsing}
+              >
                 解析采购指令
               </Button>
             </div>
@@ -102,105 +234,196 @@ export default function AiProcurementPage() {
         </div>
       </section>
 
-      <main className="max-w-7xl mx-auto px-8 py-10">
+      <main className="mx-auto max-w-7xl px-8 py-10">
         <section>
           <Title level={2} className="!mb-5">采购流程可视化</Title>
           <Card>
             <Steps
-              current={4}
-              items={workflowSteps.map((item) => ({
-                title: item.title,
+              current={currentStep}
+              items={stages.map((item) => ({
+                title: item.name,
                 description: item.description,
-                icon: item.icon,
+                icon: stageIcons[item.code],
               }))}
             />
           </Card>
         </section>
 
-        <section className="mt-10">
-          <Row gutter={[24, 24]}>
-            <Col xs={24} lg={8}>
-              <Card title="1. 指令解析" className="h-full">
-                <Space direction="vertical" size="middle" className="w-full">
-                  {parsedFields.map((item) => (
-                    <div key={item.label} className="flex items-center justify-between rounded border border-gray-100 p-3">
-                      <Text type="secondary">{item.label}</Text>
-                      <Text strong>{item.value}</Text>
-                    </div>
-                  ))}
-                </Space>
-              </Card>
-            </Col>
+        {!selectedResult ? (
+          <Card className="mt-10">
+            <Empty description={isLoggedIn ? '输入采购需求并解析后展示真实工作流结果' : '登录后可解析采购需求并创建AI采购单'} />
+          </Card>
+        ) : (
+          <>
+            <section className="mt-10">
+              <Row gutter={[24, 24]}>
+                <Col xs={24} lg={8}>
+                  <Card title="1. 指令解析" className="h-full">
+                    <Space direction="vertical" size="middle" className="w-full">
+                      <div className="flex items-center justify-between rounded border border-gray-100 p-3">
+                        <Text type="secondary">采购物品</Text>
+                        <Text strong>{selectedResult.parsed.product_name || '-'}</Text>
+                      </div>
+                      <div className="flex items-center justify-between rounded border border-gray-100 p-3">
+                        <Text type="secondary">采购数量</Text>
+                        <Text strong>{selectedResult.parsed.quantity} {selectedResult.parsed.unit}</Text>
+                      </div>
+                      <div className="flex items-center justify-between rounded border border-gray-100 p-3">
+                        <Text type="secondary">业务用途</Text>
+                        <Text strong>{selectedResult.parsed.usage || '-'}</Text>
+                      </div>
+                      <div className="flex items-center justify-between rounded border border-gray-100 p-3">
+                        <Text type="secondary">金融需求</Text>
+                        <Text strong>{selectedResult.parsed.financing_required ? '订单融资' : '暂无'}</Text>
+                      </div>
+                      <Progress percent={Math.round((selectedResult.parsed.confidence || 0) * 100)} size="small" />
+                    </Space>
+                  </Card>
+                </Col>
 
-            <Col xs={24} lg={16}>
-              <Card title="2. 商品匹配" className="h-full">
-                <Space direction="vertical" size="middle" className="w-full">
-                  {matchedProducts.map((item) => (
-                    <div key={item.name} className="grid gap-4 rounded border border-gray-100 p-4 md:grid-cols-[1fr_140px_96px] md:items-center">
+                <Col xs={24} lg={16}>
+                  <Card title="2. 商品匹配" className="h-full">
+                    {selectedResult.matched_products.length > 0 ? (
+                      <Space direction="vertical" size="middle" className="w-full">
+                        {selectedResult.matched_products.map((item, index) => (
+                          <div key={`${item.product_id || index}-${item.product_name}`} className="grid gap-4 rounded border border-gray-100 p-4 md:grid-cols-[1fr_140px_96px] md:items-center">
+                            <div>
+                              <Text strong>{item.product_name}</Text>
+                              <div className="mt-1 text-sm text-gray-500">{item.steel_mill || item.match_reason}</div>
+                            </div>
+                            <Text strong>{formatMoney(item.unit_price)} / 件</Text>
+                            <Progress percent={item.score} size="small" />
+                          </div>
+                        ))}
+                      </Space>
+                    ) : (
+                      <Empty description="暂无商品匹配结果" />
+                    )}
+                  </Card>
+                </Col>
+              </Row>
+            </section>
+
+            <section className="mt-10">
+              <Row gutter={[24, 24]}>
+                <Col xs={24} lg={12}>
+                  <Card title="3. 订单生成" className="h-full">
+                    <Row gutter={[16, 16]}>
+                      <Col xs={24} sm={12}>
+                        <div className="rounded bg-gray-50 p-4">
+                          <Text type="secondary">推荐订单金额</Text>
+                          <div className="mt-2 text-lg font-semibold text-gray-900">{formatMoney(selectedResult.order_draft.estimated_amount)}</div>
+                        </div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div className="rounded bg-gray-50 p-4">
+                          <Text type="secondary">采购数量</Text>
+                          <div className="mt-2 text-lg font-semibold text-gray-900">
+                            {selectedResult.order_draft.quantity} {selectedResult.order_draft.unit}
+                          </div>
+                        </div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div className="rounded bg-gray-50 p-4">
+                          <Text type="secondary">付款方式</Text>
+                          <div className="mt-2 text-lg font-semibold text-gray-900">{selectedResult.order_draft.payment_method || '-'}</div>
+                        </div>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div className="rounded bg-gray-50 p-4">
+                          <Text type="secondary">交付说明</Text>
+                          <div className="mt-2 text-lg font-semibold text-gray-900">{selectedResult.order_draft.delivery_note || '-'}</div>
+                        </div>
+                      </Col>
+                    </Row>
+                    <Button type="primary" block className="mt-5" onClick={handleCreate} loading={creating}>
+                      {currentProcurement ? '更新为采购单结果' : '生成采购单'}
+                    </Button>
+                  </Card>
+                </Col>
+
+                <Col xs={24} lg={12}>
+                  <Card title="4. 融资匹配" className="h-full">
+                    {selectedResult.finance_plans.length > 0 ? (
+                      <Space direction="vertical" size="middle" className="w-full">
+                        {selectedResult.finance_plans.map((item) => (
+                          <div key={`${item.provider}-${item.product_name}`} className="flex items-center justify-between gap-4 rounded border border-gray-100 p-4">
+                            <div>
+                              <Text strong>{item.provider} · {item.product_name}</Text>
+                              <div className="mt-1 text-sm text-gray-500">{formatMoney(item.amount)} · {formatRate(item.rate)} · {item.term_days} 天</div>
+                            </div>
+                            <Tag color={item.matched ? 'blue' : 'default'}>{item.matched ? '匹配' : '备选'}</Tag>
+                          </div>
+                        ))}
+                      </Space>
+                    ) : (
+                      <Empty description="当前采购需求未要求融资或暂无融资方案" />
+                    )}
+                  </Card>
+                </Col>
+              </Row>
+            </section>
+
+            <section className="mt-10">
+              <Card title="5. 审核提交">
+                <Timeline
+                  items={selectedResult.audit_items.map((item) => ({
+                    color: item.status === 'passed' || item.status === 'submitted' ? 'green' : 'gray',
+                    dot: item.status === 'passed' || item.status === 'submitted' ? <CheckCircleOutlined /> : <ClockCircleOutlined />,
+                    children: (
                       <div>
                         <Text strong>{item.name}</Text>
-                        <div className="mt-1 text-sm text-gray-500">{item.supplier}</div>
+                        <div className="text-sm text-gray-500">{item.message}</div>
                       </div>
-                      <Text strong>{item.price}</Text>
-                      <Progress percent={item.match} size="small" />
-                    </div>
-                  ))}
-                </Space>
+                    ),
+                  }))}
+                />
+                <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <Text type="secondary">提交前会合并订单、融资与企业资料，由业务和风控共同审核。</Text>
+                  <Button type="primary" icon={<AuditOutlined />} onClick={handleSubmitReview} loading={submitting} disabled={!currentProcurement}>
+                    提交审核
+                  </Button>
+                </div>
               </Card>
-            </Col>
-          </Row>
-        </section>
+            </section>
+          </>
+        )}
 
         <section className="mt-10">
-          <Row gutter={[24, 24]}>
-            <Col xs={24} lg={12}>
-              <Card title="3. 订单生成" className="h-full">
-                <Row gutter={[16, 16]}>
-                  {orderSummary.map((item) => (
-                    <Col xs={24} sm={12} key={item.label}>
-                      <div className="rounded bg-gray-50 p-4">
-                        <Text type="secondary">{item.label}</Text>
-                        <div className="mt-2 text-lg font-semibold text-gray-900">{item.value}</div>
-                      </div>
-                    </Col>
-                  ))}
-                </Row>
-                <Button type="primary" block className="mt-5">生成订单草稿</Button>
-              </Card>
-            </Col>
-
-            <Col xs={24} lg={12}>
-              <Card title="4. 融资匹配" className="h-full">
+          <div className="mb-5 flex items-center justify-between">
+            <Title level={2} className="!mb-0">我的AI采购</Title>
+            <Button onClick={() => void loadMine()} loading={loadingMine}>刷新</Button>
+          </div>
+          <Spin spinning={loadingMine}>
+            <Card>
+              {mine.length > 0 ? (
                 <Space direction="vertical" size="middle" className="w-full">
-                  {financePlans.map((item) => (
-                    <div key={item.title} className="flex items-center justify-between gap-4 rounded border border-gray-100 p-4">
-                      <div>
-                        <Text strong>{item.title}</Text>
-                        <div className="mt-1 text-sm text-gray-500">{item.amount} · {item.rate}</div>
+                  {mine.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="w-full rounded border border-gray-100 bg-white p-4 text-left transition hover:border-primary-300 hover:bg-primary-50"
+                      onClick={() => {
+                        setCurrentProcurement(item)
+                        setResult(getResultFromProcurement(item))
+                        setPrompt(item.prompt)
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <Text strong>{item.procurement_no}</Text>
+                          <div className="mt-1 text-sm text-gray-500">{item.prompt}</div>
+                        </div>
+                        <Tag color={item.status === 'review_submitted' ? 'green' : 'blue'}>{item.status}</Tag>
                       </div>
-                      <Tag color={item.status === '推荐' ? 'blue' : 'default'}>{item.status}</Tag>
-                    </div>
+                    </button>
                   ))}
                 </Space>
-              </Card>
-            </Col>
-          </Row>
-        </section>
-
-        <section className="mt-10">
-          <Card title="5. 审核提交">
-            <Timeline
-              items={auditItems.map((item) => ({
-                color: 'green',
-                dot: <CheckCircleOutlined />,
-                children: item,
-              }))}
-            />
-            <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <Text type="secondary">提交前会合并订单、融资与企业资料，由业务和风控共同审核。</Text>
-              <Button type="primary" icon={<AuditOutlined />}>提交审核</Button>
-            </div>
-          </Card>
+              ) : (
+                <Empty description={isLoggedIn ? '暂无AI采购记录' : '登录后查看我的AI采购'} />
+              )}
+            </Card>
+          </Spin>
         </section>
       </main>
     </div>

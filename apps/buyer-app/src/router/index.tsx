@@ -15,6 +15,10 @@ import AiProcurementPage from '@/pages/AiProcurement'
 import AboutPage from '@/pages/About'
 import IdentityPage from '@/pages/Identity'
 import EnterprisePage from '@/pages/Enterprise'
+import ProcurementPage from '@/pages/Procurement'
+import BiddingPage from '@/pages/Bidding'
+import BiddingModulePage from '@/pages/BiddingModule'
+import ProcurementDetailPage from '@/pages/ProcurementDetail'
 
 // Placeholder pages
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -26,8 +30,6 @@ const PlaceholderPage = ({ title }: { title: string }) => (
   </div>
 )
 
-const BiddingPage = () => <PlaceholderPage title="竞价交易" />
-const ProcurementPage = () => <PlaceholderPage title="集采大厅" />
 const SupplyPage = () => <PlaceholderPage title="供求信息" />
 
 export function AppRouter() {
@@ -43,7 +45,9 @@ export function AppRouter() {
         <Route path="matching" element={<MatchingPage />} />
         <Route path="ai-procurement" element={<AiProcurementPage />} />
         <Route path="bidding" element={<BiddingPage />} />
+        <Route path="bidding/:module" element={<BiddingModulePage />} />
         <Route path="procurement" element={<ProcurementPage />} />
+        <Route path="procurement/:id" element={<ProcurementDetailPage />} />
         <Route path="supply" element={<SupplyPage />} />
         <Route path="about" element={<AboutPage />} />
         <Route path="identity" element={<IdentityPage />} />
