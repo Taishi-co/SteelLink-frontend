@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { Button, Card, Col, Progress, Row, Space, Statistic, Tag, Typography } from 'antd'
 import {
   AimOutlined,
@@ -140,7 +139,7 @@ export default function MatchingPage() {
 
           <div className="mt-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <Title level={1} className="!mb-3">信息撮合</Title>
+              <Title level={1} className="!mb-3">供求信息</Title>
               <Paragraph className="text-gray-500 text-lg !mb-0">
                 聚合供需、仓储和物流线索，按品类、区域、价格和交付能力推荐可撮合商机。
               </Paragraph>
@@ -277,9 +276,7 @@ export default function MatchingPage() {
                 <Text type="secondary">完善品类、材质、交付地和预算后，AI 推荐会优先匹配更高可信度的信息。</Text>
               </div>
             </div>
-            <Link to="/supply">
-              <Button type="primary">完善供求信息</Button>
-            </Link>
+            <Button type="primary">完善供求信息</Button>
           </div>
         </section>
       </main>
