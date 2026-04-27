@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { Layout, Menu, Avatar, Tooltip } from 'antd'
 import {
@@ -20,12 +20,19 @@ import { getIdentityStatusLabel } from '@/services/certificationService'
 
 const { Sider, Content } = Layout
 
-const navItems = [
+interface NavItem {
+  key: string
+  icon: React.ReactNode
+  label: string
+  roles?: string[]
+}
+
+const allNavItems: NavItem[] = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '工作台' },
   { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
-  { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单' },
-  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资' },
-  { key: '/dashboard/logistics', icon: <ShopOutlined />, label: '仓储物流' },
+  { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单', roles: ['buyer', 'seller'] },
+  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资', roles: ['buyer', 'fund'] },
+  { key: '/dashboard/logistics', icon: <ShopOutlined />, label: '仓储物流', roles: ['logistics', 'warehouse', 'seller'] },
 ]
 
 const accountItems = [
@@ -38,6 +45,12 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useUserStore()
+
+  const navItems = useMemo(() => {
+    const er = user?.enterpriseRole || ''
+    if (!er) return allNavItems.filter(item => !item.roles)
+    return allNavItems.filter(item => !item.roles || item.roles.includes(er))
+  }, [user?.enterpriseRole])
 
   const handleLogout = () => {
     clearBuyerSession()
@@ -91,7 +104,9 @@ export default function DashboardLayout() {
               <div className="text-white/35 text-[10px] mb-1">当前账户</div>
               <div className="text-white/85 text-xs font-medium truncate">{user.companyName}</div>
               <div className="flex items-center gap-1.5 mt-1.5">
-                <span className="text-[9px] bg-emerald-500/18 text-emerald-400 px-1.5 py-0.5 rounded font-semibold">企业</span>
+                <span className="text-[9px] bg-emerald-500/18 text-emerald-400 px-1.5 py-0.5 rounded font-semibold">
+                  {user.enterpriseRole === 'buyer' ? '采购方' : user.enterpriseRole === 'seller' ? '供应商' : user.enterpriseRole === 'logistics' ? '物流商' : user.enterpriseRole === 'warehouse' ? '仓储商' : user.enterpriseRole === 'fund' ? '资金方' : '企业'}
+                </span>
                 <span className="text-[9px] text-white/30">{identityLabel}</span>
               </div>
             </div>

@@ -193,7 +193,7 @@ export default function ProductsPage() {
     setLoading(true)
     try {
       const response = await sellerProductService.list()
-      setProducts(response.data.data.list)
+      setProducts(response.data.list)
     } catch (error) {
       message.error('商品列表加载失败，请确认后端和登录状态')
     } finally {

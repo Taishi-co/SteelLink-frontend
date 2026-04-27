@@ -80,11 +80,12 @@ export interface User {
   username: string
   mobile: string
   companyName: string
-  role: 'buyer' | 'seller'
+  role: 'guest' | 'personal' | 'enterprise'
   realName: string
   identityStatus: number
   identityReject: string
   enterpriseCode: string
+  enterpriseRole: string
 }
 
 // Order Types

@@ -38,7 +38,7 @@ export default function IdentityPage() {
 
   const handleUpload = async (file: File, side: 'front' | 'back') => {
     try {
-      const result = await uploadService.upload(file, 'payment_voucher')
+      const result = await uploadService.upload(file, 'identity_card')
       if (side === 'front') {
         setFrontUrl(result.url)
       } else {

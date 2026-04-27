@@ -1,7 +1,7 @@
 import api from './api'
 import type { ApiResponse } from '@/types'
 
-export type UploadPurpose = 'payment_voucher' | 'receipt_voucher' | 'product_image' | 'product_qualification'
+export type UploadPurpose = 'payment_voucher' | 'receipt_voucher' | 'product_image' | 'product_qualification' | 'identity_card' | 'enterprise_license'
 
 export interface UploadResult {
   bucket: string

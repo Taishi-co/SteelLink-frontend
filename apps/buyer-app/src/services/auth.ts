@@ -8,6 +8,7 @@ interface BuyerProfile {
   personal_code: string
   enterprise_code: string
   role: string
+  enterprise_role: string
   phone: string
   qq: string
   email: string
@@ -94,11 +95,12 @@ export function normalizeBuyerUser(profile: BuyerProfile): User {
     username: profile.phone || profile.email || profile.user_no,
     mobile: profile.phone,
     companyName: profile.enterprise_code || '个人用户',
-    role: 'buyer',
+    role: (profile.role as User['role']) || 'personal',
     realName: profile.real_name || '',
     identityStatus: profile.identity_status || 0,
     identityReject: profile.identity_reject || '',
     enterpriseCode: profile.enterprise_code || '',
+    enterpriseRole: profile.enterprise_role || '',
   }
 }
 
