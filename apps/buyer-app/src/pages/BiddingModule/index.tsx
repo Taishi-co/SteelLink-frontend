@@ -39,9 +39,7 @@ export default function BiddingModulePage() {
           <Card>
             <Empty description="竞价模块不存在" />
             <div className="mt-6 text-center">
-              <Link to="/bidding">
-                <Button type="primary">返回竞价大厅</Button>
-              </Link>
+              <Link to="/bidding"><Button type="primary">返回竞价大厅</Button></Link>
             </div>
           </Card>
         </main>
@@ -59,32 +57,20 @@ export default function BiddingModulePage() {
 
         <section className="rounded bg-white p-8">
           <Tag color={moduleKey === 'buyer' ? 'blue' : 'green'}>{currentModule.role}</Tag>
-          <Title level={1} className="!mb-3 !mt-4">
-            {currentModule.title}
-          </Title>
+          <Title level={1} className="!mb-3 !mt-4">{currentModule.title}</Title>
           <Paragraph className="max-w-3xl text-lg text-gray-500 !mb-0">{currentModule.description}</Paragraph>
         </section>
 
         <Row gutter={[20, 20]} className="mt-8">
           <Col xs={24} lg={16}>
             <Card title="模块流程">
-              <Steps
-                current={1}
-                items={workflowSteps.map((step) => ({
-                  title: step.title,
-                  icon: step.icon,
-                }))}
-              />
+              <Steps current={1} items={workflowSteps.map((step) => ({ title: step.title, icon: step.icon }))} />
             </Card>
           </Col>
           <Col xs={24} lg={8}>
             <Card title="可执行操作">
               <Space direction="vertical" size="middle" className="w-full">
-                {currentModule.actions.map((action) => (
-                  <Button key={action} block>
-                    {action}
-                  </Button>
-                ))}
+                {currentModule.actions.map((action) => <Button key={action} block>{action}</Button>)}
               </Space>
             </Card>
           </Col>

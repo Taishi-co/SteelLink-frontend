@@ -34,6 +34,31 @@ interface RecentOrder {
   product_name: string
 }
 
+interface DashboardRawStats {
+  in_transit_amount?: number
+  inTransitAmount?: number
+  pending_payment_count?: number
+  pendingPaymentCount?: number
+  monthly_purchase_amount?: number
+  monthlyPurchaseAmount?: number
+  stock_quantity?: number
+  stockQuantity?: number
+}
+
+interface RecentOrderRaw {
+  id: number
+  order_no: string
+  status: number
+  total_amount: number
+  created_at: string
+  product_name: string
+}
+
+interface DashboardRaw {
+  stats?: DashboardRawStats
+  recent_orders?: RecentOrderRaw[]
+}
+
 const ORDER_STATUS_MAP: Record<number, { label: string; color: string }> = {
   1: { label: '待确认', color: 'default' },
   2: { label: '待签合同', color: 'default' },
@@ -74,16 +99,16 @@ export default function DashboardOverview() {
   const fetchDashboard = async () => {
     try {
       setLoading(true)
-      const res = await api.get<any, { code: number; data: any }>('/users/me/dashboard')
+      const res = await api.get<unknown, { code: number; data?: DashboardRaw }>('/users/me/dashboard')
       if (res.code === 0 && res.data) {
         const raw = res.data
         setStats({
-          inTransitAmount: raw.stats?.in_transit_amount || raw.stats?.inTransitAmount || 0,
-          pendingPaymentCount: raw.stats?.pending_payment_count || raw.stats?.pendingPaymentCount || 0,
-          monthlyPurchaseAmount: raw.stats?.monthly_purchase_amount || raw.stats?.monthlyPurchaseAmount || 0,
-          stockQuantity: raw.stats?.stock_quantity || raw.stats?.stockQuantity || 0,
+          inTransitAmount: raw.stats?.in_transit_amount ?? raw.stats?.inTransitAmount ?? 0,
+          pendingPaymentCount: raw.stats?.pending_payment_count ?? raw.stats?.pendingPaymentCount ?? 0,
+          monthlyPurchaseAmount: raw.stats?.monthly_purchase_amount ?? raw.stats?.monthlyPurchaseAmount ?? 0,
+          stockQuantity: raw.stats?.stock_quantity ?? raw.stats?.stockQuantity ?? 0,
         })
-        const orders = (raw.recent_orders || []).map((o: any) => ({
+        const orders = (raw.recent_orders || []).map((o) => ({
           id: o.id,
           order_no: o.order_no,
           status: o.status,
@@ -93,7 +118,8 @@ export default function DashboardOverview() {
         }))
         setRecentOrders(orders)
       }
-    } catch {
+    } catch (error) {
+      void error
     } finally {
       setLoading(false)
     }
