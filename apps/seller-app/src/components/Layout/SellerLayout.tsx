@@ -3,6 +3,7 @@ import {
   DashboardOutlined,
   HomeOutlined,
   LogoutOutlined,
+  SafetyCertificateOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
   ShopOutlined,
@@ -18,6 +19,8 @@ const menuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
   { key: '/products', icon: <ShopOutlined />, label: '商品管理' },
   { key: '/orders', icon: <ShoppingCartOutlined />, label: '订单管理' },
+  { key: '/identity', icon: <SafetyCertificateOutlined />, label: '实名认证' },
+  { key: '/enterprise', icon: <SafetyCertificateOutlined />, label: '企业入驻' },
   { key: '/settings', icon: <SettingOutlined />, label: '店铺设置' },
 ]
 

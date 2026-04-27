@@ -69,19 +69,19 @@ export interface SellerOrderTimelineItem {
 
 export const sellerOrderService = {
   async list() {
-    const response = await api.get<ApiResponse<{ list: SellerOrderInfo[] }>>('/orders?role=seller')
-    return response.data.data.list
+    const response = await api.get<unknown, ApiResponse<{ list: SellerOrderInfo[] }>>('/orders?role=seller')
+    return response.data.list
   },
   async getById(id: number) {
-    const response = await api.get<ApiResponse<SellerOrderInfo>>(`/orders/${id}`)
-    return response.data.data
+    const response = await api.get<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}`)
+    return response.data
   },
   async confirmPayment(id: number) {
-    const response = await api.post<ApiResponse<SellerOrderInfo>>(`/orders/${id}/confirm-payment`)
-    return response.data.data
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/confirm-payment`)
+    return response.data
   },
   async confirmOutbound(id: number) {
-    const response = await api.post<ApiResponse<SellerOrderInfo>>(`/orders/${id}/confirm-outbound`)
-    return response.data.data
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/confirm-outbound`)
+    return response.data
   },
 }

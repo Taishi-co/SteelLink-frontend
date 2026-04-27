@@ -65,13 +65,7 @@ interface ProductListResponse {
   page_size: number
 }
 
-interface SellerProductListServiceResponse {
-  data: ApiResponse<ProductListResponse>
-}
-
-interface SellerProductCreateServiceResponse {
-  data: ApiResponse<BackendProductInfo>
-}
+interface SellerProductListServiceResponse extends ApiResponse<ProductListResponse> {}
 
 interface BackendProductInfo {
   id: number
@@ -236,22 +230,20 @@ function toSellerProductRecord(product: BackendProductInfo): SellerProductRecord
 export const sellerProductService = {
   list: async (): Promise<SellerProductListServiceResponse> => {
     const enterpriseId = getEnterpriseIdFromToken()
-    const response = await api.get<ApiResponse<BackendProductListResponse>>('/products', {
+    const response = await api.get<unknown, ApiResponse<BackendProductListResponse>>('/products', {
       params: {
         enterprise_id: enterpriseId,
       },
     })
 
     return {
+      ...response,
       data: {
         ...response.data,
-        data: {
-          ...response.data.data,
-          list: response.data.data.list.map(toSellerProductRecord) as SellerProductRecord[],
-        },
+        list: response.data.list.map(toSellerProductRecord) as SellerProductRecord[],
       },
-    }
+    } as ApiResponse<ProductListResponse>
   },
-  create: (payload: UpsertProductPayload): Promise<SellerProductCreateServiceResponse> =>
-    api.post<ApiResponse<BackendProductInfo>>('/products', payload),
+  create: (payload: UpsertProductPayload) =>
+    api.post<unknown, ApiResponse<BackendProductInfo>>('/products', payload),
 }

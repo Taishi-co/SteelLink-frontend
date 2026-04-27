@@ -23,11 +23,11 @@ export const uploadService = {
     formData.append('file', file)
     formData.append('purpose', purpose)
 
-    const response = await api.post<ApiResponse<UploadResult>>('/uploads', formData, {
+    const response = await api.post<unknown, ApiResponse<UploadResult>>('/uploads', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     })
-    return response.data.data
+    return response.data
   },
 }
