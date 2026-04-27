@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom'
 import HomeLayout from '@/components/Layout/HomeLayout'
 import MainLayout from '@/components/Layout/MainLayout'
+import DashboardLayout from '@/components/Layout/DashboardLayout'
+import RequireAuth from '@/components/RequireAuth'
 import HomePage from '@/pages/Home'
 import MallPage from '@/pages/Mall'
 import ProductsPage from '@/pages/Products'
@@ -19,26 +21,25 @@ import ProcurementPage from '@/pages/Procurement'
 import BiddingPage from '@/pages/Bidding'
 import BiddingModulePage from '@/pages/BiddingModule'
 import ProcurementDetailPage from '@/pages/ProcurementDetail'
+import DashboardOverview from '@/pages/Dashboard/Overview'
+import DashboardMarket from '@/pages/Dashboard/Market'
+import DashboardFinance from '@/pages/Dashboard/Finance'
+import DashboardLogistics from '@/pages/Dashboard/Logistics'
 
-// Placeholder pages
-const PlaceholderPage = ({ title }: { title: string }) => (
+const SupplyPage = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
     <div className="text-center">
-      <h1 className="text-3xl font-bold text-gray-700 mb-4">{title}</h1>
+      <h1 className="text-3xl font-bold text-gray-700 mb-4">供求信息</h1>
       <p className="text-gray-500">功能开发中，敬请期待...</p>
     </div>
   </div>
 )
 
-const SupplyPage = () => <PlaceholderPage title="供求信息" />
-
 export function AppRouter() {
   return (
     <Routes>
-      {/* Login page - no layout */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* Home page - with HomeLayout */}
       <Route path="/" element={<HomeLayout />}>
         <Route index element={<HomePage />} />
         <Route path="mall" element={<MallPage />} />
@@ -50,11 +51,8 @@ export function AppRouter() {
         <Route path="procurement/:id" element={<ProcurementDetailPage />} />
         <Route path="supply" element={<SupplyPage />} />
         <Route path="about" element={<AboutPage />} />
-        <Route path="identity" element={<IdentityPage />} />
-        <Route path="enterprise" element={<EnterprisePage />} />
       </Route>
 
-      {/* Buyer pages - with MainLayout */}
       <Route path="/" element={<MainLayout />}>
         <Route path="products" element={<ProductsPage />} />
         <Route path="products/:id" element={<ProductDetailPage />} />
@@ -62,6 +60,17 @@ export function AppRouter() {
         <Route path="checkout" element={<CheckoutPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="orders/:id" element={<OrderDetailPage />} />
+      </Route>
+
+      <Route path="/dashboard" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
+        <Route index element={<DashboardOverview />} />
+        <Route path="market" element={<DashboardMarket />} />
+        <Route path="orders" element={<OrdersPage />} />
+        <Route path="orders/:id" element={<OrderDetailPage />} />
+        <Route path="identity" element={<IdentityPage />} />
+        <Route path="enterprise" element={<EnterprisePage />} />
+        <Route path="finance" element={<DashboardFinance />} />
+        <Route path="logistics" element={<DashboardLogistics />} />
       </Route>
     </Routes>
   )

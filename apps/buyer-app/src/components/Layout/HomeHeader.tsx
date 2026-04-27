@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Button, Space, Dropdown, Avatar } from 'antd'
-import { TeamOutlined, UserOutlined, LogoutOutlined, ShoppingCartOutlined, OrderedListOutlined, SafetyCertificateOutlined, BankOutlined } from '@ant-design/icons'
+import { TeamOutlined, UserOutlined, LogoutOutlined, ShoppingCartOutlined, OrderedListOutlined, SafetyCertificateOutlined, BankOutlined, DashboardOutlined } from '@ant-design/icons'
 import { clearBuyerSession } from '@/services/auth'
 import { getIdentityStatusLabel } from '@/services/certificationService'
 import { useUserStore } from '@/stores'
@@ -32,9 +32,10 @@ export default function HomeHeader() {
     || (location.pathname === '/' ? '/' : '')
 
   const userMenuItems = [
-    { key: 'identity', label: `实名认证 (${getIdentityStatusLabel(user?.identityStatus ?? 0)})`, icon: <SafetyCertificateOutlined />, onClick: () => navigate('/identity') },
-    { key: 'enterprise', label: user?.enterpriseCode ? '企业信息' : '企业入驻', icon: <BankOutlined />, onClick: () => navigate('/enterprise') },
-    { key: 'orders', label: '我的订单', icon: <OrderedListOutlined />, onClick: () => navigate('/orders') },
+    { key: 'dashboard', label: '工作台', icon: <DashboardOutlined />, onClick: () => navigate('/dashboard') },
+    { key: 'identity', label: `实名认证 (${getIdentityStatusLabel(user?.identityStatus ?? 0)})`, icon: <SafetyCertificateOutlined />, onClick: () => navigate('/dashboard/identity') },
+    { key: 'enterprise', label: user?.enterpriseCode ? '企业信息' : '企业入驻', icon: <BankOutlined />, onClick: () => navigate('/dashboard/enterprise') },
+    { key: 'orders', label: '我的订单', icon: <OrderedListOutlined />, onClick: () => navigate('/dashboard/orders') },
     { key: 'cart', label: '购物车', icon: <ShoppingCartOutlined />, onClick: () => navigate('/cart') },
     { key: 'divider', type: 'divider' as const },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, danger: true, onClick: handleLogout },
@@ -60,12 +61,21 @@ export default function HomeHeader() {
 
         <Space size="middle" className="flex-shrink-0">
           {isLoggedIn ? (
-            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-              <div className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                <Avatar size="small" icon={<UserOutlined />} className="bg-blue-500" />
-                <span className="text-sm text-gray-700">{user?.username || user?.mobile || '用户'}</span>
-              </div>
-            </Dropdown>
+            <>
+              <Button
+                type="primary"
+                icon={<DashboardOutlined />}
+                onClick={() => navigate('/dashboard')}
+              >
+                工作台
+              </Button>
+              <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+                <div className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <Avatar size="small" icon={<UserOutlined />} className="bg-blue-500" />
+                  <span className="text-sm text-gray-700">{user?.realName || user?.username || user?.mobile || '用户'}</span>
+                </div>
+              </Dropdown>
+            </>
           ) : (
             <>
               <Link to="/login">
