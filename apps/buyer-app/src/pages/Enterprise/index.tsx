@@ -42,7 +42,7 @@ export default function EnterprisePage() {
 
   const handleUploadLicense = async (file: File) => {
     try {
-      const result = await uploadService.upload(file, 'payment_voucher')
+      const result = await uploadService.upload(file, 'enterprise_license')
       setLicenseUrl(result.url)
       message.success('上传成功')
       return false
