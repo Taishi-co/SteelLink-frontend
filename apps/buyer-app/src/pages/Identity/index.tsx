@@ -29,7 +29,8 @@ export default function IdentityPage() {
       if (res.code === 0 && res.data) {
         setIdentityStatus(res.data)
       }
-    } catch {
+    } catch (error) {
+      void error
     } finally {
       setFetching(false)
     }

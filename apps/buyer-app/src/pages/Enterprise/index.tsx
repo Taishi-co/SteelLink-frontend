@@ -5,8 +5,12 @@ import { BankOutlined, UploadOutlined, ArrowLeftOutlined, SafetyCertificateOutli
 import { certificationService } from '@/services/certificationService'
 import { uploadService } from '@/services/uploadService'
 import { useUserStore } from '@/stores'
+import type { CreateEnterprisePayload, EnterpriseInfo } from '@/services/certificationService'
 
 const { Title, Text, Paragraph } = Typography
+
+type CreateEnterpriseFormValues = Omit<CreateEnterprisePayload, 'business_license_url'>
+type ApiError = { response?: { data?: { message?: string } } }
 
 export default function EnterprisePage() {
   const [form] = Form.useForm()
@@ -15,7 +19,7 @@ export default function EnterprisePage() {
   const [mode, setMode] = useState<'create' | 'join' | null>(null)
   const [fetching, setFetching] = useState(true)
   const [hasEnterprise, setHasEnterprise] = useState(false)
-  const [enterpriseInfo, setEnterpriseInfo] = useState<any>(null)
+  const [enterpriseInfo, setEnterpriseInfo] = useState<EnterpriseInfo | null>(null)
   const [licenseUrl, setLicenseUrl] = useState('')
   const navigate = useNavigate()
   const user = useUserStore((s) => s.user)
@@ -34,7 +38,8 @@ export default function EnterprisePage() {
           setEnterpriseInfo(list[0])
         }
       }
-    } catch {
+    } catch (error) {
+      void error
     } finally {
       setFetching(false)
     }
@@ -52,7 +57,7 @@ export default function EnterprisePage() {
     }
   }
 
-  const handleCreate = async (values: any) => {
+  const handleCreate = async (values: CreateEnterpriseFormValues) => {
     if (!licenseUrl) {
       message.warning('请上传营业执照')
       return
@@ -86,8 +91,8 @@ export default function EnterprisePage() {
       } else {
         message.error(res.message || '加入失败')
       }
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || '加入失败，请确认企业编码正确且您已完成实名认证'
+    } catch (err: unknown) {
+      const msg = (err as ApiError).response?.data?.message || '加入失败，请确认企业编码正确且您已完成实名认证'
       message.error(msg)
     } finally {
       setLoading(false)
@@ -124,12 +129,12 @@ export default function EnterprisePage() {
               </div>
               {enterpriseInfo && (
                 <Descriptions bordered column={1} size="small" className="mb-6">
-                  <Descriptions.Item label="企业名称">{enterpriseInfo.name}</Descriptions.Item>
+                  <Descriptions.Item label="企业名称">{enterpriseInfo.enterprise_name}</Descriptions.Item>
                   <Descriptions.Item label="企业编码">{enterpriseInfo.enterprise_code}</Descriptions.Item>
                   <Descriptions.Item label="企业角色">
                     <Tag color="blue">{enterpriseInfo.enterprise_role}</Tag>
                   </Descriptions.Item>
-                  <Descriptions.Item label="统一社会信用代码">{enterpriseInfo.credit_code}</Descriptions.Item>
+                  <Descriptions.Item label="统一社会信用代码">{enterpriseInfo.unified_social_credit_code}</Descriptions.Item>
                   <Descriptions.Item label="认证状态">
                     <Tag color={enterpriseInfo.status === 1 ? 'success' : enterpriseInfo.status === 0 ? 'processing' : 'error'}>
                       {enterpriseInfo.status === 1 ? '已认证' : enterpriseInfo.status === 0 ? '待审核' : '已驳回'}
