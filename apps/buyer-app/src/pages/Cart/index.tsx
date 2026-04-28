@@ -1,122 +1,52 @@
-import { useState } from 'react'
+import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Card, Table, Button, InputNumber, Space, Typography, Empty, Divider, message, Checkbox, Tag, Row, Col } from 'antd'
+import { Card, Table, Button, InputNumber, Space, Typography, Empty, Divider, message, Checkbox, Tag, Row, Col, Spin } from 'antd'
 import { DeleteOutlined, ShoppingCartOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { useCartStore } from '@/stores/cartStore'
+import type { CartItem } from '@/types'
 
 const { Title, Text } = Typography
 
-interface CartItem {
-  id: number
-  name: string
-  specs: string
-  price: number
-  quantity: number
-  seller: string
-  mill: string
-  warehouse: string
-  bundleNos: string[]
-  checked: boolean
-}
-
-const mockCartItems: CartItem[] = [
-  {
-    id: 1,
-    name: '热轧卷板 SPHC 3.0×1250×C',
-    specs: '材质：SPHC | 厚度：3.0mm | 宽度：1250mm',
-    price: 3850,
-    quantity: 100,
-    seller: '河钢集团唐山分公司',
-    mill: '河钢集团',
-    warehouse: '唐山仓库A区',
-    bundleNos: ['HB-2026-0420-0001', 'HB-2026-0420-0002'],
-    checked: true,
-  },
-  {
-    id: 2,
-    name: '螺纹钢 HRB400E Φ16mm',
-    specs: '材质：HRB400E | 规格：Φ16mm',
-    price: 3580,
-    quantity: 500,
-    seller: '唐山松汀钢铁有限公司',
-    mill: '唐山松汀',
-    warehouse: '唐山仓库A区',
-    bundleNos: ['TS-2026-0420-0001'],
-    checked: true,
-  },
-  {
-    id: 3,
-    name: '冷轧卷板 SPCC 1.0×1000mm',
-    specs: '材质：SPCC | 厚度：1.0mm | 宽度：1000mm',
-    price: 4320,
-    quantity: 50,
-    seller: '首钢京唐钢铁联合有限公司',
-    mill: '首钢京唐',
-    warehouse: '石家庄仓库',
-    bundleNos: ['SJ-2026-0420-0001'],
-    checked: false,
-  },
-]
-
 export default function CartPage() {
   const navigate = useNavigate()
-  const [cartItems, setCartItems] = useState<CartItem[]>(mockCartItems)
+  const { items, totalItems, isLoading, fetchCart, updateQuantity, removeItem, clearCart } = useCartStore()
 
-  const updateQuantity = (id: number, quantity: number) => {
-    setCartItems(items =>
-      items.map(item =>
-        item.id === id ? { ...item, quantity } : item
-      )
-    )
+  useEffect(() => {
+    fetchCart()
+  }, [fetchCart])
+
+  const handleQuantityChange = async (id: number, quantity: number) => {
+    try {
+      await updateQuantity(id, quantity)
+      message.success('数量已更新')
+    } catch {
+      message.error('更新失败')
+    }
   }
 
-  const removeItem = (id: number) => {
-    setCartItems(items => items.filter(item => item.id !== id))
-    message.success('商品已移除')
+  const handleRemove = async (id: number) => {
+    try {
+      await removeItem(id)
+      message.success('商品已移除')
+    } catch {
+      message.error('删除失败')
+    }
   }
 
-  const toggleCheck = (id: number) => {
-    setCartItems(items =>
-      items.map(item =>
-        item.id === id ? { ...item, checked: !item.checked } : item
-      )
-    )
-  }
-
-  const toggleCheckAll = (checked: boolean) => {
-    setCartItems(items => items.map(item => ({ ...item, checked })))
-  }
-
-  const checkedItems = cartItems.filter(item => item.checked)
+  const checkedItems = items.filter(item => item.checked)
   const totalPrice = checkedItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const totalQuantity = checkedItems.reduce((sum, item) => sum + item.quantity, 0)
 
   const columns = [
     {
-      title: (
-        <Checkbox
-          checked={cartItems.length > 0 && checkedItems.length === cartItems.length}
-          indeterminate={checkedItems.length > 0 && checkedItems.length < cartItems.length}
-          onChange={(e) => toggleCheckAll(e.target.checked)}
-        />
-      ),
-      key: 'check',
-      width: 60,
-      render: (_: unknown, record: CartItem) => (
-        <Checkbox
-          checked={record.checked}
-          onChange={() => toggleCheck(record.id)}
-        />
-      ),
-    },
-    {
       title: '商品信息',
-      dataIndex: 'name',
+      dataIndex: 'productName',
       key: 'name',
       render: (name: string, record: CartItem) => (
         <div>
           <Row gutter={12} align="middle">
             <Col span={24}>
-              <Link to={`/products/${record.id}`} className="text-gray-800 hover:text-primary-600 font-medium">
+              <Link to={`/products/${record.productId}`} className="text-gray-800 hover:text-primary-600 font-medium">
                 {name}
               </Link>
             </Col>
@@ -129,20 +59,8 @@ export default function CartPage() {
               <Space size="small">
                 <Text type="secondary" className="text-xs">
                   <ShoppingCartOutlined className="mr-1" />
-                  钢厂：{record.mill}
+                  卖家：{record.seller}
                 </Text>
-                <Text type="secondary" className="text-xs">
-                  仓库：{record.warehouse}
-                </Text>
-              </Space>
-            </Col>
-            <Col span={24} className="mt-1">
-              <Space size="small">
-                {record.bundleNos.map((no, idx) => (
-                  <Tag key={idx} color="blue" className="text-xs">
-                    {no}
-                  </Tag>
-                ))}
               </Space>
             </Col>
           </Row>
@@ -170,7 +88,7 @@ export default function CartPage() {
         <InputNumber
           min={1}
           value={quantity}
-          onChange={(v) => updateQuantity(record.id, v || 1)}
+          onChange={(v) => v && handleQuantityChange(record.id, v)}
           addonAfter="吨"
           style={{ width: '100%' }}
         />
@@ -197,7 +115,7 @@ export default function CartPage() {
           type="text"
           danger
           icon={<DeleteOutlined />}
-          onClick={() => removeItem(record.id)}
+          onClick={() => handleRemove(record.id)}
         >
           删除
         </Button>
@@ -213,17 +131,27 @@ export default function CartPage() {
     navigate('/checkout')
   }
 
+  if (isLoading && items.length === 0) {
+    return (
+      <div className="bg-gray-50 min-h-screen py-6">
+        <div className="max-w-7xl mx-auto px-6 flex justify-center items-center h-64">
+          <Spin size="large" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-gray-50 min-h-screen py-6">
       <div className="max-w-7xl mx-auto px-6">
         <Title level={3} className="!mb-6">采购清单</Title>
 
-        {cartItems.length > 0 ? (
+        {items.length > 0 ? (
           <>
             <Card className="mb-6">
               <Table
                 columns={columns}
-                dataSource={cartItems}
+                dataSource={items}
                 rowKey="id"
                 pagination={false}
               />
@@ -234,11 +162,11 @@ export default function CartPage() {
                 <Col span={12}>
                   <Space size="middle">
                     <Text type="secondary">
-                      已选 <Text className="text-primary-600 font-bold">{checkedItems.length}</Text> 种商品
+                      共 <Text className="text-primary-600 font-bold">{items.length}</Text> 种商品
                     </Text>
                     <Divider type="vertical" />
                     <Text type="secondary">
-                      总重量：<Text className="font-bold">{totalQuantity.toLocaleString()}</Text> 吨
+                      总重量：<Text className="font-bold">{totalItems.toLocaleString()}</Text> 吨
                     </Text>
                   </Space>
                 </Col>
