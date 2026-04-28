@@ -26,10 +26,10 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const response = await sellerAuthService.login(values)
-      if (response.data.code !== 0 || !response.data.data) {
-        throw new Error(response.data.message || '登录失败')
+      if (response.code !== 0 || !response.data) {
+        throw new Error(response.message || '登录失败')
       }
-      const { access_token, user } = response.data.data
+      const { access_token, user } = response.data
       saveSellerSession(access_token, user)
       message.success('卖家登录成功')
       navigate('/dashboard', { replace: true })
@@ -44,10 +44,10 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const response = await sellerAuthService.register(values)
-      if (response.data.code !== 0 || !response.data.data) {
-        throw new Error(response.data.message || '注册失败')
+      if (response.code !== 0 || !response.data) {
+        throw new Error(response.message || '注册失败')
       }
-      const { access_token, user } = response.data.data
+      const { access_token, user } = response.data
       saveSellerSession(access_token, user)
       message.success('注册成功，已自动登录')
       navigate('/dashboard', { replace: true })

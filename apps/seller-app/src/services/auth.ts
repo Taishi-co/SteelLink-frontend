@@ -45,8 +45,8 @@ const TOKEN_KEY = 'token'
 const USER_KEY = 'seller_user'
 
 export const sellerAuthService = {
-  login: (payload: SellerLoginPayload) => api.post<ApiResponse<LoginResponse>>('/auth/login', payload),
-  register: (payload: SellerRegisterPayload) => api.post<ApiResponse<LoginResponse>>('/auth/register', payload),
+  login: (payload: SellerLoginPayload) => api.post<unknown, ApiResponse<LoginResponse>>('/auth/login', payload),
+  register: (payload: SellerRegisterPayload) => api.post<unknown, ApiResponse<LoginResponse>>('/auth/register', payload),
 }
 
 export function saveSellerSession(token: string, user: SellerUser) {
