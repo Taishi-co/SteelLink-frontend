@@ -7,27 +7,46 @@ import {
   SettingOutlined,
   ShoppingCartOutlined,
   ShopOutlined,
+  TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { clearSellerSession, getSellerUser } from '@/services/auth'
+import { clearSellerSession, getSellerUser, isIdentityVerified, hasEnterprise, isSellerReady } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Text } = Typography
-
-const menuItems = [
-  { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
-  { key: '/products', icon: <ShopOutlined />, label: '商品管理' },
-  { key: '/orders', icon: <ShoppingCartOutlined />, label: '订单管理' },
-  { key: '/identity', icon: <SafetyCertificateOutlined />, label: '实名认证' },
-  { key: '/enterprise', icon: <SafetyCertificateOutlined />, label: '企业入驻' },
-  { key: '/settings', icon: <SettingOutlined />, label: '店铺设置' },
-]
 
 export default function SellerLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const user = getSellerUser()
+
+  const identityOk = isIdentityVerified(user)
+  const enterpriseOk = hasEnterprise(user)
+  const ready = isSellerReady(user)
+
+  const menuItems = (() => {
+    const items: Array<{ key: string; icon: React.ReactNode; label: string }> = []
+
+    if (!identityOk) {
+      items.push({ key: '/identity', icon: <SafetyCertificateOutlined />, label: '实名认证' })
+      items.push({ key: '/enterprise', icon: <TeamOutlined />, label: '企业入驻' })
+      return items
+    }
+
+    if (!enterpriseOk) {
+      items.push({ key: '/identity', icon: <SafetyCertificateOutlined />, label: '实名认证' })
+      items.push({ key: '/enterprise', icon: <TeamOutlined />, label: '企业入驻' })
+      return items
+    }
+
+    items.push({ key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' })
+    items.push({ key: '/products', icon: <ShopOutlined />, label: '商品管理' })
+    items.push({ key: '/orders', icon: <ShoppingCartOutlined />, label: '订单管理' })
+    items.push({ key: '/enterprise', icon: <TeamOutlined />, label: '企业信息' })
+    items.push({ key: '/settings', icon: <SettingOutlined />, label: '店铺设置' })
+    return items
+  })()
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
@@ -46,12 +65,25 @@ export default function SellerLayout() {
     }
   }
 
+  const defaultPath = ready ? '/dashboard' : '/identity'
+
+  if (location.pathname === '/') {
+    navigate(defaultPath, { replace: true })
+  }
+
   return (
     <Layout className="min-h-screen">
       <Sider width={220} className="bg-white shadow-sm">
         <div className="h-16 flex items-center justify-center border-b">
           <Text className="text-xl font-bold text-primary-600">SteelLink</Text>
         </div>
+        {!ready && (
+          <div className="px-4 py-3 mx-3 mt-3 bg-orange-50 rounded-lg border border-orange-100">
+            <Text className="text-xs text-orange-600 block">
+              {!identityOk ? '请先完成实名认证' : '请完成企业入驻'}
+            </Text>
+          </div>
+        )}
         <Menu
           mode="inline"
           selectedKeys={[location.pathname]}

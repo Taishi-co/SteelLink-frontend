@@ -11,6 +11,8 @@ export interface SellerUser {
   phone: string
   qq: string
   email: string
+  identity_status: number
+  identity_reject: string
   status: number
   created_at: string
   updated_at: string
@@ -43,20 +45,44 @@ export interface SellerRegisterPayload {
 
 const TOKEN_KEY = 'token'
 const USER_KEY = 'seller_user'
+const ENTERPRISE_ROLE_KEY = 'seller_enterprise_role'
 
 export const sellerAuthService = {
   login: (payload: SellerLoginPayload) => api.post<unknown, ApiResponse<LoginResponse>>('/auth/login', payload),
   register: (payload: SellerRegisterPayload) => api.post<unknown, ApiResponse<LoginResponse>>('/auth/register', payload),
+  me: () => api.get<unknown, ApiResponse<SellerUser>>('/users/me'),
+}
+
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const base64 = token.split('.')[1]
+    const json = atob(base64.replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(json)
+  } catch {
+    return null
+  }
 }
 
 export function saveSellerSession(token: string, user: SellerUser) {
   localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+
+  const payload = parseJwtPayload(token)
+  if (payload?.enterprise_role) {
+    localStorage.setItem(ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+  } else {
+    localStorage.removeItem(ENTERPRISE_ROLE_KEY)
+  }
+}
+
+export function updateSellerUser(user: SellerUser) {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
 export function clearSellerSession() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(ENTERPRISE_ROLE_KEY)
 }
 
 export function getSellerToken() {
@@ -74,4 +100,20 @@ export function getSellerUser(): SellerUser | null {
   } catch {
     return null
   }
+}
+
+export function getSellerEnterpriseRole(): string {
+  return localStorage.getItem(ENTERPRISE_ROLE_KEY) || ''
+}
+
+export function isIdentityVerified(user: SellerUser | null): boolean {
+  return (user?.identity_status ?? 0) >= 2
+}
+
+export function hasEnterprise(user: SellerUser | null): boolean {
+  return !!user?.enterprise_code
+}
+
+export function isSellerReady(user: SellerUser | null): boolean {
+  return isIdentityVerified(user) && hasEnterprise(user)
 }
