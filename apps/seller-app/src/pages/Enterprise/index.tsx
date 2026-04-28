@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Form, Input, Button, Typography, Select, Upload, Spin, message, Divider, Descriptions, Tag, Result, Steps } from 'antd'
-import { BankOutlined, UploadOutlined, ArrowLeftOutlined, SafetyCertificateOutlined, TeamOutlined, UserOutlined, CheckCircleFilled } from '@ant-design/icons'
+import { BankOutlined, UploadOutlined, ArrowLeftOutlined, SafetyCertificateOutlined, TeamOutlined, CheckCircleFilled, ClockCircleFilled, CloseCircleFilled } from '@ant-design/icons'
 import { certificationService, getIdentityStatusLabel, getIdentityStatusColor } from '@/services/certificationService'
 import { uploadService } from '@/services/uploadService'
 import type { CreateEnterprisePayload, EnterpriseInfo, IdentityStatus } from '@/services/certificationService'
@@ -120,8 +120,53 @@ export default function EnterprisePage() {
 
   const identityStep = identityStatus?.identity_status ?? 0
   const identityCompleted = identityStep >= 2
+  const identityRejected = identityStep === 3
+  const identityReviewing = identityStep === 1
 
-  const stepCurrent = hasEnterprise ? 2 : identityCompleted ? 1 : 0
+  const enterpriseApproved = hasEnterprise && enterpriseInfo?.status === 1
+  const enterpriseReviewing = hasEnterprise && enterpriseInfo?.status === 0
+  const enterpriseRejected = hasEnterprise && enterpriseInfo?.status === 2
+
+  const stepCurrent = enterpriseApproved ? 2 : hasEnterprise || identityCompleted ? 1 : 0
+
+  const identityIcon = () => {
+    if (identityCompleted) return <CheckCircleFilled className="text-green-500" />
+    if (identityReviewing) return <ClockCircleFilled className="text-blue-500" />
+    if (identityRejected) return <CloseCircleFilled className="text-red-500" />
+    return <CloseCircleFilled className="text-gray-300" />
+  }
+
+  const identityDesc = () => {
+    if (identityCompleted) return '已通过'
+    if (identityReviewing) return '审核中'
+    if (identityRejected) return '已驳回'
+    return '未提交'
+  }
+
+  const enterpriseIcon = () => {
+    if (enterpriseApproved) return <CheckCircleFilled className="text-green-500" />
+    if (enterpriseReviewing) return <ClockCircleFilled className="text-blue-500" />
+    if (enterpriseRejected) return <CloseCircleFilled className="text-red-500" />
+    if (hasEnterprise) return <ClockCircleFilled className="text-blue-500" />
+    return <CloseCircleFilled className="text-gray-300" />
+  }
+
+  const enterpriseDesc = () => {
+    if (enterpriseApproved) return '已通过'
+    if (enterpriseReviewing) return '审核中'
+    if (enterpriseRejected) return '已驳回'
+    return '未提交'
+  }
+
+  const sellingIcon = () => {
+    if (enterpriseApproved) return <CheckCircleFilled className="text-green-500" />
+    return <CloseCircleFilled className="text-gray-300" />
+  }
+
+  const sellingDesc = () => {
+    if (enterpriseApproved) return '已通过'
+    return '未通过'
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -143,17 +188,18 @@ export default function EnterprisePage() {
             items={[
               {
                 title: '个人实名',
-                description: identityCompleted ? '已认证' : '待完成',
-                icon: identityCompleted ? <CheckCircleFilled className="text-green-500" /> : <UserOutlined />,
+                description: identityDesc(),
+                icon: identityIcon(),
               },
               {
                 title: '企业认证',
-                description: hasEnterprise ? '已完成' : '待完成',
-                icon: hasEnterprise ? <CheckCircleFilled className="text-green-500" /> : <BankOutlined />,
+                description: enterpriseDesc(),
+                icon: enterpriseIcon(),
               },
               {
                 title: '开始经营',
-                description: '发布商品',
+                description: sellingDesc(),
+                icon: sellingIcon(),
               },
             ]}
           />
