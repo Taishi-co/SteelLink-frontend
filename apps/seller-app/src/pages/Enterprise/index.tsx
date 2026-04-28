@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Form, Input, Button, Typography, Select, Upload, Spin, message, Divider, Descriptions, Tag } from 'antd'
 import { BankOutlined, UploadOutlined, ArrowLeftOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons'
-import { certificationService } from '@/services/certificationService'
+import { certificationService, getIdentityStatusLabel, getIdentityStatusColor } from '@/services/certificationService'
 import { uploadService } from '@/services/uploadService'
-import { getSellerUser } from '@/services/auth'
-import type { CreateEnterprisePayload, EnterpriseInfo } from '@/services/certificationService'
+import type { CreateEnterprisePayload, EnterpriseInfo, IdentityStatus } from '@/services/certificationService'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -20,13 +19,25 @@ export default function EnterprisePage() {
   const [fetching, setFetching] = useState(true)
   const [hasEnterprise, setHasEnterprise] = useState(false)
   const [enterpriseInfo, setEnterpriseInfo] = useState<EnterpriseInfo | null>(null)
+  const [identityStatus, setIdentityStatus] = useState<IdentityStatus | null>(null)
   const [licenseUrl, setLicenseUrl] = useState('')
   const navigate = useNavigate()
-  const user = getSellerUser()
 
   useEffect(() => {
     checkEnterprise()
+    checkIdentity()
   }, [])
+
+  const checkIdentity = async () => {
+    try {
+      const res = await certificationService.getIdentityStatus()
+      if (res.code === 0 && res.data) {
+        setIdentityStatus(res.data)
+      }
+    } catch (error) {
+      void error
+    }
+  }
 
   const checkEnterprise = async () => {
     try {
@@ -146,10 +157,15 @@ export default function EnterprisePage() {
                 <Button type="primary" onClick={() => navigate('/products')}>管理商品</Button>
               </div>
             </div>
-          ) : user?.role !== 'enterprise' ? (
+          ) : (identityStatus?.identity_status ?? 0) < 2 ? (
             <div className="text-center py-8">
               <SafetyCertificateOutlined className="text-6xl text-orange-400 mb-4" />
               <Title level={4}>请先完成实名认证</Title>
+              <div className="mb-4">
+                <Tag color={getIdentityStatusColor(identityStatus?.identity_status ?? 0)}>
+                  {getIdentityStatusLabel(identityStatus?.identity_status ?? 0)}
+                </Tag>
+              </div>
               <Paragraph type="secondary">加入企业前需要完成个人实名认证</Paragraph>
               <Button type="primary" onClick={() => navigate('/identity')}>去实名认证</Button>
             </div>
