@@ -37,7 +37,7 @@ export default function HomeHeader() {
     { key: 'dashboard', label: '工作台', icon: <DashboardOutlined />, onClick: () => navigate('/dashboard') },
     ...(hasEnterpriseAccess(user) ? [{ key: 'seller', label: '卖家中心', icon: <ShopOutlined />, onClick: () => { window.location.href = sellerDashboardHref } }] : []),
     { key: 'identity', label: `实名认证 (${getIdentityStatusLabel(user?.identityStatus ?? 0)})`, icon: <SafetyCertificateOutlined />, onClick: () => navigate('/dashboard/identity') },
-    { key: 'enterprise', label: user?.enterpriseCode ? '企业信息' : '企业入驻', icon: <BankOutlined />, onClick: () => navigate('/dashboard/enterprise') },
+    { key: 'enterprise', label: user?.enterpriseCode ? '企业信息' : '企业入驻', icon: <BankOutlined />, onClick: () => navigate(user?.enterpriseCode ? '/dashboard/enterprise' : '/enterprise') },
     { key: 'orders', label: '我的订单', icon: <OrderedListOutlined />, onClick: () => navigate('/dashboard/orders') },
     { key: 'cart', label: '购物车', icon: <ShoppingCartOutlined />, onClick: () => navigate('/cart') },
     { key: 'divider', type: 'divider' as const },
