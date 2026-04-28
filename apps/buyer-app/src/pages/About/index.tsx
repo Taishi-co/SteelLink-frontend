@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 
 const { Title, Paragraph, Text } = Typography
+const sellerEntryHref = import.meta.env.DEV ? 'http://localhost:5174/seller/enterprise' : '/seller/enterprise'
 
 const platformMetrics = [
   { value: '5000+', label: '入驻商家' },
@@ -181,7 +182,7 @@ export default function AboutPage() {
               <Link to="/login">
                 <Button type="primary">登录咨询</Button>
               </Link>
-              <a href="/seller">
+              <a href={sellerEntryHref}>
                 <Button>企业入驻</Button>
               </a>
             </Space>

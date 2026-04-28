@@ -14,7 +14,7 @@ import {
   UserOutlined,
   ArrowRightOutlined,
 } from '@ant-design/icons'
-import { clearBuyerSession } from '@/services/auth'
+import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
 import { useUserStore } from '@/stores'
 import { getIdentityStatusLabel } from '@/services/certificationService'
 
@@ -40,6 +40,8 @@ const accountItems = [
   { key: '/dashboard/enterprise', icon: <BankOutlined />, label: '企业信息' },
 ]
 
+const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
+
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const navigate = useNavigate()
@@ -47,10 +49,11 @@ export default function DashboardLayout() {
   const { user, logout } = useUserStore()
 
   const navItems = useMemo(() => {
+    if (hasEnterpriseAccess(user)) return allNavItems
     const er = user?.enterpriseRole || ''
     if (!er) return allNavItems.filter(item => !item.roles)
     return allNavItems.filter(item => !item.roles || item.roles.includes(er))
-  }, [user?.enterpriseRole])
+  }, [user])
 
   const handleLogout = () => {
     clearBuyerSession()
@@ -157,6 +160,22 @@ export default function DashboardLayout() {
           </nav>
 
           <div className="px-2.5 mb-2">
+            {hasEnterpriseAccess(user) && (
+              <a href={sellerDashboardHref}>
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
+                  style={{ background: 'rgba(16,185,129,.14)', border: '1px solid rgba(16,185,129,.25)' }}
+                >
+                  <ShopOutlined className="text-emerald-400 text-sm" />
+                  {!collapsed && (
+                    <>
+                      <span className="text-xs text-emerald-400 font-semibold flex-1">进入卖家中心</span>
+                      <ArrowRightOutlined className="text-emerald-400 text-[10px]" />
+                    </>
+                  )}
+                </div>
+              </a>
+            )}
             <Link to="/mall">
               <div
                 className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer"

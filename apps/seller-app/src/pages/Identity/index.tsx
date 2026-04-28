@@ -4,7 +4,7 @@ import { Card, Form, Input, Button, Typography, Steps, Upload, Tag, Spin, messag
 import { UserOutlined, IdcardOutlined, UploadOutlined, SafetyCertificateOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import { certificationService, getIdentityStatusLabel, getIdentityStatusColor } from '@/services/certificationService'
 import { uploadService } from '@/services/uploadService'
-import { getSellerUser } from '@/services/auth'
+import { getSellerUser, updateSellerUser } from '@/services/auth'
 import type { IdentityStatus } from '@/services/certificationService'
 
 const { Title, Text, Paragraph } = Typography
@@ -28,6 +28,13 @@ export default function IdentityPage() {
       const res = await certificationService.getIdentityStatus()
       if (res.code === 0 && res.data) {
         setIdentityStatus(res.data)
+        if (user) {
+          updateSellerUser({
+            ...user,
+            identity_status: res.data.identity_status,
+            identity_reject: res.data.identity_reject,
+          })
+        }
       }
     } catch (error) {
       void error
