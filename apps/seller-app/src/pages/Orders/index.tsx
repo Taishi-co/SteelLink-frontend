@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Descriptions, Input, Modal, Select, Space, Spin, Table, Tag, Timeline, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { EyeOutlined } from '@ant-design/icons'
-import { getErrorMessage, timelineColor } from '@steellink/shared/utils'
+import { getErrorMessage, getErrorStatus, timelineColor } from '@steellink/shared/utils'
 import { sellerOrderService, type SellerOrderInfo } from '@/services/orderService'
+import { sellerAuthService, updateSellerUser } from '@/services/auth'
+import { useNavigate } from 'react-router-dom'
 
 const { Search } = Input
 const { Text, Paragraph } = Typography
@@ -54,6 +56,7 @@ function getPrimaryProduct(order: SellerOrderInfo) {
 }
 
 export default function OrdersPage() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState<SellerOrderInfo[]>([])
   const [searchText, setSearchText] = useState('')
@@ -70,6 +73,19 @@ export default function OrdersPage() {
       const list = await sellerOrderService.list()
       setOrders(list)
     } catch (error: unknown) {
+      if (getErrorStatus(error) === 403) {
+        try {
+          const res = await sellerAuthService.me()
+          if (res.code === 0 && res.data) {
+            updateSellerUser(res.data)
+          }
+        } catch {
+          // Ignore refresh failure; the permission error below is the actionable state.
+        }
+        message.warning('企业仍在审核中或登录状态未刷新，请先完成企业审核后再访问订单管理')
+        navigate('/enterprise', { replace: true })
+        return
+      }
       message.error(getErrorMessage(error, '订单加载失败'))
     } finally {
       setLoading(false)

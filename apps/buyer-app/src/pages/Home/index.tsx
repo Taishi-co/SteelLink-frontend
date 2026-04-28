@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons'
 
 const { Title, Paragraph, Text } = Typography
+const sellerEntryHref = import.meta.env.DEV ? 'http://localhost:5174/seller/enterprise' : '/seller/enterprise'
 
 const features = [
   {
@@ -66,7 +67,7 @@ export default function HomePage() {
                     进入商城
                   </Button>
                 </Link>
-                <a href="/seller">
+                <a href={sellerEntryHref}>
                   <Button size="large" icon={<RocketOutlined />} className="h-12 px-8 bg-white text-primary-600 border-white hover:bg-gray-100">
                     企业入驻
                   </Button>
@@ -212,7 +213,7 @@ export default function HomePage() {
                 进入商城
               </Button>
             </Link>
-            <a href="/seller">
+            <a href={sellerEntryHref}>
               <Button size="large" icon={<RocketOutlined />} className="h-12 px-8 bg-transparent text-white border-white hover:bg-white/10">
                 企业入驻
               </Button>

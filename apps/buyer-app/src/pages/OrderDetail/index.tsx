@@ -114,6 +114,7 @@ export default function OrderDetailPage() {
   const [uploading, setUploading] = useState(false)
   const [savingDelivery, setSavingDelivery] = useState(false)
   const [confirmingReceipt, setConfirmingReceipt] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [form] = Form.useForm()
   const [deliveryForm] = Form.useForm()
   const [receiptForm] = Form.useForm()
@@ -140,6 +141,7 @@ export default function OrderDetailPage() {
   const pickupWarehouseRegion = [productDetail?.warehouseInfo?.province, productDetail?.warehouseInfo?.city, productDetail?.warehouseInfo?.district]
     .filter(Boolean)
     .join(' ')
+  const canCancelOrder = order?.status === 3 && !order.payment_info?.voucher_url
 
   const handleUploadVoucher = async () => {
     try {
@@ -218,6 +220,29 @@ export default function OrderDetailPage() {
     } finally {
       setConfirmingReceipt(false)
     }
+  }
+
+  const handleCancelOrder = () => {
+    Modal.confirm({
+      title: '确认取消订单？',
+      content: '取消后将释放锁定库存，订单会进入已取消状态。已上传支付凭证的订单不能直接取消。',
+      okText: '确认取消',
+      cancelText: '暂不取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          setCancelling(true)
+          await orderService.cancel(Number(id))
+          message.success('订单已取消')
+          await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+          await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+        } catch (error: unknown) {
+          message.error(getErrorMessage(error, '取消失败'))
+        } finally {
+          setCancelling(false)
+        }
+      },
+    })
   }
 
   return (
@@ -378,6 +403,11 @@ export default function OrderDetailPage() {
               {order.status === 3 && (
                 <Button className="mt-4" type="primary" icon={<UploadOutlined />} onClick={() => setOpen(true)}>
                   上传支付凭证
+                </Button>
+              )}
+              {canCancelOrder && (
+                <Button className="mt-4 ml-3" danger loading={cancelling} onClick={handleCancelOrder}>
+                  取消订单
                 </Button>
               )}
               {order.status === 5 && (

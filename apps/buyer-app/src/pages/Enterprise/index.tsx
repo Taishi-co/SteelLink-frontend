@@ -5,9 +5,18 @@ import { BankOutlined, UploadOutlined, ArrowLeftOutlined, SafetyCertificateOutli
 import { certificationService } from '@/services/certificationService'
 import { uploadService } from '@/services/uploadService'
 import { useUserStore } from '@/stores'
+import {
+  buyerAuthService,
+  clearBuyerSession,
+  getBuyerToken,
+  hasEnterpriseAccess,
+  normalizeBuyerUser,
+  updateBuyerSessionUser,
+} from '@/services/auth'
 import type { CreateEnterprisePayload, EnterpriseInfo } from '@/services/certificationService'
 
 const { Title, Text, Paragraph } = Typography
+const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
 
 type CreateEnterpriseFormValues = Omit<CreateEnterprisePayload, 'business_license_url'>
 type ApiError = { response?: { data?: { message?: string } } }
@@ -21,25 +30,53 @@ export default function EnterprisePage() {
   const [hasEnterprise, setHasEnterprise] = useState(false)
   const [enterpriseInfo, setEnterpriseInfo] = useState<EnterpriseInfo | null>(null)
   const [licenseUrl, setLicenseUrl] = useState('')
+  const [resubmitEnterpriseId, setResubmitEnterpriseId] = useState<number | null>(null)
   const navigate = useNavigate()
   const user = useUserStore((s) => s.user)
+  const login = useUserStore((s) => s.login)
 
   useEffect(() => {
-    checkEnterprise()
+    refreshUserAndEnterprise()
   }, [])
 
-  const checkEnterprise = async () => {
+  const refreshUserAndEnterprise = async () => {
     try {
-      const res = await certificationService.getMyEnterprise()
+      const res = await buyerAuthService.me()
+      const latestUser = res.code === 0 ? normalizeBuyerUser(res.data) : user
+      if (res.code === 0) {
+        updateBuyerSessionUser(res.data)
+        const token = getBuyerToken()
+        if (token && latestUser) {
+          login(latestUser, token)
+        }
+      }
+      await checkEnterprise(latestUser?.enterpriseCode)
+    } catch {
+      await checkEnterprise(user?.enterpriseCode)
+    }
+  }
+
+  const checkEnterprise = async (enterpriseCode?: string) => {
+    if (!enterpriseCode) {
+      setHasEnterprise(false)
+      setEnterpriseInfo(null)
+      setFetching(false)
+      return
+    }
+
+    try {
+      const res = await certificationService.getEnterpriseByCode(enterpriseCode)
       if (res.code === 0 && res.data) {
         setHasEnterprise(true)
-        const list = Array.isArray(res.data) ? res.data : [res.data]
-        if (list.length > 0) {
-          setEnterpriseInfo(list[0])
-        }
+        setEnterpriseInfo(res.data)
+      } else {
+        setHasEnterprise(false)
+        setEnterpriseInfo(null)
       }
     } catch (error) {
       void error
+      setHasEnterprise(false)
+      setEnterpriseInfo(null)
     } finally {
       setFetching(false)
     }
@@ -64,18 +101,25 @@ export default function EnterprisePage() {
     }
     setLoading(true)
     try {
-      const res = await certificationService.createEnterprise({
+      const payload = {
         ...values,
         business_license_url: licenseUrl,
-      })
+      }
+      const res = resubmitEnterpriseId
+        ? await certificationService.verifyEnterprise(resubmitEnterpriseId, payload)
+        : await certificationService.createEnterprise(payload)
       if (res.code === 0) {
-        message.success('企业创建成功，请等待审核')
+        message.success(resubmitEnterpriseId ? '企业认证已重新提交，请等待审核' : '企业创建成功，请等待审核')
         setHasEnterprise(true)
+        setEnterpriseInfo(res.data)
+        setResubmitEnterpriseId(null)
+        await refreshUserAndEnterprise()
       } else {
         message.error(res.message || '创建失败')
       }
-    } catch {
-      message.error('创建失败，请稍后重试')
+    } catch (err: unknown) {
+      const msg = (err as ApiError).response?.data?.message || (resubmitEnterpriseId ? '重新提交失败，请稍后重试' : '创建失败，请稍后重试')
+      message.error(msg)
     } finally {
       setLoading(false)
     }
@@ -88,6 +132,7 @@ export default function EnterprisePage() {
       if (res.code === 0) {
         message.success('已成功加入企业')
         setHasEnterprise(true)
+        await refreshUserAndEnterprise()
       } else {
         message.error(res.message || '加入失败')
       }
@@ -98,6 +143,12 @@ export default function EnterprisePage() {
       setLoading(false)
     }
   }
+
+  const enterpriseApproved = enterpriseInfo?.status === 1
+  const enterpriseReviewing = enterpriseInfo?.status === 0
+  const enterpriseRejected = enterpriseInfo?.status === 2
+  const enterpriseAccessReady = hasEnterpriseAccess(user)
+  const needsVerificationMaterial = !!enterpriseInfo && !enterpriseInfo.verification_info?.legal_person
 
   if (fetching) {
     return (
@@ -121,11 +172,18 @@ export default function EnterprisePage() {
             <Text type="secondary">加入企业后可进行交易、发布商品</Text>
           </div>
 
-          {hasEnterprise ? (
+          {hasEnterprise && mode === null ? (
             <div>
               <div className="text-center mb-6">
                 <TeamOutlined className="text-5xl text-green-400 mb-3" />
-                <Title level={4}>您已加入企业</Title>
+                <Title level={4}>
+                  {enterpriseApproved ? '企业认证已通过' : enterpriseReviewing ? '企业认证审核中' : '企业认证被驳回'}
+                </Title>
+                <Paragraph type="secondary">
+                  {enterpriseApproved
+                    ? enterpriseAccessReady ? '您已获得买家和卖家权限，可在两端自由切换。' : '审核已通过，重新登录后即可刷新企业权限。'
+                    : enterpriseReviewing ? '请等待平台审核，通过后重新登录刷新权限。' : '请根据驳回原因重新提交认证材料。'}
+                </Paragraph>
               </div>
               {enterpriseInfo && (
                 <Descriptions bordered column={1} size="small" className="mb-6">
@@ -142,8 +200,38 @@ export default function EnterprisePage() {
                   </Descriptions.Item>
                 </Descriptions>
               )}
-              <div className="text-center">
-                <Button type="primary" onClick={() => navigate('/mall')}>进入商城</Button>
+              <div className="text-center flex justify-center gap-3">
+                {enterpriseApproved && !enterpriseAccessReady ? (
+                  <Button type="primary" onClick={() => {
+                    clearBuyerSession()
+                    navigate('/login?redirect=/dashboard', { replace: true })
+                  }}>
+                    重新登录刷新权限
+                  </Button>
+                ) : enterpriseApproved ? (
+                  <>
+                    <Button type="primary" onClick={() => navigate('/mall')}>进入商城</Button>
+                    <a href={sellerDashboardHref}>
+                      <Button>进入卖家中心</Button>
+                    </a>
+                  </>
+                ) : enterpriseReviewing && needsVerificationMaterial ? (
+                  <Button type="primary" onClick={() => {
+                    setResubmitEnterpriseId(enterpriseInfo.id)
+                    setMode('create')
+                  }}>
+                    补充企业认证材料
+                  </Button>
+                ) : enterpriseRejected ? (
+                  <Button type="primary" onClick={() => {
+                    setResubmitEnterpriseId(enterpriseInfo.id)
+                    setMode('create')
+                  }}>
+                    重新提交企业认证
+                  </Button>
+                ) : (
+                  <Button type="primary" onClick={() => navigate('/mall')}>进入商城</Button>
+                )}
               </div>
             </div>
           ) : user?.identityStatus !== 2 ? (
@@ -151,7 +239,7 @@ export default function EnterprisePage() {
               <SafetyCertificateOutlined className="text-6xl text-orange-400 mb-4" />
               <Title level={4}>请先完成实名认证</Title>
               <Paragraph type="secondary">加入企业前需要完成个人实名认证</Paragraph>
-              <Button type="primary" onClick={() => navigate('/identity')}>去实名认证</Button>
+              <Button type="primary" onClick={() => navigate('/dashboard/identity')}>去实名认证</Button>
             </div>
           ) : mode === null ? (
             <div className="space-y-4">
@@ -215,6 +303,10 @@ export default function EnterprisePage() {
 
                 <Form.Item label="联系人邮箱" name="contact_email">
                   <Input placeholder="请输入联系人邮箱（选填）" size="large" />
+                </Form.Item>
+
+                <Form.Item label="注册地址" name="registered_address" rules={[{ required: true, message: '请输入注册地址' }]}>
+                  <Input placeholder="请输入营业执照注册地址" size="large" />
                 </Form.Item>
 
                 <Divider />

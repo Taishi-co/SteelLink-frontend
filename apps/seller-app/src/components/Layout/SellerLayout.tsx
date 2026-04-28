@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Avatar, Button, Dropdown, Layout, Menu, Space, Typography } from 'antd'
 import {
   DashboardOutlined,
@@ -11,15 +12,35 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { clearSellerSession, getSellerUser, isIdentityVerified, hasEnterprise, hasEnterprisePending, isSellerReady } from '@/services/auth'
+import { clearSellerSession, getSellerUser, isIdentityVerified, hasEnterprise, hasEnterprisePending, isSellerReady, sellerAuthService, updateSellerUser } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Text } = Typography
+const buyerHomeHref = import.meta.env.DEV ? 'http://localhost:5173/' : '/'
 
 export default function SellerLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const user = getSellerUser()
+  const [user, setUser] = useState(getSellerUser())
+
+  useEffect(() => {
+    let ignore = false
+    sellerAuthService.me()
+      .then((res) => {
+        if (!ignore && res.code === 0 && res.data) {
+          updateSellerUser(res.data)
+          setUser(res.data)
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setUser(getSellerUser())
+        }
+      })
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   const identityOk = isIdentityVerified(user)
   const enterpriseOk = hasEnterprise(user)
@@ -97,7 +118,7 @@ export default function SellerLayout() {
         <Header className="bg-white px-6 flex items-center justify-between shadow-sm h-16">
           <Text className="text-lg font-medium">卖家后台</Text>
           <Space size="middle">
-            <a href="/">
+            <a href={buyerHomeHref}>
               <Button icon={<HomeOutlined />}>买家首页</Button>
             </a>
             <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">

@@ -5,6 +5,7 @@ import { UserOutlined, IdcardOutlined, UploadOutlined, SafetyCertificateOutlined
 import { certificationService, getIdentityStatusLabel, getIdentityStatusColor } from '@/services/certificationService'
 import { uploadService } from '@/services/uploadService'
 import { useUserStore } from '@/stores'
+import { getBuyerToken } from '@/services/auth'
 import type { IdentityStatus } from '@/services/certificationService'
 
 const { Title, Text, Paragraph } = Typography
@@ -18,6 +19,7 @@ export default function IdentityPage() {
   const [backUrl, setBackUrl] = useState('')
   const navigate = useNavigate()
   const user = useUserStore((s) => s.user)
+  const login = useUserStore((s) => s.login)
 
   useEffect(() => {
     fetchStatus()
@@ -28,6 +30,15 @@ export default function IdentityPage() {
       const res = await certificationService.getIdentityStatus()
       if (res.code === 0 && res.data) {
         setIdentityStatus(res.data)
+        const token = getBuyerToken()
+        if (user && token) {
+          login({
+            ...user,
+            realName: res.data.real_name || user.realName,
+            identityStatus: res.data.identity_status,
+            identityReject: res.data.identity_reject,
+          }, token)
+        }
       }
     } catch (error) {
       void error
@@ -202,7 +213,7 @@ export default function IdentityPage() {
             <div className="text-center mt-4">
               <Space>
                 <Text type="secondary">已完成实名，可以加入企业</Text>
-                <Button type="primary" onClick={() => navigate('/enterprise')}>
+                <Button type="primary" onClick={() => navigate('/dashboard/enterprise')}>
                   企业入驻
                 </Button>
               </Space>

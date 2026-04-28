@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { clearSellerSession } from './auth'
+import { clearSellerSession, getSellerToken } from './auth'
 
 const defaultBaseURL = import.meta.env.DEV ? 'http://localhost:8080/api/v1' : '/api/v1'
 
@@ -13,7 +13,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = getSellerToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -28,7 +28,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       clearSellerSession()
       const currentPath = window.location.pathname + window.location.search
-      window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`
+      window.location.href = `/seller/login?redirect=${encodeURIComponent(currentPath)}`
     }
     return Promise.reject(error)
   },

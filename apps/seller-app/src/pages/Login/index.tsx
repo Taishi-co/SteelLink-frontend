@@ -21,6 +21,15 @@ interface RegisterValues {
 export default function LoginPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  const redirect = new URLSearchParams(window.location.search).get('redirect')
+
+  const goAfterLogin = () => {
+    if (redirect?.startsWith('/seller/')) {
+      navigate(redirect.replace(/^\/seller/, '') || '/', { replace: true })
+      return
+    }
+    navigate('/dashboard', { replace: true })
+  }
 
   const handleLogin = async (values: LoginValues) => {
     setLoading(true)
@@ -32,7 +41,7 @@ export default function LoginPage() {
       const { access_token, user } = response.data
       saveSellerSession(access_token, user)
       message.success('卖家登录成功')
-      navigate('/dashboard', { replace: true })
+      goAfterLogin()
     } catch (error: unknown) {
       message.error(getErrorMessage(error, '登录失败，请检查账号密码或确认后端服务是否正常'))
     } finally {
@@ -50,7 +59,7 @@ export default function LoginPage() {
       const { access_token, user } = response.data
       saveSellerSession(access_token, user)
       message.success('注册成功，已自动登录')
-      navigate('/dashboard', { replace: true })
+      goAfterLogin()
     } catch (error: unknown) {
       message.error(getErrorMessage(error, '注册失败，请确认手机号未被占用'))
     } finally {

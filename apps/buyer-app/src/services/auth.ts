@@ -47,6 +47,8 @@ export interface BuyerRegisterPayload {
 
 const TOKEN_KEY = 'token'
 const USER_KEY = 'buyer_user'
+const SELLER_USER_KEY = 'seller_user'
+const SELLER_ENTERPRISE_ROLE_KEY = 'seller_enterprise_role'
 let memoryToken: string | null = null
 let memoryUser: User | null = null
 
@@ -87,6 +89,17 @@ export const buyerAuthService = {
     api.post<unknown, ApiResponse<LoginResponse>>('/auth/login', payload),
   register: (payload: BuyerRegisterPayload) =>
     api.post<unknown, ApiResponse<LoginResponse>>('/auth/register', payload),
+  me: () => api.get<unknown, ApiResponse<BuyerProfile>>('/users/me'),
+}
+
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const base64 = token.split('.')[1]
+    const json = atob(base64.replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(json)
+  } catch {
+    return null
+  }
 }
 
 export function normalizeBuyerUser(profile: BuyerProfile): User {
@@ -109,8 +122,27 @@ export function saveBuyerSession(token: string, profile: BuyerProfile) {
   memoryUser = normalizeBuyerUser(profile)
   setStorageItem(TOKEN_KEY, token)
   setStorageItem(USER_KEY, JSON.stringify(memoryUser))
+  setStorageItem(SELLER_USER_KEY, JSON.stringify(profile))
   setCookie(TOKEN_KEY, token)
   setCookie(USER_KEY, JSON.stringify(memoryUser))
+  setCookie(SELLER_USER_KEY, JSON.stringify(profile))
+
+  const payload = parseJwtPayload(token)
+  if (payload?.enterprise_role) {
+    setStorageItem(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+    setCookie(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+  } else {
+    removeStorageItem(SELLER_ENTERPRISE_ROLE_KEY)
+    removeCookie(SELLER_ENTERPRISE_ROLE_KEY)
+  }
+}
+
+export function updateBuyerSessionUser(profile: BuyerProfile) {
+  memoryUser = normalizeBuyerUser(profile)
+  setStorageItem(USER_KEY, JSON.stringify(memoryUser))
+  setStorageItem(SELLER_USER_KEY, JSON.stringify(profile))
+  setCookie(USER_KEY, JSON.stringify(memoryUser))
+  setCookie(SELLER_USER_KEY, JSON.stringify(profile))
 }
 
 export function getBuyerUser(): User | null {
@@ -120,14 +152,20 @@ export function getBuyerUser(): User | null {
   }
 
   try {
-    return JSON.parse(raw) as User
+    const user = JSON.parse(raw) as User
+    setCookie(USER_KEY, JSON.stringify(user))
+    return user
   } catch {
     return memoryUser
   }
 }
 
 export function getBuyerToken() {
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || getCookie(TOKEN_KEY) || memoryToken
+  const token = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || getCookie(TOKEN_KEY) || memoryToken
+  if (token) {
+    setCookie(TOKEN_KEY, token)
+  }
+  return token
 }
 
 export function clearBuyerSession() {
@@ -135,6 +173,19 @@ export function clearBuyerSession() {
   memoryUser = null
   removeStorageItem(TOKEN_KEY)
   removeStorageItem(USER_KEY)
+  removeStorageItem(SELLER_USER_KEY)
+  removeStorageItem(SELLER_ENTERPRISE_ROLE_KEY)
   removeCookie(TOKEN_KEY)
   removeCookie(USER_KEY)
+  removeCookie(SELLER_USER_KEY)
+  removeCookie(SELLER_ENTERPRISE_ROLE_KEY)
+}
+
+export function isEnterpriseToken() {
+  const payload = parseJwtPayload(getBuyerToken() || '')
+  return payload?.user_type === 'enterprise'
+}
+
+export function hasEnterpriseAccess(user: User | null) {
+  return !!user?.enterpriseCode && user.role === 'enterprise' && isEnterpriseToken()
 }

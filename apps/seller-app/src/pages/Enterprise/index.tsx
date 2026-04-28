@@ -4,6 +4,7 @@ import { Card, Form, Input, Button, Typography, Select, Upload, Spin, message, D
 import { BankOutlined, UploadOutlined, ArrowLeftOutlined, SafetyCertificateOutlined, TeamOutlined, CheckCircleFilled, ClockCircleFilled, CloseCircleFilled } from '@ant-design/icons'
 import { certificationService, getIdentityStatusLabel, getIdentityStatusColor } from '@/services/certificationService'
 import { uploadService } from '@/services/uploadService'
+import { clearSellerSession, getSellerUser, hasEnterprise as hasEnterpriseAccess, sellerAuthService, updateSellerUser } from '@/services/auth'
 import type { CreateEnterprisePayload, EnterpriseInfo, IdentityStatus } from '@/services/certificationService'
 
 const { Title, Text, Paragraph } = Typography
@@ -21,36 +22,73 @@ export default function EnterprisePage() {
   const [enterpriseInfo, setEnterpriseInfo] = useState<EnterpriseInfo | null>(null)
   const [identityStatus, setIdentityStatus] = useState<IdentityStatus | null>(null)
   const [licenseUrl, setLicenseUrl] = useState('')
+  const [resubmitEnterpriseId, setResubmitEnterpriseId] = useState<number | null>(null)
   const navigate = useNavigate()
+  const user = getSellerUser()
 
   useEffect(() => {
-    checkEnterprise()
-    checkIdentity()
+    refreshUserAndStatus()
   }, [])
 
-  const checkIdentity = async () => {
+  const refreshUserAndStatus = async () => {
+    try {
+      const res = await sellerAuthService.me()
+      const latestUser = res.code === 0 ? res.data : user
+      if (latestUser) {
+        updateSellerUser(latestUser)
+      }
+      await Promise.all([
+        checkEnterprise(latestUser?.enterprise_code),
+        checkIdentity(latestUser),
+      ])
+    } catch {
+      await Promise.all([
+        checkEnterprise(),
+        checkIdentity(),
+      ])
+    }
+  }
+
+  const checkIdentity = async (currentUser = user) => {
     try {
       const res = await certificationService.getIdentityStatus()
       if (res.code === 0 && res.data) {
         setIdentityStatus(res.data)
+        if (currentUser) {
+          updateSellerUser({
+            ...currentUser,
+            identity_status: res.data.identity_status,
+            identity_reject: res.data.identity_reject,
+          })
+        }
       }
     } catch (error) {
       void error
     }
   }
 
-  const checkEnterprise = async () => {
+  const checkEnterprise = async (overrideEnterpriseCode?: string) => {
+    const enterpriseCode = overrideEnterpriseCode || user?.enterprise_code
+    if (!enterpriseCode) {
+      setHasEnterprise(false)
+      setEnterpriseInfo(null)
+      setFetching(false)
+      return
+    }
+
     try {
-      const res = await certificationService.getMyEnterprise()
+      const res = await certificationService.getEnterpriseByCode(enterpriseCode)
       if (res.code === 0 && res.data) {
         setHasEnterprise(true)
-        const list = Array.isArray(res.data) ? res.data : [res.data]
-        if (list.length > 0) {
-          setEnterpriseInfo(list[0])
-        }
+        setEnterpriseInfo(res.data)
+      } else {
+        setHasEnterprise(false)
+        setEnterpriseInfo(null)
       }
     } catch (error) {
       void error
+      setHasEnterprise(false)
+      setEnterpriseInfo(null)
     } finally {
       setFetching(false)
     }
@@ -75,18 +113,30 @@ export default function EnterprisePage() {
     }
     setLoading(true)
     try {
-      const res = await certificationService.createEnterprise({
+      const payload = {
         ...values,
         business_license_url: licenseUrl,
-      })
+      }
+      const res = resubmitEnterpriseId
+        ? await certificationService.verifyEnterprise(resubmitEnterpriseId, payload)
+        : await certificationService.createEnterprise(payload)
       if (res.code === 0) {
-        message.success('企业创建成功，请等待审核')
+        message.success(resubmitEnterpriseId ? '企业认证已重新提交，请等待审核' : '企业创建成功，请等待审核')
         setHasEnterprise(true)
+        setEnterpriseInfo(res.data)
+        setResubmitEnterpriseId(null)
+        if (user && res.data?.enterprise_code) {
+          updateSellerUser({
+            ...user,
+            enterprise_code: res.data.enterprise_code,
+          })
+        }
       } else {
         message.error(res.message || '创建失败')
       }
-    } catch {
-      message.error('创建失败，请稍后重试')
+    } catch (err: unknown) {
+      const msg = (err as ApiError).response?.data?.message || (resubmitEnterpriseId ? '重新提交失败，请稍后重试' : '创建失败，请稍后重试')
+      message.error(msg)
     } finally {
       setLoading(false)
     }
@@ -99,6 +149,13 @@ export default function EnterprisePage() {
       if (res.code === 0) {
         message.success('已成功加入企业')
         setHasEnterprise(true)
+        if (user) {
+          updateSellerUser({
+            ...user,
+            enterprise_code: values.enterprise_code,
+          })
+        }
+        await checkEnterprise(values.enterprise_code)
       } else {
         message.error(res.message || '加入失败')
       }
@@ -119,13 +176,15 @@ export default function EnterprisePage() {
   }
 
   const identityStep = identityStatus?.identity_status ?? 0
-  const identityCompleted = identityStep >= 2
+  const identityCompleted = identityStep === 2
   const identityRejected = identityStep === 3
   const identityReviewing = identityStep === 1
 
   const enterpriseApproved = hasEnterprise && enterpriseInfo?.status === 1
   const enterpriseReviewing = hasEnterprise && enterpriseInfo?.status === 0
   const enterpriseRejected = hasEnterprise && enterpriseInfo?.status === 2
+  const needsVerificationMaterial = !!enterpriseInfo && !enterpriseInfo.verification_info?.legal_person
+  const enterpriseAccessReady = hasEnterpriseAccess(getSellerUser())
 
   const stepCurrent = enterpriseApproved ? 2 : hasEnterprise || identityCompleted ? 1 : 0
 
@@ -205,7 +264,7 @@ export default function EnterprisePage() {
           />
         </Card>
 
-        {hasEnterprise ? (
+        {hasEnterprise && mode === null ? (
           <Card className="rounded-2xl shadow-sm border-0">
             <Result
               status={enterpriseInfo?.status === 1 ? 'success' : enterpriseInfo?.status === 0 ? 'info' : 'error'}
@@ -241,8 +300,30 @@ export default function EnterprisePage() {
               </Descriptions>
             )}
             <div className="text-center">
-              {enterpriseInfo?.status === 1 ? (
+              {enterpriseInfo?.status === 1 && !enterpriseAccessReady ? (
+                <Button type="primary" size="large" onClick={() => {
+                  clearSellerSession()
+                  navigate('/login?redirect=/seller/dashboard', { replace: true })
+                }}>
+                  重新登录刷新权限
+                </Button>
+              ) : enterpriseInfo?.status === 1 ? (
                 <Button type="primary" size="large" onClick={() => navigate('/products')}>管理商品</Button>
+              ) : enterpriseInfo?.status === 0 && needsVerificationMaterial ? (
+                <Button type="primary" size="large" onClick={() => {
+                  setResubmitEnterpriseId(enterpriseInfo.id)
+                  setMode('create')
+                }}>
+                  补充企业认证材料
+                </Button>
+              ) : enterpriseInfo?.status === 2 ? (
+                <Button type="primary" size="large" onClick={() => {
+                  setHasEnterprise(false)
+                  setResubmitEnterpriseId(enterpriseInfo.id)
+                  setMode('create')
+                }}>
+                  重新提交企业认证
+                </Button>
               ) : (
                 <Button onClick={() => navigate('/dashboard')}>返回首页</Button>
               )}
@@ -356,6 +437,10 @@ export default function EnterprisePage() {
 
               <Form.Item label="联系人邮箱" name="contact_email">
                 <Input placeholder="请输入联系人邮箱（选填）" size="large" />
+              </Form.Item>
+
+              <Form.Item label="注册地址" name="registered_address" rules={[{ required: true, message: '请输入注册地址' }]}>
+                <Input placeholder="请输入营业执照注册地址" size="large" />
               </Form.Item>
 
               <Divider />

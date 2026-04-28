@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 
 const { Footer: AntFooter } = Layout
 const { Text } = Typography
+const sellerEntryHref = import.meta.env.DEV ? 'http://localhost:5174/seller/enterprise' : '/seller/enterprise'
+const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
 
 export default function HomeFooter() {
   return (
@@ -36,8 +38,8 @@ export default function HomeFooter() {
           <Col span={4}>
             <Text className="text-white font-medium block mb-4">商家服务</Text>
             <Space direction="vertical" className="text-gray-400">
-              <a href="/seller" className="text-gray-400 hover:text-white">企业入驻</a>
-              <a href="/seller" className="text-gray-400 hover:text-white">商家中心</a>
+              <a href={sellerEntryHref} className="text-gray-400 hover:text-white">企业入驻</a>
+              <a href={sellerDashboardHref} className="text-gray-400 hover:text-white">商家中心</a>
               <Link to="/rules" className="text-gray-400 hover:text-white">平台规则</Link>
             </Space>
           </Col>
