@@ -111,7 +111,11 @@ export function isIdentityVerified(user: SellerUser | null): boolean {
 }
 
 export function hasEnterprise(user: SellerUser | null): boolean {
-  return !!user?.enterprise_code
+  return !!user?.enterprise_code && user?.role === 'enterprise'
+}
+
+export function hasEnterprisePending(user: SellerUser | null): boolean {
+  return !!user?.enterprise_code && user?.role !== 'enterprise'
 }
 
 export function isSellerReady(user: SellerUser | null): boolean {

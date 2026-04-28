@@ -229,7 +229,7 @@ export default function EnterprisePage() {
               <Descriptions bordered column={1} size="small" className="mb-6">
                 <Descriptions.Item label="企业名称">{enterpriseInfo.enterprise_name}</Descriptions.Item>
                 <Descriptions.Item label="企业编码">{enterpriseInfo.enterprise_code}</Descriptions.Item>
-                <Descriptions.Item label="企业角色">
+                <Descriptions.Item label="供应链身份">
                   <Tag color="blue">{enterpriseInfo.enterprise_role}</Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label="统一社会信用代码">{enterpriseInfo.unified_social_credit_code}</Descriptions.Item>
@@ -315,8 +315,8 @@ export default function EnterprisePage() {
                 <Input placeholder="请输入营业执照上的企业全称" size="large" />
               </Form.Item>
 
-              <Form.Item label="企业角色" name="enterprise_role" rules={[{ required: true, message: '请选择企业角色' }]}>
-                <Select placeholder="请选择企业角色" size="large" options={[
+              <Form.Item label="供应链身份" name="enterprise_role" rules={[{ required: true, message: '请选择供应链身份' }]}>
+                <Select placeholder="请选择供应链身份" size="large" options={[
                   { value: 'seller', label: '供应商' },
                   { value: 'buyer', label: '采购方/贸易商' },
                   { value: 'logistics', label: '物流商' },

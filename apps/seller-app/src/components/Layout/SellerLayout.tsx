@@ -11,7 +11,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { clearSellerSession, getSellerUser, isIdentityVerified, hasEnterprise, isSellerReady } from '@/services/auth'
+import { clearSellerSession, getSellerUser, isIdentityVerified, hasEnterprise, hasEnterprisePending, isSellerReady } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Text } = Typography
@@ -23,6 +23,7 @@ export default function SellerLayout() {
 
   const identityOk = isIdentityVerified(user)
   const enterpriseOk = hasEnterprise(user)
+  const enterprisePending = hasEnterprisePending(user)
   const ready = isSellerReady(user)
 
   const menuItems = (() => {
@@ -36,7 +37,7 @@ export default function SellerLayout() {
 
     if (!enterpriseOk) {
       items.push({ key: '/identity', icon: <SafetyCertificateOutlined />, label: '实名认证' })
-      items.push({ key: '/enterprise', icon: <TeamOutlined />, label: '企业入驻' })
+      items.push({ key: '/enterprise', icon: <TeamOutlined />, label: enterprisePending ? '企业审核中' : '企业入驻' })
       return items
     }
 
@@ -80,7 +81,7 @@ export default function SellerLayout() {
         {!ready && (
           <div className="px-4 py-3 mx-3 mt-3 bg-orange-50 rounded-lg border border-orange-100">
             <Text className="text-xs text-orange-600 block">
-              {!identityOk ? '请先完成实名认证' : '请完成企业入驻'}
+              {!identityOk ? '请先完成实名认证' : enterprisePending ? '企业审核中，审核通过后即可使用全部功能' : '请完成企业入驻'}
             </Text>
           </div>
         )}
