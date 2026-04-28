@@ -162,9 +162,21 @@ export default function EnterprisePage() {
         {hasEnterprise ? (
           <Card className="rounded-2xl shadow-sm border-0">
             <Result
-              status="success"
-              title="您已加入企业"
-              subTitle="企业认证信息如下"
+              status={enterpriseInfo?.status === 1 ? 'success' : enterpriseInfo?.status === 0 ? 'info' : 'error'}
+              title={
+                enterpriseInfo?.status === 1
+                  ? '企业认证已通过'
+                  : enterpriseInfo?.status === 0
+                    ? '企业认证审核中'
+                    : '企业认证被驳回'
+              }
+              subTitle={
+                enterpriseInfo?.status === 1
+                  ? '您已可以正常使用卖家功能'
+                  : enterpriseInfo?.status === 0
+                    ? '请耐心等待平台审核'
+                    : '请根据驳回原因修改后重新提交'
+              }
               className="!pb-2"
             />
             {enterpriseInfo && (
@@ -183,7 +195,11 @@ export default function EnterprisePage() {
               </Descriptions>
             )}
             <div className="text-center">
-              <Button type="primary" size="large" onClick={() => navigate('/products')}>管理商品</Button>
+              {enterpriseInfo?.status === 1 ? (
+                <Button type="primary" size="large" onClick={() => navigate('/products')}>管理商品</Button>
+              ) : (
+                <Button onClick={() => navigate('/dashboard')}>返回首页</Button>
+              )}
             </div>
           </Card>
         ) : !identityCompleted ? (
