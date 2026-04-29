@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Descriptions, Input, Modal, Select, Space, Spin, Table, Tag, Timeline, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { EyeOutlined } from '@ant-design/icons'
@@ -67,7 +67,7 @@ export default function OrdersPage() {
   const [confirmAction, setConfirmAction] = useState<{ type: 'payment' | 'outbound'; order: SellerOrderInfo } | null>(null)
   const [confirmInput, setConfirmInput] = useState('')
 
-  async function loadOrders() {
+  const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
       const list = await sellerOrderService.list()
@@ -90,11 +90,11 @@ export default function OrdersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [navigate])
 
   useEffect(() => {
     void loadOrders()
-  }, [])
+  }, [loadOrders])
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {

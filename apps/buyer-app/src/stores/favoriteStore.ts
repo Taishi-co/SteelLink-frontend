@@ -14,6 +14,10 @@ interface FavoriteState {
   checkFavorite: (productId: number) => Promise<boolean>
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
 export const useFavoriteStore = create<FavoriteState>((set, get) => ({
   items: [],
   totalCount: 0,
@@ -26,8 +30,8 @@ export const useFavoriteStore = create<FavoriteState>((set, get) => ({
       const response = await favoriteService.getList()
       const items = response.data.list
       set({ items, totalCount: items.length, isLoading: false })
-    } catch (error: any) {
-      set({ error: error.message || '获取收藏夹失败', isLoading: false })
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error, '获取收藏夹失败'), isLoading: false })
     }
   },
 
@@ -36,8 +40,8 @@ export const useFavoriteStore = create<FavoriteState>((set, get) => ({
     try {
       await favoriteService.add({ product_id: productId })
       await get().fetchFavorites()
-    } catch (error: any) {
-      set({ error: error.message || '添加收藏失败', isLoading: false })
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error, '添加收藏失败'), isLoading: false })
       throw error
     }
   },
@@ -47,8 +51,8 @@ export const useFavoriteStore = create<FavoriteState>((set, get) => ({
     try {
       await favoriteService.remove(id)
       await get().fetchFavorites()
-    } catch (error: any) {
-      set({ error: error.message || '删除收藏失败', isLoading: false })
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error, '删除收藏失败'), isLoading: false })
       throw error
     }
   },
@@ -58,8 +62,8 @@ export const useFavoriteStore = create<FavoriteState>((set, get) => ({
     try {
       await favoriteService.removeByProduct(productId)
       await get().fetchFavorites()
-    } catch (error: any) {
-      set({ error: error.message || '删除收藏失败', isLoading: false })
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error, '删除收藏失败'), isLoading: false })
       throw error
     }
   },

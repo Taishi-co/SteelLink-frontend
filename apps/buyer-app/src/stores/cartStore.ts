@@ -14,6 +14,10 @@ interface CartState {
   clearCart: () => Promise<void>
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   totalItems: 0,
@@ -27,8 +31,8 @@ export const useCartStore = create<CartState>((set, get) => ({
       const items = response.data.list
       const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
       set({ items, totalItems, isLoading: false })
-    } catch (error: any) {
-      set({ error: error.message || '获取购物车失败', isLoading: false })
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error, '获取购物车失败'), isLoading: false })
     }
   },
 
@@ -37,8 +41,8 @@ export const useCartStore = create<CartState>((set, get) => ({
     try {
       await cartService.addItem({ product_id: productId, quantity })
       await get().fetchCart()
-    } catch (error: any) {
-      set({ error: error.message || '加入购物车失败', isLoading: false })
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error, '加入购物车失败'), isLoading: false })
       throw error
     }
   },
@@ -48,8 +52,8 @@ export const useCartStore = create<CartState>((set, get) => ({
     try {
       await cartService.updateItem(itemId, { quantity })
       await get().fetchCart()
-    } catch (error: any) {
-      set({ error: error.message || '更新购物车失败', isLoading: false })
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error, '更新购物车失败'), isLoading: false })
       throw error
     }
   },
@@ -59,8 +63,8 @@ export const useCartStore = create<CartState>((set, get) => ({
     try {
       await cartService.removeItem(itemId)
       await get().fetchCart()
-    } catch (error: any) {
-      set({ error: error.message || '删除购物车商品失败', isLoading: false })
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error, '删除购物车商品失败'), isLoading: false })
       throw error
     }
   },
@@ -70,8 +74,8 @@ export const useCartStore = create<CartState>((set, get) => ({
     try {
       await cartService.clearCart()
       set({ items: [], totalItems: 0, isLoading: false })
-    } catch (error: any) {
-      set({ error: error.message || '清空购物车失败', isLoading: false })
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error, '清空购物车失败'), isLoading: false })
       throw error
     }
   },
