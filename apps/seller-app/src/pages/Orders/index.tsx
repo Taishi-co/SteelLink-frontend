@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Descriptions, Input, Modal, Select, Space, Spin, Table, Tag, Timeline, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { EyeOutlined } from '@ant-design/icons'
+import { EyeOutlined, ReloadOutlined } from '@ant-design/icons'
 import { getErrorMessage, getErrorStatus, timelineColor } from '@steellink/shared/utils'
 import { sellerOrderService, type SellerOrderInfo } from '@/services/orderService'
 import { sellerAuthService, updateSellerUser } from '@/services/auth'
@@ -27,6 +27,7 @@ const statusMeta: Record<number, { color: string; text: string }> = {
 
 const statusOptions = [
   { label: '全部状态', value: 'all' },
+  { label: '进行中', value: 'active' },
   { label: '待确认', value: 1 },
   { label: '待签合同', value: 2 },
   { label: '待支付', value: 3 },
@@ -37,6 +38,16 @@ const statusOptions = [
   { label: '已完成', value: 8 },
   { label: '已取消', value: 9 },
 ]
+
+const activeOrderStatuses = [1, 2, 3, 4, 5, 6, 7]
+
+const summaryStatusItems = [
+  { key: 'active', label: '进行中', statuses: activeOrderStatuses },
+  { key: 1, label: '待确认', statuses: [1] },
+  { key: 4, label: '待确认收款', statuses: [4] },
+  { key: 5, label: '待提货', statuses: [5] },
+  { key: 8, label: '已完成', statuses: [8] },
+] as const
 
 function formatCurrency(amount: number) {
   return `¥${amount.toLocaleString()}`
@@ -106,10 +117,32 @@ export default function OrdersPage() {
         order.order_no.includes(searchText) ||
         order.buyer_name.includes(searchText) ||
         primary?.product_name?.includes(searchText)
-      const matchesStatus = statusFilter === 'all' || order.status === statusFilter
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && activeOrderStatuses.includes(order.status)) ||
+        order.status === statusFilter
       return matchesSearch && matchesStatus
     })
   }, [orders, searchText, statusFilter])
+
+  const orderSummary = useMemo(() => {
+    const totalAmount = orders
+      .filter((order) => ![0, 9, 10].includes(order.status))
+      .reduce((sum, order) => sum + (order.total_amount || 0), 0)
+
+    return {
+      total: orders.length,
+      totalAmount,
+      statusCounts: orders.reduce<Record<number, number>>((counts, order) => {
+        counts[order.status] = (counts[order.status] || 0) + 1
+        return counts
+      }, {}),
+    }
+  }, [orders])
+
+  const setSummaryFilter = (item: (typeof summaryStatusItems)[number]) => {
+    setStatusFilter(item.key)
+  }
 
   async function openOrderDetail(order: SellerOrderInfo) {
     setActionLoading(true)
@@ -209,17 +242,20 @@ export default function OrdersPage() {
       title: '订单号',
       dataIndex: 'order_no',
       key: 'order_no',
-      width: 220,
+      width: 210,
+      render: (value: string) => <Text className="text-sm font-medium text-gray-900">{value}</Text>,
     },
     {
       title: '买家企业',
       dataIndex: 'buyer_name',
       key: 'buyer_name',
-      width: 180,
+      width: 170,
+      ellipsis: true,
     },
     {
       title: '商品',
       key: 'product',
+      width: 260,
       render: (_, record) => {
         const product = getPrimaryProduct(record)
         if (!product) {
@@ -227,8 +263,8 @@ export default function OrdersPage() {
         }
         return (
           <div>
-            <div>{product.product_name}</div>
-            <div style={{ color: '#8c8c8c', fontSize: 12 }}>
+            <div className="line-clamp-2 font-medium text-gray-900">{product.product_name}</div>
+            <div className="text-xs text-gray-500">
               {product.steel_mill || '未填写钢厂'} / {product.bundle_no || '未填捆包号'}
             </div>
           </div>
@@ -239,21 +275,21 @@ export default function OrdersPage() {
       title: '数量',
       dataIndex: 'total_quantity',
       key: 'total_quantity',
-      width: 120,
+      width: 110,
       render: (value: number) => `${value} 吨`,
     },
     {
       title: '金额',
       dataIndex: 'total_amount',
       key: 'total_amount',
-      width: 140,
-      render: (value: number) => formatCurrency(value),
+      width: 130,
+      render: (value: number) => <Text className="font-medium">{formatCurrency(value)}</Text>,
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 120,
+      width: 130,
       render: (status: number) => {
         const meta = formatStatus(status)
         return <Tag color={meta.color}>{meta.text}</Tag>
@@ -269,15 +305,15 @@ export default function OrdersPage() {
       title: '下单时间',
       dataIndex: 'created_at',
       key: 'created_at',
-      width: 180,
+      width: 170,
       render: (value: string) => formatDate(value),
     },
     {
       title: '操作',
       key: 'action',
-      width: 180,
+      width: 220,
       render: (_, record) => (
-        <Space>
+        <Space wrap size={4}>
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => void openOrderDetail(record)}>
             详情
           </Button>
@@ -310,31 +346,78 @@ export default function OrdersPage() {
   const selectedStatus = selectedOrder ? formatStatus(selectedOrder.status) : null
 
   return (
-    <div>
-      <Card title="订单管理">
-        <Space className="mb-4" wrap>
+    <div className="min-w-0">
+      <Card
+        title="订单管理"
+        extra={
+          <Button icon={<ReloadOutlined />} onClick={() => void loadOrders()}>
+            刷新
+          </Button>
+        }
+      >
+        <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-6">
+          <button
+            type="button"
+            onClick={() => setStatusFilter('all')}
+            className={`rounded-lg border px-4 py-3 text-left transition ${
+              statusFilter === 'all' ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'
+            }`}
+          >
+            <div className="text-xs text-gray-500">全部订单</div>
+            <div className="mt-1 text-2xl font-semibold text-gray-900">{orderSummary.total}</div>
+          </button>
+          {summaryStatusItems.map((item) => {
+            const count = item.statuses.reduce((sum, status) => sum + (orderSummary.statusCounts[status] || 0), 0)
+            const active = statusFilter === item.key
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setSummaryFilter(item)}
+                className={`rounded-lg border px-4 py-3 text-left transition ${
+                  active ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'
+                }`}
+              >
+                <div className="text-xs text-gray-500">{item.label}</div>
+                <div className="mt-1 text-2xl font-semibold text-gray-900">{count}</div>
+              </button>
+            )
+          })}
+        </div>
+
+        <Alert
+          className="mb-4"
+          type="info"
+          showIcon
+          message={`当前有效订单金额 ${formatCurrency(orderSummary.totalAmount)}`}
+          description="卖家可在这里确认订单、签署合同、确认收款和核销出库；高风险操作仍会弹窗二次确认。"
+        />
+
+        <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center">
           <Search
+            className="w-full xl:max-w-md"
             placeholder="搜索订单号 / 买家企业 / 商品名"
             allowClear
-            style={{ width: 280 }}
             onSearch={setSearchText}
             onChange={(event) => setSearchText(event.target.value)}
             value={searchText}
           />
           <Select
+            className="w-full xl:w-44"
             value={statusFilter}
             onChange={setStatusFilter}
-            style={{ width: 160 }}
             options={statusOptions}
           />
-        </Space>
+        </div>
 
         <Table
           loading={loading}
           columns={columns}
           dataSource={filteredOrders}
           rowKey="id"
-          pagination={{ pageSize: 10 }}
+          size="middle"
+          scroll={{ x: 1520 }}
+          pagination={{ pageSize: 10, showSizeChanger: false }}
         />
       </Card>
 
