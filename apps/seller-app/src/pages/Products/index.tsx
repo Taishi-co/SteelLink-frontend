@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
+  Alert,
   Button,
   Card,
   Descriptions,
@@ -21,6 +22,7 @@ import {
 import {
   CheckCircleOutlined,
   CloudUploadOutlined,
+  EditOutlined,
   EyeOutlined,
   InfoCircleOutlined,
   PlusOutlined,
@@ -57,6 +59,14 @@ interface ProductFormValues {
   quantity: number
   unitPrice: number
   minOrderQty: number
+  description: string
+  deliveryDays: number
+  quoteValidity: number
+  imageFiles: UploadFile[]
+  qualificationFiles: UploadFile[]
+}
+
+interface ProductDisplayFormValues {
   description: string
   deliveryDays: number
   quoteValidity: number
@@ -120,6 +130,13 @@ const marketplaceVisibilityMeta: Record<ProductStatus, { color: string; text: st
   },
 }
 
+const summaryStatusItems: Array<{ key: ProductStatus; label: string }> = [
+  { key: 'pending_review', label: '审核中' },
+  { key: 'approved', label: '已上架' },
+  { key: 'rejected', label: '被驳回' },
+  { key: 'offline', label: '已下架' },
+]
+
 function normalizeUploadList(fileList?: string[]) {
   return (fileList ?? []).map((file, index) => ({
     uid: `${file}-${index}`,
@@ -177,6 +194,16 @@ function toPayload(values: ProductFormValues, imageURLs: string[], qualification
   }
 }
 
+function toDisplayPayload(values: ProductDisplayFormValues, imageURLs: string[], qualificationURLs: string[]) {
+  return {
+    images: imageURLs,
+    quality_cert: qualificationURLs[0] || '',
+    description: values.description,
+    delivery_days: values.deliveryDays,
+    quote_validity: values.quoteValidity,
+  }
+}
+
 export default function ProductsPage() {
   const [products, setProducts] = useState<SellerProductRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -185,9 +212,12 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState('全部')
   const [statusFilter, setStatusFilter] = useState<'all' | ProductStatus>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isDisplayModalOpen, setIsDisplayModalOpen] = useState(false)
   const [drawerProduct, setDrawerProduct] = useState<SellerProductRecord | null>(null)
   const [editingProduct, setEditingProduct] = useState<SellerProductRecord | null>(null)
+  const [displayProduct, setDisplayProduct] = useState<SellerProductRecord | null>(null)
   const [form] = Form.useForm<ProductFormValues>()
+  const [displayForm] = Form.useForm<ProductDisplayFormValues>()
 
   const loadProducts = async () => {
     setLoading(true)
@@ -218,6 +248,26 @@ export default function ProductsPage() {
     [categoryFilter, products, searchText, statusFilter],
   )
 
+  const productSummary = useMemo(
+    () =>
+      products.reduce(
+        (summary, product) => {
+          summary.total += 1
+          summary[product.status] += 1
+          return summary
+        },
+        {
+          total: 0,
+          draft: 0,
+          pending_review: 0,
+          approved: 0,
+          rejected: 0,
+          offline: 0,
+        } as Record<ProductStatus | 'total', number>,
+      ),
+    [products],
+  )
+
   const openCreateModal = () => {
     setEditingProduct(null)
     form.resetFields()
@@ -228,38 +278,28 @@ export default function ProductsPage() {
     setIsModalOpen(true)
   }
 
-  const openResubmitModal = (product: SellerProductRecord) => {
-    setEditingProduct(product)
-    form.setFieldsValue({
-      name: product.name,
-      category: product.category,
-      subCategory: product.sub_category,
-      steelMill: product.steel_mill,
-      material: product.material,
-      spec: product.specs,
-      warehouseName: product.warehouse_name,
-      warehouseCode: product.warehouse_code,
-      province: product.province,
-      city: product.city,
-      district: product.district,
-      address: product.address,
-      bundleNo: product.bundle_no,
-      quantity: product.stock,
-      unitPrice: product.price,
-      minOrderQty: product.min_order_qty,
-      description: product.description,
-      deliveryDays: 3,
-      quoteValidity: 72,
-      imageFiles: normalizeUploadList(product.image_urls),
-      qualificationFiles: normalizeUploadList(product.qualification_urls),
-    })
-    setIsModalOpen(true)
-  }
-
   const closeModal = () => {
     form.resetFields()
     setEditingProduct(null)
     setIsModalOpen(false)
+  }
+
+  const openDisplayModal = (product: SellerProductRecord) => {
+    setDisplayProduct(product)
+    displayForm.setFieldsValue({
+      description: product.description,
+      deliveryDays: product.delivery_days || 3,
+      quoteValidity: product.quote_validity || 72,
+      imageFiles: normalizeUploadList(product.image_urls),
+      qualificationFiles: normalizeUploadList(product.qualification_urls),
+    })
+    setIsDisplayModalOpen(true)
+  }
+
+  const closeDisplayModal = () => {
+    displayForm.resetFields()
+    setDisplayProduct(null)
+    setIsDisplayModalOpen(false)
   }
 
   const handleSubmitForReview = async () => {
@@ -279,16 +319,34 @@ export default function ProductsPage() {
     }
   }
 
+  const handleUpdateDisplay = async () => {
+    if (!displayProduct) return
+    const values = await displayForm.validateFields()
+    setSubmitting(true)
+    try {
+      const imageURLs = await resolveUploadedURLs(values.imageFiles, 'product_image')
+      const qualificationURLs = await resolveUploadedURLs(values.qualificationFiles, 'product_qualification')
+      await sellerProductService.updateDisplay(displayProduct.id, toDisplayPayload(values, imageURLs, qualificationURLs))
+      message.success('商品资料已更新并重新进入审核')
+      closeDisplayModal()
+      await loadProducts()
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '更新失败，请确认后端服务正常且当前账号有权限'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const columns: ColumnsType<SellerProductRecord> = [
     {
       title: '商品名称',
       dataIndex: 'name',
       key: 'name',
-      width: 280,
+      width: 260,
       render: (_, record) => (
         <div>
-          <div className="font-medium text-gray-900">{record.name}</div>
-          <Text type="secondary">
+          <div className="line-clamp-2 font-medium text-gray-900">{record.name}</div>
+          <Text type="secondary" className="text-xs">
             {record.sku_id} · 卖家UID {record.seller_uid}
           </Text>
         </div>
@@ -298,26 +356,36 @@ export default function ProductsPage() {
       title: '品类',
       dataIndex: 'category',
       key: 'category',
+      width: 110,
       render: (value) => <Tag color="blue">{value}</Tag>,
     },
-    { title: '规格/品牌', dataIndex: 'specs', key: 'specs' },
+    {
+      title: '规格/品牌',
+      dataIndex: 'specs',
+      key: 'specs',
+      width: 140,
+      ellipsis: true,
+    },
     {
       title: '单价',
       dataIndex: 'price',
       key: 'price',
+      width: 120,
       render: (value: number) => `¥${value}/吨`,
     },
     {
       title: '库存',
       key: 'stock',
+      width: 130,
       render: (_, record) => `${record.visible_stock}/${record.stock} 吨`,
     },
     {
       title: '审核状态',
       dataIndex: 'status',
       key: 'status',
+      width: 240,
       render: (status: ProductStatus, record) => (
-        <div className="max-w-64">
+        <div className="max-w-56">
           <Space size={6} wrap>
             <Tag color={statusMeta[status].color}>{statusMeta[status].text}</Tag>
             {status === 'approved' && record.approved_at ? <Text type="secondary">通过于 {record.approved_at}</Text> : null}
@@ -330,7 +398,7 @@ export default function ProductsPage() {
     {
       title: '商城展示',
       key: 'marketplace_visibility',
-      width: 180,
+      width: 170,
       render: (_, record) => (
         <Tag color={marketplaceVisibilityMeta[record.status].color}>
           {marketplaceVisibilityMeta[record.status].text}
@@ -358,6 +426,7 @@ export default function ProductsPage() {
     {
       title: '资料',
       key: 'files',
+      width: 130,
       render: (_, record) => (
         <Space direction="vertical" size={0}>
           <Text type="secondary">主图 {record.image_urls.length} 份</Text>
@@ -381,8 +450,13 @@ export default function ProductsPage() {
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setDrawerProduct(record)}>
             查看审核
           </Button>
+          {record.status !== 'pending_review' && record.status !== 'rejected' ? (
+            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openDisplayModal(record)}>
+              补充资料
+            </Button>
+          ) : null}
           {record.status === 'rejected' ? (
-            <Button type="link" size="small" icon={<ReloadOutlined />} onClick={() => openResubmitModal(record)}>
+            <Button type="link" size="small" icon={<ReloadOutlined />} onClick={() => openDisplayModal(record)}>
               重新提交
             </Button>
           ) : null}
@@ -392,7 +466,7 @@ export default function ProductsPage() {
   ]
 
   return (
-    <div>
+    <div className="min-w-0">
       <Card
         title="商品管理"
         extra={
@@ -401,42 +475,83 @@ export default function ProductsPage() {
           </Button>
         }
       >
-        <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
-          商品发布后不会直接上架。卖家需上传商品主图和审核资料，提交后进入平台审核；审核通过后方可在买家端显示。
+        <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
+          <button
+            type="button"
+            onClick={() => setStatusFilter('all')}
+            className={`rounded-lg border px-4 py-3 text-left transition ${
+              statusFilter === 'all' ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'
+            }`}
+          >
+            <div className="text-xs text-gray-500">全部商品</div>
+            <div className="mt-1 text-2xl font-semibold text-gray-900">{productSummary.total}</div>
+          </button>
+          {summaryStatusItems.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setStatusFilter(item.key)}
+              className={`rounded-lg border px-4 py-3 text-left transition ${
+                statusFilter === item.key ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'
+              }`}
+            >
+              <div className="text-xs text-gray-500">{item.label}</div>
+              <div className="mt-1 text-2xl font-semibold text-gray-900">{productSummary[item.key]}</div>
+            </button>
+          ))}
         </div>
 
-        <Space className="mb-4" wrap>
+        <Alert
+          className="mb-4"
+          type="warning"
+          showIcon
+          message="商品发布后不会直接上架"
+          description="卖家需上传商品主图和审核资料，提交后进入平台审核；审核通过后方可在买家端显示。"
+        />
+
+        <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center">
           <Search
+            className="w-full xl:max-w-sm"
             placeholder="搜索商品名称或 SKU"
             allowClear
-            style={{ width: 320 }}
             onSearch={setSearchText}
             prefix={<SearchOutlined />}
           />
-          <Select
-            value={categoryFilter}
-            onChange={setCategoryFilter}
-            style={{ width: 160 }}
-            options={categoryOptions.map((category) => ({ label: category, value: category }))}
-          />
-          <Select
-            value={statusFilter}
-            onChange={setStatusFilter}
-            style={{ width: 160 }}
-            options={[
-              { label: '全部状态', value: 'all' },
-              { label: '待审核', value: 'pending_review' },
-              { label: '审核通过', value: 'approved' },
-              { label: '审核驳回', value: 'rejected' },
-              { label: '已下架', value: 'offline' },
-              { label: '草稿', value: 'draft' },
-            ]}
-          />
-          <Button onClick={() => void loadProducts()}>刷新</Button>
-        </Space>
+          <div className="grid grid-cols-2 gap-3 xl:flex xl:flex-1">
+            <Select
+              className="w-full xl:w-40"
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              options={categoryOptions.map((category) => ({ label: category, value: category }))}
+            />
+            <Select
+              className="w-full xl:w-40"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { label: '全部状态', value: 'all' },
+                { label: '待审核', value: 'pending_review' },
+                { label: '审核通过', value: 'approved' },
+                { label: '审核驳回', value: 'rejected' },
+                { label: '已下架', value: 'offline' },
+                { label: '草稿', value: 'draft' },
+              ]}
+            />
+          </div>
+          <Button icon={<ReloadOutlined />} onClick={() => void loadProducts()}>
+            刷新
+          </Button>
+        </div>
 
         <Spin spinning={loading}>
-          <Table columns={columns} dataSource={filteredProducts} rowKey="id" pagination={{ pageSize: 10 }} />
+          <Table
+            columns={columns}
+            dataSource={filteredProducts}
+            rowKey="id"
+            size="middle"
+            scroll={{ x: 1600 }}
+            pagination={{ pageSize: 10, showSizeChanger: false }}
+          />
         </Spin>
       </Card>
 
@@ -574,6 +689,82 @@ export default function ProductsPage() {
             </Upload>
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="补充商品展示资料"
+        open={isDisplayModalOpen}
+        onOk={() => void handleUpdateDisplay()}
+        onCancel={closeDisplayModal}
+        width={680}
+        okText="提交审核"
+        confirmLoading={submitting}
+      >
+        {displayProduct ? (
+          <Space direction="vertical" size="middle" className="w-full">
+            <Alert
+              type="info"
+              showIcon
+              message="仅允许修改展示和审核补充资料"
+              description="捆包号、库存、单价、规格、仓库等关键交易字段已锁定。如需调整这些字段，请下架后重新发布对应批次商品。"
+            />
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label="商品名称">{displayProduct.name}</Descriptions.Item>
+              <Descriptions.Item label="捆包号">{displayProduct.bundle_no}</Descriptions.Item>
+              <Descriptions.Item label="规格/材质">
+                {displayProduct.specs || '-'} / {displayProduct.material || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="库存/单价">
+                {displayProduct.stock} 吨 / ¥{displayProduct.price}/吨
+              </Descriptions.Item>
+            </Descriptions>
+            <Form<ProductDisplayFormValues> form={displayForm} layout="vertical">
+              <Form.Item
+                name="imageFiles"
+                label="商品主图"
+                valuePropName="fileList"
+                getValueFromEvent={(event) => event?.fileList ?? []}
+                rules={[
+                  {
+                    validator: async (_, fileList: UploadFile[]) => {
+                      if (fileList && fileList.length > 0) {
+                        return
+                      }
+                      throw new Error('请至少保留 1 张商品主图')
+                    },
+                  },
+                ]}
+                extra="可新增或替换买家端展示图片，提交后会重新进入平台审核。"
+              >
+                <Upload beforeUpload={() => false} listType="picture" maxCount={5}>
+                  <Button icon={<CloudUploadOutlined />}>上传主图</Button>
+                </Upload>
+              </Form.Item>
+              <Form.Item
+                name="qualificationFiles"
+                label="审核资料"
+                valuePropName="fileList"
+                getValueFromEvent={(event) => event?.fileList ?? []}
+                extra="可补充质保书、材质证明、出厂单等资料。"
+              >
+                <Upload beforeUpload={() => false} maxCount={8}>
+                  <Button icon={<CloudUploadOutlined />}>上传审核资料</Button>
+                </Upload>
+              </Form.Item>
+              <Form.Item name="description" label="商品说明" rules={[{ required: true, message: '请输入商品说明' }]}>
+                <TextArea rows={4} placeholder="填写材质、交货方式、可售批次等补充说明。" />
+              </Form.Item>
+              <Space className="w-full" size="large">
+                <Form.Item name="deliveryDays" label="交货周期（天）" rules={[{ required: true, message: '请输入交货周期' }]}>
+                  <InputNumber min={1} className="w-60" placeholder="请输入交货周期" />
+                </Form.Item>
+                <Form.Item name="quoteValidity" label="报价有效期（小时）" rules={[{ required: true, message: '请输入报价有效期' }]}>
+                  <InputNumber min={1} className="w-60" placeholder="请输入报价有效期" />
+                </Form.Item>
+              </Space>
+            </Form>
+          </Space>
+        ) : null}
       </Modal>
 
       <Drawer title="审核详情" width={680} open={Boolean(drawerProduct)} onClose={() => setDrawerProduct(null)} destroyOnClose>

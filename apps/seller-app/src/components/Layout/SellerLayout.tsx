@@ -96,8 +96,8 @@ export default function SellerLayout() {
   }
 
   return (
-    <Layout className="min-h-screen">
-      <Sider width={220} className="bg-white shadow-sm">
+    <Layout className="min-h-screen min-w-0">
+      <Sider width={220} className="bg-white shadow-sm shrink-0">
         <div className="h-16 flex items-center justify-center border-b">
           <Text className="text-xl font-bold text-primary-600">SteelLink</Text>
         </div>
@@ -116,7 +116,7 @@ export default function SellerLayout() {
           className="border-none h-[calc(100vh-64px)]"
         />
       </Sider>
-      <Layout>
+      <Layout className="min-w-0">
         <Header className="bg-white px-6 flex items-center justify-between shadow-sm h-16">
           <Text className="text-lg font-medium">卖家后台</Text>
           <Space size="middle">
@@ -131,7 +131,7 @@ export default function SellerLayout() {
             </Dropdown>
           </Space>
         </Header>
-        <Content className="m-6 p-6 bg-white rounded-lg min-h-[calc(100vh-112px)]">
+        <Content className="m-6 min-w-0 overflow-x-hidden rounded-lg bg-white p-6 min-h-[calc(100vh-112px)]">
           <Outlet />
         </Content>
       </Layout>

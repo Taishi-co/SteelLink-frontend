@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Descriptions, Empty, Form, Input, Space, Spin, Statistic, Table, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Descriptions, Empty, Form, Input, Space, Spin, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { getErrorMessage, getErrorStatus } from '@steellink/shared/utils'
@@ -82,6 +82,18 @@ export default function FulfillmentPage() {
     })
   }, [orders, searchText])
 
+  const fulfillmentSummary = useMemo(() => {
+    const totalAmount = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0)
+    const vehicleCount = new Set(orders.map((order) => order.delivery_info?.plate_number).filter(Boolean)).size
+
+    return {
+      total: orders.length,
+      filtered: filteredOrders.length,
+      totalAmount,
+      vehicleCount,
+    }
+  }, [filteredOrders.length, orders])
+
   async function handleVerify() {
     if (!selectedOrder) return
     try {
@@ -110,22 +122,25 @@ export default function FulfillmentPage() {
       title: '订单号',
       dataIndex: 'order_no',
       key: 'order_no',
-      width: 220,
+      width: 210,
+      render: (value: string) => <Text className="text-sm font-medium text-gray-900">{value}</Text>,
     },
     {
       title: '买家企业',
       dataIndex: 'buyer_name',
       key: 'buyer_name',
-      width: 180,
+      width: 170,
+      ellipsis: true,
     },
     {
       title: '商品',
       key: 'product',
+      width: 260,
       render: (_, record) => {
         const product = primaryProduct(record)
         return product ? (
           <div>
-            <div>{product.product_name}</div>
+            <div className="line-clamp-2 font-medium text-gray-900">{product.product_name}</div>
             <Text type="secondary" className="text-xs">
               {product.steel_mill || '未填钢厂'} / {product.bundle_no || '未填捆包号'}
             </Text>
@@ -154,7 +169,7 @@ export default function FulfillmentPage() {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 110,
       render: (_, record) => (
         <Button type="link" size="small" onClick={() => { setSelectedOrder(record); form.resetFields() }}>
           核销
@@ -166,37 +181,59 @@ export default function FulfillmentPage() {
   const product = selectedOrder ? primaryProduct(selectedOrder) : null
 
   return (
-    <div>
-      <Space className="mb-4" wrap>
-        <Statistic title="待核销订单" value={orders.length} />
-        <Statistic title="当前筛选" value={filteredOrders.length} />
-      </Space>
+    <div className="min-w-0">
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-3">
+          <div className="text-xs text-gray-500">待核销订单</div>
+          <div className="mt-1 text-2xl font-semibold text-gray-900">{fulfillmentSummary.total}</div>
+        </div>
+        <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+          <div className="text-xs text-gray-500">当前筛选</div>
+          <div className="mt-1 text-2xl font-semibold text-gray-900">{fulfillmentSummary.filtered}</div>
+        </div>
+        <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+          <div className="text-xs text-gray-500">待出库金额</div>
+          <div className="mt-1 text-2xl font-semibold text-gray-900">{formatCurrency(fulfillmentSummary.totalAmount)}</div>
+        </div>
+        <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+          <div className="text-xs text-gray-500">关联车辆</div>
+          <div className="mt-1 text-2xl font-semibold text-gray-900">{fulfillmentSummary.vehicleCount}</div>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-6">
+      <Alert
+        className="mb-4"
+        type="warning"
+        showIcon
+        message="核销前请核对司机、车牌、提货码和仓库信息"
+        description="确认核销后订单会进入配送中状态，当前操作会直接调用后端出库确认接口。"
+      />
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card
           title="履约核销"
           extra={
-            <Space>
-              <Search
-                allowClear
-                placeholder="搜索订单号 / 买家 / 商品 / 提货码"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                onSearch={setSearchText}
-                style={{ width: 300 }}
-              />
-              <Button icon={<ReloadOutlined />} onClick={() => void loadOrders()}>
-                刷新
-              </Button>
-            </Space>
+            <Button icon={<ReloadOutlined />} onClick={() => void loadOrders()}>
+              刷新
+            </Button>
           }
         >
+          <Search
+            className="mb-4 w-full xl:max-w-md"
+            allowClear
+            placeholder="搜索订单号 / 买家 / 商品 / 提货码"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            onSearch={setSearchText}
+          />
           <Table
             loading={loading}
             columns={columns}
             dataSource={filteredOrders}
             rowKey="id"
-            pagination={{ pageSize: 8 }}
+            size="middle"
+            scroll={{ x: 1200 }}
+            pagination={{ pageSize: 8, showSizeChanger: false }}
             onRow={(record) => ({
               onClick: () => {
                 setSelectedOrder(record)

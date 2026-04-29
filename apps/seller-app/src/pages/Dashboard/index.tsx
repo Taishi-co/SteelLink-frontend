@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Row, Col, Card, Statistic, Typography, Table, Tag, Spin, Button, Space, Progress } from 'antd'
+import { Alert, Card, Typography, Table, Tag, Spin, Button, Space } from 'antd'
 import {
   ShoppingCartOutlined,
-  DollarOutlined,
-  ShopOutlined,
-  CheckCircleOutlined,
   ExclamationCircleOutlined,
   PlusOutlined,
   WarningOutlined,
   FileProtectOutlined,
+  TruckOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { sellerOrderService, type SellerOrderInfo } from '@/services/orderService'
@@ -35,10 +33,12 @@ const orderStatusMeta: Record<number, { color: string; text: string }> = {
 interface TodoItem {
   key: string
   text: string
+  description: string
   count: number
   color: string
   icon: React.ReactNode
   link: string
+  actionText: string
 }
 
 export default function DashboardPage() {
@@ -82,7 +82,9 @@ export default function DashboardPage() {
 
   const orderStats = (() => {
     const pendingConfirm = orders.filter(o => o.status === 1).length
+    const pendingContract = orders.filter(o => o.status === 2).length
     const pendingPayment = orders.filter(o => o.status === 3).length
+    const pendingPaymentReview = orders.filter(o => o.status === 4).length
     const pendingDelivery = orders.filter(o => o.status === 5).length
     const inTransit = orders.filter(o => o.status === 6).length
     const completed = orders.filter(o => o.status === 8).length
@@ -90,61 +92,99 @@ export default function DashboardPage() {
       .filter(o => o.status !== 0 && o.status !== 9)
       .reduce((sum, o) => sum + (o.total_amount || 0), 0)
 
-    return { pendingConfirm, pendingPayment, pendingDelivery, inTransit, completed, totalAmount }
+    return { pendingConfirm, pendingContract, pendingPayment, pendingPaymentReview, pendingDelivery, inTransit, completed, totalAmount }
   })()
 
   const todos: TodoItem[] = [
     ...(orderStats.pendingConfirm > 0 ? [{
       key: 'confirm',
       text: '待确认订单',
+      description: '核对商品、数量、价格后确认订单',
       count: orderStats.pendingConfirm,
       color: '#f59e0b',
       icon: <ExclamationCircleOutlined />,
       link: '/orders',
+      actionText: '处理订单',
+    }] : []),
+    ...(orderStats.pendingContract > 0 ? [{
+      key: 'contract',
+      text: '待签署合同',
+      description: '完成卖家侧合同签署，推进订单支付',
+      count: orderStats.pendingContract,
+      color: '#6366f1',
+      icon: <FileProtectOutlined />,
+      link: '/orders',
+      actionText: '去签署',
+    }] : []),
+    ...(orderStats.pendingPaymentReview > 0 ? [{
+      key: 'payment-review',
+      text: '待确认收款',
+      description: '买家已上传凭证，确认后进入提货',
+      count: orderStats.pendingPaymentReview,
+      color: '#2563eb',
+      icon: <ShoppingCartOutlined />,
+      link: '/orders',
+      actionText: '核对凭证',
     }] : []),
     ...(orderStats.pendingDelivery > 0 ? [{
       key: 'delivery',
       text: '待提货订单',
+      description: '司机到仓后核销提货码并确认出库',
       count: orderStats.pendingDelivery,
       color: '#3b82f6',
-      icon: <ShoppingCartOutlined />,
-      link: '/orders',
+      icon: <TruckOutlined />,
+      link: '/fulfillment',
+      actionText: '去核销',
     }] : []),
     ...(productPending > 0 ? [{
       key: 'product-review',
       text: '商品审核中',
+      description: '关注平台审核结果，审核通过后进入买家端',
       count: productPending,
       color: '#06b6d4',
       icon: <FileProtectOutlined />,
       link: '/products',
+      actionText: '查看商品',
     }] : []),
     ...(productRejected > 0 ? [{
       key: 'product-rejected',
       text: '商品被驳回',
+      description: '按审核备注补充资料后重新提交',
       count: productRejected,
       color: '#ef4444',
       icon: <WarningOutlined />,
       link: '/products',
+      actionText: '修改商品',
     }] : []),
   ]
 
-  const recentOrders = orders.slice(0, 5)
+  const recentOrders = orders
+    .filter((order) => ![0, 8, 9].includes(order.status))
+    .slice(0, 5)
 
-  const orderStatusDistribution = (() => {
-    if (orders.length === 0) return []
-    const statusCounts: Record<number, number> = {}
-    orders.forEach(o => {
-      statusCounts[o.status] = (statusCounts[o.status] || 0) + 1
-    })
-    return Object.entries(statusCounts)
-      .map(([status, count]) => ({
-        status: Number(status),
-        count,
-        percent: Math.round((count / orders.length) * 100),
-        meta: orderStatusMeta[Number(status)],
-      }))
-      .sort((a, b) => b.count - a.count)
-  })()
+  const healthItems = [
+    {
+      label: '商品可售',
+      value: productApproved,
+      hint: productCount ? `共 ${productCount} 个商品` : '暂无商品',
+      status: productApproved > 0 ? '正常' : '待补充',
+      color: productApproved > 0 ? 'green' : 'orange',
+    },
+    {
+      label: '商品驳回',
+      value: productRejected,
+      hint: productRejected > 0 ? '需要重新提交' : '暂无驳回',
+      status: productRejected > 0 ? '需处理' : '正常',
+      color: productRejected > 0 ? 'red' : 'green',
+    },
+    {
+      label: '履约中',
+      value: orderStats.inTransit,
+      hint: '配送中订单',
+      status: orderStats.inTransit > 0 ? '跟进中' : '无',
+      color: orderStats.inTransit > 0 ? 'blue' : 'default',
+    },
+  ]
 
   const columns = [
     {
@@ -187,23 +227,22 @@ export default function DashboardPage() {
   }
 
   return (
-    <div>
-      <Card className="mb-6 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 rounded-2xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <Title level={4} className="!mb-1 !text-white">
-              欢迎回来{user?.phone ? `，${user.phone}` : ''}
+    <div className="min-w-0">
+      <Card className="mb-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <Title level={4} className="!mb-1">
+              今日工作台{user?.phone ? `，${user.phone}` : ''}
             </Title>
-            <Paragraph className="!mb-0 !text-blue-100">
-              SteelLink 卖家工作台 — 管理商品、处理订单、追踪发货
+            <Paragraph className="!mb-0 !text-gray-500">
+              按待处理优先级进入商品、订单和履约页面，减少重复看数。
             </Paragraph>
           </div>
           <Space>
             <Button
-              type="default"
+              type="primary"
               icon={<PlusOutlined />}
               onClick={() => navigate('/products')}
-              className="bg-white/20 border-white/40 text-white hover:bg-white/30"
             >
               发布商品
             </Button>
@@ -211,162 +250,94 @@ export default function DashboardPage() {
               type="default"
               icon={<ShoppingCartOutlined />}
               onClick={() => navigate('/orders')}
-              className="bg-white/20 border-white/40 text-white hover:bg-white/30"
             >
-              查看订单
+              处理订单
             </Button>
           </Space>
         </div>
       </Card>
 
-      {todos.length > 0 && (
-        <Card className="mb-6 rounded-2xl border-0" title={
+      <Card className="mb-6" title={
           <Space>
             <ExclamationCircleOutlined className="text-orange-500" />
-            <span>待处理事项</span>
+            <span>待处理队列</span>
           </Space>
         }>
-          <Row gutter={16}>
-            {todos.map(todo => (
-              <Col key={todo.key} span={6}>
-                <Card
-                  hoverable
-                  className="rounded-xl border"
-                  onClick={() => navigate(todo.link)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="text-2xl" style={{ color: todo.color }}>{todo.icon}</div>
-                    <div>
-                      <div className="text-2xl font-bold">{todo.count}</div>
-                      <Text type="secondary" className="text-sm">{todo.text}</Text>
+        {todos.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+            {todos.map((todo) => (
+              <button
+                key={todo.key}
+                type="button"
+                className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-left transition hover:border-blue-200 hover:bg-blue-50"
+                onClick={() => navigate(todo.link)}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 text-2xl" style={{ color: todo.color }}>{todo.icon}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <Text className="font-medium text-gray-900">{todo.text}</Text>
+                      <Text className="text-2xl font-semibold text-gray-900">{todo.count}</Text>
                     </div>
+                    <div className="mt-1 text-sm text-gray-500">{todo.description}</div>
+                    <div className="mt-3 text-sm font-medium text-blue-600">{todo.actionText}</div>
                   </div>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </Card>
-      )}
-
-      <Row gutter={16} className="mb-6">
-        <Col span={6}>
-          <Card className="rounded-xl">
-            <Statistic
-              title="待确认订单"
-              value={orderStats.pendingConfirm}
-              prefix={<ExclamationCircleOutlined style={{ color: '#f59e0b' }} />}
-              valueStyle={{ color: '#f59e0b' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card className="rounded-xl">
-            <Statistic
-              title="待提货"
-              value={orderStats.pendingDelivery}
-              prefix={<ShoppingCartOutlined style={{ color: '#3b82f6' }} />}
-              valueStyle={{ color: '#3b82f6' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card className="rounded-xl">
-            <Statistic
-              title="累计成交额"
-              value={orderStats.totalAmount}
-              prefix="¥"
-              suffix={<DollarOutlined style={{ color: '#10b981' }} />}
-              valueStyle={{ color: '#10b981' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card className="rounded-xl">
-            <Statistic
-              title="已完成订单"
-              value={orderStats.completed}
-              prefix={<CheckCircleOutlined style={{ color: '#22c55e' }} />}
-              valueStyle={{ color: '#22c55e' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Row gutter={16} className="mb-6">
-        <Col span={12}>
-          <Card title="商品概览" className="rounded-2xl border-0 h-full">
-            <Row gutter={16}>
-              <Col span={8}>
-                <Statistic title="全部商品" value={productCount} prefix={<ShopOutlined />} />
-              </Col>
-              <Col span={8}>
-                <Statistic title="已上架" value={productApproved} valueStyle={{ color: '#22c55e' }} />
-              </Col>
-              <Col span={8}>
-                <Statistic title="审核中" value={productPending} valueStyle={{ color: '#06b6d4' }} />
-              </Col>
-            </Row>
-            {productCount > 0 && (
-              <div className="mt-4">
-                <div className="flex items-center justify-between mb-1">
-                  <Text type="secondary" className="text-xs">上架率</Text>
-                  <Text type="secondary" className="text-xs">{Math.round((productApproved / productCount) * 100)}%</Text>
                 </div>
-                <Progress
-                  percent={Math.round((productApproved / productCount) * 100)}
-                  showInfo={false}
-                  strokeColor="#22c55e"
-                  trailColor="#f3f4f6"
-                  size="small"
-                />
-              </div>
-            )}
-            {productRejected > 0 && (
-              <div className="mt-3">
-                <Tag color="error">{productRejected} 个商品被驳回，需修改后重新提交</Tag>
-              </div>
-            )}
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Card title="订单状态分布" className="rounded-2xl border-0 h-full">
-            {orderStatusDistribution.length > 0 ? (
-              <div className="space-y-2">
-                {orderStatusDistribution.slice(0, 5).map(item => (
-                  <div key={item.status} className="flex items-center gap-3">
-                    <Tag color={item.meta?.color} className="!w-20 text-center">{item.meta?.text || `状态${item.status}`}</Tag>
-                    <Progress
-                      percent={item.percent}
-                      size="small"
-                      showInfo={false}
-                      className="flex-1"
-                    />
-                    <Text type="secondary" className="text-sm !w-12 text-right">{item.count} 单</Text>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6 text-gray-400">暂无订单数据</div>
-            )}
-          </Card>
-        </Col>
-      </Row>
-
-      <Card title="近期订单" className="rounded-2xl border-0">
-        {recentOrders.length > 0 ? (
-          <Table
-            columns={columns}
-            dataSource={recentOrders}
-            rowKey="id"
-            pagination={false}
-            size="small"
-          />
-        ) : (
-          <div className="text-center py-8 text-gray-400">
-            暂无订单数据
+              </button>
+            ))}
           </div>
+        ) : (
+          <Alert
+            type="success"
+            showIcon
+            message="当前没有紧急待办"
+            description="可继续维护商品资料，或进入订单管理查看全部交易记录。"
+          />
         )}
       </Card>
+
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card title="近期需跟进订单">
+          {recentOrders.length > 0 ? (
+            <Table
+              columns={columns}
+              dataSource={recentOrders}
+              rowKey="id"
+              pagination={false}
+              size="middle"
+              scroll={{ x: 760 }}
+            />
+          ) : (
+            <div className="py-8 text-center text-gray-400">
+              暂无需要跟进的订单
+            </div>
+          )}
+        </Card>
+
+        <Card title="经营状态">
+          <div className="space-y-3">
+            {healthItems.map((item) => (
+              <div key={item.label} className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <Text className="font-medium text-gray-900">{item.label}</Text>
+                    <div className="mt-1 text-sm text-gray-500">{item.hint}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-semibold text-gray-900">{item.value}</div>
+                    <Tag color={item.color}>{item.status}</Tag>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 rounded-lg bg-blue-50 px-4 py-3">
+            <div className="text-sm font-medium text-blue-900">有效订单金额</div>
+            <div className="mt-1 text-2xl font-semibold text-blue-900">¥{orderStats.totalAmount.toLocaleString()}</div>
+            <div className="mt-1 text-sm text-blue-700">已完成 {orderStats.completed} 单，待支付 {orderStats.pendingPayment} 单</div>
+          </div>
+        </Card>
+      </div>
     </div>
   )
 }

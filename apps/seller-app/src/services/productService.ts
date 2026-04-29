@@ -139,6 +139,14 @@ export interface UpsertProductPayload {
   quote_validity: number
 }
 
+export interface UpdateProductDisplayPayload {
+  images: string[]
+  quality_cert?: string
+  description: string
+  delivery_days: number
+  quote_validity: number
+}
+
 function mapStatus(status: number): ProductStatus {
   switch (status) {
     case 0:
@@ -246,4 +254,6 @@ export const sellerProductService = {
   },
   create: (payload: UpsertProductPayload) =>
     api.post<unknown, ApiResponse<BackendProductInfo>>('/products', payload),
+  updateDisplay: (id: number, payload: UpdateProductDisplayPayload) =>
+    api.put<unknown, ApiResponse<BackendProductInfo>>(`/products/${id}/display`, payload),
 }
