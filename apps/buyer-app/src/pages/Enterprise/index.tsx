@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Form, Input, Button, Typography, Select, Upload, Spin, message, Divider, Descriptions, Tag } from 'antd'
 import { BankOutlined, UploadOutlined, ArrowLeftOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons'
@@ -35,28 +35,7 @@ export default function EnterprisePage() {
   const user = useUserStore((s) => s.user)
   const login = useUserStore((s) => s.login)
 
-  useEffect(() => {
-    refreshUserAndEnterprise()
-  }, [])
-
-  const refreshUserAndEnterprise = async () => {
-    try {
-      const res = await buyerAuthService.me()
-      const latestUser = res.code === 0 ? normalizeBuyerUser(res.data) : user
-      if (res.code === 0) {
-        updateBuyerSessionUser(res.data)
-        const token = getBuyerToken()
-        if (token && latestUser) {
-          login(latestUser, token)
-        }
-      }
-      await checkEnterprise(latestUser?.enterpriseCode)
-    } catch {
-      await checkEnterprise(user?.enterpriseCode)
-    }
-  }
-
-  const checkEnterprise = async (enterpriseCode?: string) => {
+  const checkEnterprise = useCallback(async (enterpriseCode?: string) => {
     if (!enterpriseCode) {
       setHasEnterprise(false)
       setEnterpriseInfo(null)
@@ -80,7 +59,28 @@ export default function EnterprisePage() {
     } finally {
       setFetching(false)
     }
-  }
+  }, [])
+
+  const refreshUserAndEnterprise = useCallback(async () => {
+    try {
+      const res = await buyerAuthService.me()
+      const latestUser = res.code === 0 ? normalizeBuyerUser(res.data) : useUserStore.getState().user
+      if (res.code === 0) {
+        updateBuyerSessionUser(res.data)
+        const token = getBuyerToken()
+        if (token && latestUser) {
+          login(latestUser, token)
+        }
+      }
+      await checkEnterprise(latestUser?.enterpriseCode)
+    } catch {
+      await checkEnterprise(useUserStore.getState().user?.enterpriseCode)
+    }
+  }, [checkEnterprise, login])
+
+  useEffect(() => {
+    void refreshUserAndEnterprise()
+  }, [refreshUserAndEnterprise])
 
   const handleUploadLicense = async (file: File) => {
     try {
