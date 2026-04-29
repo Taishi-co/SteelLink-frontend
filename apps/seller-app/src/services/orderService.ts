@@ -35,6 +35,13 @@ export interface SellerOrderInfo {
   status: number
   expires_at?: string
   created_at: string
+  contract_info?: {
+    contract_no?: string
+    contract_url?: string
+    buyer_signed: boolean
+    seller_signed: boolean
+    signed_at?: string
+  }
   receipt_voucher?: string
   receipt_at?: string
   timeline?: SellerOrderTimelineItem[]
@@ -78,6 +85,14 @@ export const sellerOrderService = {
   },
   async confirmPayment(id: number) {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/confirm-payment`)
+    return response.data
+  },
+  async confirmOrder(id: number) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/confirm`)
+    return response.data
+  },
+  async signContract(id: number) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/sign-contract`)
     return response.data
   },
   async confirmOutbound(id: number) {

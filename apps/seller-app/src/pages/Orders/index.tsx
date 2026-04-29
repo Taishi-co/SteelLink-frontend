@@ -27,6 +27,8 @@ const statusMeta: Record<number, { color: string; text: string }> = {
 
 const statusOptions = [
   { label: '全部状态', value: 'all' },
+  { label: '待确认', value: 1 },
+  { label: '待签合同', value: 2 },
   { label: '待支付', value: 3 },
   { label: '待确认收款', value: 4 },
   { label: '待提货', value: 5 },
@@ -117,6 +119,40 @@ export default function OrdersPage() {
       setIsModalOpen(true)
     } catch (error: unknown) {
       message.error(getErrorMessage(error, '订单详情加载失败'))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleConfirmOrder(order: SellerOrderInfo) {
+    setActionLoading(true)
+    try {
+      const detail = await sellerOrderService.confirmOrder(order.id)
+      message.success('订单已确认，等待双方签署合同')
+      setSelectedOrder(detail)
+      setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+      setIsModalOpen(true)
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '确认订单失败'))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleSignContract(order: SellerOrderInfo) {
+    setActionLoading(true)
+    try {
+      const detail = await sellerOrderService.signContract(order.id)
+      if (detail.contract_info?.buyer_signed && detail.contract_info?.seller_signed) {
+        message.success('双方已签署合同，订单进入待支付阶段')
+      } else {
+        message.success('合同已签署，等待对方签署')
+      }
+      setSelectedOrder(detail)
+      setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+      setIsModalOpen(true)
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '签署合同失败'))
     } finally {
       setActionLoading(false)
     }
@@ -241,6 +277,16 @@ export default function OrdersPage() {
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => void openOrderDetail(record)}>
             详情
           </Button>
+          {record.status === 1 && (
+            <Button type="link" size="small" onClick={() => void handleConfirmOrder(record)}>
+              确认订单
+            </Button>
+          )}
+          {record.status === 2 && !record.contract_info?.seller_signed && (
+            <Button type="link" size="small" onClick={() => void handleSignContract(record)}>
+              签署合同
+            </Button>
+          )}
           {record.status === 4 && record.payment_info?.voucher_url && (
             <Button type="link" size="small" onClick={() => void handleConfirmPayment(record)}>
               确认收款
@@ -296,6 +342,16 @@ export default function OrdersPage() {
           <Button key="close" onClick={() => setIsModalOpen(false)}>
             关闭
           </Button>,
+          selectedOrder?.status === 1 ? (
+            <Button key="confirm-order" type="primary" loading={actionLoading} onClick={() => selectedOrder && void handleConfirmOrder(selectedOrder)}>
+              确认订单
+            </Button>
+          ) : null,
+          selectedOrder?.status === 2 && !selectedOrder.contract_info?.seller_signed ? (
+            <Button key="sign-contract" type="primary" loading={actionLoading} onClick={() => selectedOrder && void handleSignContract(selectedOrder)}>
+              签署合同
+            </Button>
+          ) : null,
           selectedOrder?.status === 4 && selectedOrder.payment_info?.voucher_url ? (
             <Button key="confirm" type="primary" loading={actionLoading} onClick={() => void handleConfirmPayment(selectedOrder)}>
               确认收款
@@ -329,9 +385,19 @@ export default function OrdersPage() {
 
             <div style={{ marginTop: 16 }}>
               <Alert
-                type={selectedOrder.payment_info?.voucher_url ? 'info' : 'warning'}
+                type={selectedOrder.status === 1 ? 'warning' : selectedOrder.status === 2 ? 'info' : selectedOrder.payment_info?.voucher_url ? 'info' : 'warning'}
                 showIcon
-                message={selectedOrder.payment_info?.voucher_url ? '买家已上传支付凭证，可确认收款。' : '买家尚未上传支付凭证。'}
+                message={
+                  selectedOrder.status === 1
+                    ? '新订单待确认，请核实商品和价格后确认订单。'
+                    : selectedOrder.status === 2
+                      ? selectedOrder.contract_info?.buyer_signed
+                        ? '买家已签署合同，等待您签署后订单进入支付阶段。'
+                        : '订单已确认，等待买卖双方签署合同。'
+                      : selectedOrder.payment_info?.voucher_url
+                        ? '买家已上传支付凭证，可确认收款。'
+                        : '买家尚未上传支付凭证。'
+                }
               />
             </div>
 

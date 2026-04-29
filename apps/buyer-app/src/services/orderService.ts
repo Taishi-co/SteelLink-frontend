@@ -35,6 +35,13 @@ export interface OrderInfo {
   status: number
   expires_at?: string
   created_at: string
+  contract_info?: {
+    contract_no?: string
+    contract_url?: string
+    buyer_signed: boolean
+    seller_signed: boolean
+    signed_at?: string
+  }
   receipt_voucher?: string
   receipt_at?: string
   timeline?: OrderTimelineItem[]
@@ -82,6 +89,8 @@ export const orderService = {
   },
   cancel: (id: number) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/cancel`).then((response) => response.data),
+  signContract: (id: number) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/sign-contract`).then((response) => response.data),
   uploadPaymentVoucher: (
     id: number,
     payload: {
