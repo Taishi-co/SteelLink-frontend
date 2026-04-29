@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Form, Input, Button, Typography, Select, Upload, Spin, message, Divider, Descriptions, Tag, Result, Steps } from 'antd'
 import { BankOutlined, UploadOutlined, ArrowLeftOutlined, SafetyCertificateOutlined, TeamOutlined, CheckCircleFilled, ClockCircleFilled, CloseCircleFilled } from '@ant-design/icons'
@@ -26,30 +26,7 @@ export default function EnterprisePage() {
   const navigate = useNavigate()
   const user = getSellerUser()
 
-  useEffect(() => {
-    refreshUserAndStatus()
-  }, [])
-
-  const refreshUserAndStatus = async () => {
-    try {
-      const res = await sellerAuthService.me()
-      const latestUser = res.code === 0 ? res.data : user
-      if (latestUser) {
-        updateSellerUser(latestUser)
-      }
-      await Promise.all([
-        checkEnterprise(latestUser?.enterprise_code),
-        checkIdentity(latestUser),
-      ])
-    } catch {
-      await Promise.all([
-        checkEnterprise(),
-        checkIdentity(),
-      ])
-    }
-  }
-
-  const checkIdentity = async (currentUser = user) => {
+  const checkIdentity = useCallback(async (currentUser = getSellerUser()) => {
     try {
       const res = await certificationService.getIdentityStatus()
       if (res.code === 0 && res.data) {
@@ -65,10 +42,10 @@ export default function EnterprisePage() {
     } catch (error) {
       void error
     }
-  }
+  }, [])
 
-  const checkEnterprise = async (overrideEnterpriseCode?: string) => {
-    const enterpriseCode = overrideEnterpriseCode || user?.enterprise_code
+  const checkEnterprise = useCallback(async (overrideEnterpriseCode?: string) => {
+    const enterpriseCode = overrideEnterpriseCode || getSellerUser()?.enterprise_code
     if (!enterpriseCode) {
       setHasEnterprise(false)
       setEnterpriseInfo(null)
@@ -92,7 +69,30 @@ export default function EnterprisePage() {
     } finally {
       setFetching(false)
     }
-  }
+  }, [])
+
+  const refreshUserAndStatus = useCallback(async () => {
+    try {
+      const res = await sellerAuthService.me()
+      const latestUser = res.code === 0 ? res.data : getSellerUser()
+      if (latestUser) {
+        updateSellerUser(latestUser)
+      }
+      await Promise.all([
+        checkEnterprise(latestUser?.enterprise_code),
+        checkIdentity(latestUser),
+      ])
+    } catch {
+      await Promise.all([
+        checkEnterprise(),
+        checkIdentity(),
+      ])
+    }
+  }, [checkEnterprise, checkIdentity])
+
+  useEffect(() => {
+    void refreshUserAndStatus()
+  }, [refreshUserAndStatus])
 
   const handleUploadLicense = async (file: File) => {
     try {

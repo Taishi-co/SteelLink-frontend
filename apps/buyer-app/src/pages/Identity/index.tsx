@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Form, Input, Button, Typography, Steps, Upload, Tag, Spin, message, Space } from 'antd'
 import { UserOutlined, IdcardOutlined, UploadOutlined, SafetyCertificateOutlined, ArrowLeftOutlined } from '@ant-design/icons'
@@ -21,20 +21,17 @@ export default function IdentityPage() {
   const user = useUserStore((s) => s.user)
   const login = useUserStore((s) => s.login)
 
-  useEffect(() => {
-    fetchStatus()
-  }, [])
-
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const res = await certificationService.getIdentityStatus()
       if (res.code === 0 && res.data) {
         setIdentityStatus(res.data)
         const token = getBuyerToken()
-        if (user && token) {
+        const currentUser = useUserStore.getState().user
+        if (currentUser && token) {
           login({
-            ...user,
-            realName: res.data.real_name || user.realName,
+            ...currentUser,
+            realName: res.data.real_name || currentUser.realName,
             identityStatus: res.data.identity_status,
             identityReject: res.data.identity_reject,
           }, token)
@@ -45,7 +42,11 @@ export default function IdentityPage() {
     } finally {
       setFetching(false)
     }
-  }
+  }, [login])
+
+  useEffect(() => {
+    void fetchStatus()
+  }, [fetchStatus])
 
   const handleUpload = async (file: File, side: 'front' | 'back') => {
     try {
@@ -78,11 +79,11 @@ export default function IdentityPage() {
       })
       if (res.code === 0) {
         message.success('实名认证已提交，请等待审核')
-        fetchStatus()
+        void fetchStatus()
       } else {
         message.error(res.message || '提交失败')
       }
-    } catch (err) {
+    } catch {
       message.error('提交失败，请稍后重试')
     } finally {
       setLoading(false)

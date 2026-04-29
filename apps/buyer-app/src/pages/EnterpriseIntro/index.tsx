@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons'
 import { useUserStore } from '@/stores'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Paragraph } = Typography
 
 const flowSteps = [
   {
