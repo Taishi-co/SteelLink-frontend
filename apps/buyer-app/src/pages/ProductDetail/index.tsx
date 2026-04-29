@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Card, Row, Col, Typography, Button, InputNumber, Space, Divider, Descriptions, Tabs, message, Spin, Tag } from 'antd'
@@ -6,6 +6,8 @@ import { ShoppingCartOutlined, HeartOutlined, ShareAltOutlined } from '@ant-desi
 import { getErrorMessage, getErrorStatus } from '@steellink/shared/utils'
 import { orderService } from '@/services/orderService'
 import { productService } from '@/services/productService'
+import { useCartStore } from '@/stores/cartStore'
+import { useFavoriteStore } from '@/stores/favoriteStore'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -15,6 +17,10 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(10)
   const [activeTab, setActiveTab] = useState('specs')
   const [submitting, setSubmitting] = useState(false)
+  const [isFavorite, setIsFavorite] = useState(false)
+
+  const { addItem: addToCart } = useCartStore()
+  const { addFavorite, removeByProduct, checkFavorite } = useFavoriteStore()
 
   const { data: product, isLoading: loading } = useQuery({
     queryKey: ['product-detail', productId],
@@ -24,6 +30,14 @@ export default function ProductDetailPage() {
     },
     enabled: Boolean(productId),
   })
+
+  useEffect(() => {
+    if (productId && product) {
+      checkFavorite(Number(productId)).then((fav) => {
+        setIsFavorite(fav)
+      })
+    }
+  }, [productId, product, checkFavorite])
 
   const previewImage = useMemo(() => product?.images?.[0] || '', [product])
   const maxAvailableQty = useMemo(() => Math.max(product?.availableQty || 1, 1), [product])
@@ -66,6 +80,42 @@ export default function ProductDetailPage() {
       message.error(getErrorMessage(error, '下单失败，请先登录并确认库存'))
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleAddToCart = async () => {
+    if (!product) return
+    try {
+      await addToCart(product.id, safeQuantity)
+      message.success('已加入购物车')
+    } catch (error: unknown) {
+      if (getErrorStatus(error) === 401) {
+        message.warning('请先登录后再加入购物车')
+        navigate(`/login?redirect=${encodeURIComponent(`/products/${product.id}`)}`)
+        return
+      }
+      message.error(getErrorMessage(error, '加入购物车失败'))
+    }
+  }
+
+  const handleToggleFavorite = async () => {
+    if (!product) return
+    try {
+      if (isFavorite) {
+        await removeByProduct(product.id)
+        message.success('已取消收藏')
+      } else {
+        await addFavorite(product.id)
+        message.success('已添加收藏')
+      }
+      setIsFavorite(!isFavorite)
+    } catch (error: unknown) {
+      if (getErrorStatus(error) === 401) {
+        message.warning('请先登录后再收藏')
+        navigate(`/login?redirect=${encodeURIComponent(`/products/${product.id}`)}`)
+        return
+      }
+      message.error(getErrorMessage(error, '操作失败'))
     }
   }
 
@@ -196,8 +246,22 @@ export default function ProductDetailPage() {
                       >
                         立即下单
                       </Button>
-                      <Button size="large" icon={<HeartOutlined />}>
-                        收藏
+                      <Button
+                        type="default"
+                        size="large"
+                        icon={<ShoppingCartOutlined />}
+                        onClick={handleAddToCart}
+                      >
+                        加入购物车
+                      </Button>
+                      <Button
+                        type={isFavorite ? 'primary' : 'default'}
+                        size="large"
+                        icon={<HeartOutlined />}
+                        onClick={handleToggleFavorite}
+                        danger={isFavorite}
+                      >
+                        {isFavorite ? '已收藏' : '收藏'}
                       </Button>
                       <Button size="large" icon={<ShareAltOutlined />}>
                         分享

@@ -72,6 +72,61 @@ export interface CartItem {
   price: number
   quantity: number
   seller: string
+  unit?: string
+  subTotal?: number
+}
+
+export interface CartItemDTO {
+  id: number
+  product_id: number
+  product_name: string
+  spec: string
+  price: number
+  quantity: number
+  seller_id: number
+  seller_name: string
+  unit: string
+  sub_total: number
+}
+
+export interface AddCartRequest {
+  product_id: number
+  quantity: number
+}
+
+export interface UpdateCartRequest {
+  quantity: number
+}
+
+// Favorite Types
+export interface Favorite {
+  id: number
+  productId: number
+  productName: string
+  category: string
+  spec: string
+  price: number
+  image: string
+  sellerId: number
+  sellerName: string
+  createdAt: string
+}
+
+export interface FavoriteDTO {
+  id: number
+  product_id: number
+  product_name: string
+  category: string
+  spec: string
+  price: number
+  image: string
+  seller_id: number
+  seller_name: string
+  created_at: string
+}
+
+export interface AddFavoriteRequest {
+  product_id: number
 }
 
 // User Types

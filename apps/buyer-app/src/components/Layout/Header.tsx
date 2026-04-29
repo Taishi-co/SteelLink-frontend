@@ -1,8 +1,11 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Space, Badge, Input, Button, Dropdown, Avatar } from 'antd'
-import { ShoppingCartOutlined, UserOutlined, SearchOutlined, HomeOutlined, LogoutOutlined } from '@ant-design/icons'
+import { ShoppingCartOutlined, UserOutlined, SearchOutlined, HomeOutlined, LogoutOutlined, HeartOutlined, ShoppingOutlined } from '@ant-design/icons'
 import { clearBuyerSession } from '@/services/auth'
 import { useUserStore } from '@/stores'
+import { useCartStore } from '@/stores/cartStore'
+import { useFavoriteStore } from '@/stores/favoriteStore'
+import { useEffect } from 'react'
 
 const { Header: AntHeader } = Layout
 
@@ -10,6 +13,15 @@ export default function Header() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, isLoggedIn, logout } = useUserStore()
+  const { totalItems, fetchCart } = useCartStore()
+  const { totalCount, fetchFavorites } = useFavoriteStore()
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchCart()
+      fetchFavorites()
+    }
+  }, [isLoggedIn, fetchCart, fetchFavorites])
 
   const menuItems = [
     { key: '/products', label: <Link to="/products">商品列表</Link> },
@@ -22,7 +34,9 @@ export default function Header() {
   }
 
   const userMenuItems = [
-    { key: 'orders', label: '我的订单', onClick: () => navigate('/orders') },
+    { key: 'orders', label: '我的订单', icon: <ShoppingOutlined />, onClick: () => navigate('/orders') },
+    { key: 'cart', label: '我的购物车', icon: <ShoppingCartOutlined />, onClick: () => navigate('/cart') },
+    { key: 'favorites', label: '我的收藏', icon: <HeartOutlined />, onClick: () => navigate('/favorites') },
     { key: 'divider', type: 'divider' as const },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, onClick: handleLogout },
   ]
@@ -53,8 +67,14 @@ export default function Header() {
             <Button type="text" icon={<HomeOutlined />}>首页</Button>
           </Link>
 
+          <Link to="/favorites">
+            <Badge count={totalCount} size="small">
+              <Button type="text" icon={<HeartOutlined className="text-lg" />} />
+            </Badge>
+          </Link>
+
           <Link to="/cart">
-            <Badge count={0} size="small">
+            <Badge count={totalItems} size="small">
               <Button type="text" icon={<ShoppingCartOutlined className="text-lg" />} />
             </Badge>
           </Link>

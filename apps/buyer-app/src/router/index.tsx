@@ -8,6 +8,7 @@ import MallPage from '@/pages/Mall'
 import ProductsPage from '@/pages/Products'
 import ProductDetailPage from '@/pages/ProductDetail'
 import CartPage from '@/pages/Cart'
+import FavoritesPage from '@/pages/Favorites'
 import LoginPage from '@/pages/Login'
 import CheckoutPage from '@/pages/Checkout'
 import OrderDetailPage from '@/pages/OrderDetail'
@@ -17,6 +18,7 @@ import AiProcurementPage from '@/pages/AiProcurement'
 import AboutPage from '@/pages/About'
 import IdentityPage from '@/pages/Identity'
 import EnterprisePage from '@/pages/Enterprise'
+import EnterpriseIntroPage from '@/pages/EnterpriseIntro'
 import ProcurementPage from '@/pages/Procurement'
 import BiddingPage from '@/pages/Bidding'
 import BiddingModulePage from '@/pages/BiddingModule'
@@ -51,12 +53,14 @@ export function AppRouter() {
         <Route path="procurement/:id" element={<ProcurementDetailPage />} />
         <Route path="supply" element={<SupplyPage />} />
         <Route path="about" element={<AboutPage />} />
+        <Route path="enterprise" element={<EnterpriseIntroPage />} />
       </Route>
 
       <Route path="/" element={<MainLayout />}>
         <Route path="products" element={<ProductsPage />} />
         <Route path="products/:id" element={<ProductDetailPage />} />
         <Route path="cart" element={<CartPage />} />
+        <Route path="favorites" element={<FavoritesPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="orders/:id" element={<OrderDetailPage />} />
