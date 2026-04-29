@@ -9,6 +9,7 @@ import {
   ShoppingCartOutlined,
   ShopOutlined,
   TeamOutlined,
+  TruckOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -65,6 +66,7 @@ export default function SellerLayout() {
     items.push({ key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' })
     items.push({ key: '/products', icon: <ShopOutlined />, label: '商品管理' })
     items.push({ key: '/orders', icon: <ShoppingCartOutlined />, label: '订单管理' })
+    items.push({ key: '/fulfillment', icon: <TruckOutlined />, label: '履约核销' })
     items.push({ key: '/enterprise', icon: <TeamOutlined />, label: '企业信息' })
     items.push({ key: '/settings', icon: <SettingOutlined />, label: '店铺设置' })
     return items

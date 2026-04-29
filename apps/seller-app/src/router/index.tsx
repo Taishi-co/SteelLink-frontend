@@ -7,6 +7,7 @@ import LoginPage from '@/pages/Login'
 import OrdersPage from '@/pages/Orders'
 import ProductsPage from '@/pages/Products'
 import SettingsPage from '@/pages/Settings'
+import FulfillmentPage from '@/pages/Fulfillment'
 import { getSellerToken, getSellerUser, isIdentityVerified, hasEnterprise } from '@/services/auth'
 
 function ProtectedRoute() {
@@ -45,6 +46,7 @@ export function AppRouter() {
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="products" element={<ProductsPage />} />
               <Route path="orders" element={<OrdersPage />} />
+              <Route path="fulfillment" element={<FulfillmentPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
           </Route>
