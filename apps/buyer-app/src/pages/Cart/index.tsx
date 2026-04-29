@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Card, Table, Button, InputNumber, Space, Typography, Empty, Divider, message, Checkbox, Tag, Row, Col, Spin } from 'antd'
+import { Card, Table, Button, InputNumber, Space, Typography, Empty, Divider, message, Row, Col, Spin } from 'antd'
 import { DeleteOutlined, ShoppingCartOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { useCartStore } from '@/stores/cartStore'
 import type { CartItem } from '@/types'
@@ -9,7 +9,7 @@ const { Title, Text } = Typography
 
 export default function CartPage() {
   const navigate = useNavigate()
-  const { items, totalItems, isLoading, fetchCart, updateQuantity, removeItem, clearCart } = useCartStore()
+  const { items, totalItems, isLoading, fetchCart, updateQuantity, removeItem } = useCartStore()
 
   useEffect(() => {
     fetchCart()
@@ -33,9 +33,7 @@ export default function CartPage() {
     }
   }
 
-  const checkedItems = items.filter(item => item.checked)
-  const totalPrice = checkedItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const totalQuantity = checkedItems.reduce((sum, item) => sum + item.quantity, 0)
+  const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
   const columns = [
     {
@@ -124,7 +122,7 @@ export default function CartPage() {
   ]
 
   const handleCheckout = () => {
-    if (checkedItems.length === 0) {
+    if (items.length === 0) {
       message.warning('请选择要结算的商品')
       return
     }
@@ -182,7 +180,7 @@ export default function CartPage() {
                       type="primary"
                       size="large"
                       onClick={handleCheckout}
-                      disabled={checkedItems.length === 0}
+                      disabled={items.length === 0}
                       className="h-12 px-8 text-lg"
                     >
                       去结算
