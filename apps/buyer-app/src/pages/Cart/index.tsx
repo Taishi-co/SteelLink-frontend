@@ -123,7 +123,7 @@ export default function CartPage() {
 
   const handleCheckout = () => {
     if (items.length === 0) {
-      message.warning('请选择要结算的商品')
+      message.warning('采购清单为空')
       return
     }
     navigate('/checkout')
