@@ -28,6 +28,8 @@ const statusMap: Record<number, { label: string; color: string }> = {
 
 const orderSteps = [
   { title: '订单创建' },
+  { title: '卖家确认' },
+  { title: '签署合同' },
   { title: '支付凭证' },
   { title: '待提货' },
   { title: '配送中' },
@@ -35,14 +37,34 @@ const orderSteps = [
 ]
 
 function getCurrentStep(status: number) {
-  if (status <= 3) return 1
-  if (status === 4 || status === 5) return 2
-  if (status === 6 || status === 7) return 3
-  if (status >= 8) return 4
+  if (status <= 1) return 0
+  if (status === 2) return 2
+  if (status === 3) return 3
+  if (status === 4 || status === 5) return 4
+  if (status === 6 || status === 7) return 5
+  if (status >= 8) return 6
   return 0
 }
 
-function getStatusNotice(status: number, hasPaymentVoucher: boolean, hasDeliveryInfo: boolean) {
+function getStatusNotice(status: number, hasPaymentVoucher: boolean, hasDeliveryInfo: boolean, contractInfo?: { buyer_signed: boolean; seller_signed: boolean }) {
+  if (status === 1) {
+    return {
+      type: 'warning' as const,
+      message: '订单已提交，等待卖家确认。',
+    }
+  }
+  if (status === 2) {
+    if (contractInfo?.buyer_signed) {
+      return {
+        type: 'info' as const,
+        message: '您已签署合同，等待卖家签署后进入支付阶段。',
+      }
+    }
+    return {
+      type: 'warning' as const,
+      message: '卖家已确认订单，请签署合同。',
+    }
+  }
   if (status === 3) {
     return {
       type: hasPaymentVoucher ? 'info' as const : 'warning' as const,
@@ -115,6 +137,7 @@ export default function OrderDetailPage() {
   const [savingDelivery, setSavingDelivery] = useState(false)
   const [confirmingReceipt, setConfirmingReceipt] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [signing, setSigning] = useState(false)
   const [form] = Form.useForm()
   const [deliveryForm] = Form.useForm()
   const [receiptForm] = Form.useForm()
@@ -133,7 +156,7 @@ export default function OrderDetailPage() {
     enabled: Boolean(item?.product_id),
   })
   const status = statusMap[order?.status || 0] || { label: `状态${order?.status ?? '-'}`, color: 'default' }
-  const statusNotice = getStatusNotice(order?.status || 0, Boolean(order?.payment_info?.voucher_url), Boolean(order?.delivery_info))
+  const statusNotice = getStatusNotice(order?.status || 0, Boolean(order?.payment_info?.voucher_url), Boolean(order?.delivery_info), order?.contract_info)
   const pickupWarehouseName = productDetail?.warehouseInfo?.warehouse_name || order?.delivery_info?.warehouse_name || ''
   const pickupWarehouseId = productDetail?.warehouseInfo?.warehouse_id || 0
   const pickupWarehouseAddress = productDetail?.warehouseInfo?.address || ''
@@ -141,7 +164,7 @@ export default function OrderDetailPage() {
   const pickupWarehouseRegion = [productDetail?.warehouseInfo?.province, productDetail?.warehouseInfo?.city, productDetail?.warehouseInfo?.district]
     .filter(Boolean)
     .join(' ')
-  const canCancelOrder = order?.status === 3 && !order.payment_info?.voucher_url
+  const canCancelOrder = (order?.status === 1 || order?.status === 2 || order?.status === 3) && !order.payment_info?.voucher_url
 
   const handleUploadVoucher = async () => {
     try {
@@ -219,6 +242,20 @@ export default function OrderDetailPage() {
       message.error(getErrorMessage(error, '确认收货失败'))
     } finally {
       setConfirmingReceipt(false)
+    }
+  }
+
+  const handleSignContract = async () => {
+    try {
+      setSigning(true)
+      await orderService.signContract(Number(id))
+      message.success('合同签署成功')
+      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '签署失败'))
+    } finally {
+      setSigning(false)
     }
   }
 
@@ -331,6 +368,27 @@ export default function OrderDetailPage() {
               </Descriptions>
             </Card>
 
+            {order.contract_info && (
+              <Card title="合同信息" className="mt-6">
+                <Descriptions bordered column={2}>
+                  <Descriptions.Item label="合同编号">{order.contract_info.contract_no || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="签署状态">{order.contract_info.sign_status || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="买家签署">{order.contract_info.buyer_signed ? '已签署' : '未签署'}</Descriptions.Item>
+                  <Descriptions.Item label="卖家签署">{order.contract_info.seller_signed ? '已签署' : '未签署'}</Descriptions.Item>
+                  <Descriptions.Item label="签署时间">
+                    {order.contract_info.signed_at ? new Date(order.contract_info.signed_at).toLocaleString() : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="合同文件">
+                    {isValidHttpUrl(order.contract_info.contract_url) ? (
+                      <a href={order.contract_info.contract_url} target="_blank" rel="noreferrer">
+                        查看合同
+                      </a>
+                    ) : '-'}
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+            )}
+
             {order.payment_info && (
               <Card title="支付信息" className="mt-6">
                 <Descriptions bordered column={2}>
@@ -341,6 +399,15 @@ export default function OrderDetailPage() {
                   <Descriptions.Item label="交易流水号">{order.payment_info.transaction_no || '-'}</Descriptions.Item>
                   <Descriptions.Item label="付款账户">{order.payment_info.payer_account || '-'}</Descriptions.Item>
                   <Descriptions.Item label="收款账户">{order.payment_info.payee_account || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="上传时间">
+                    {order.payment_info.uploaded_at ? new Date(order.payment_info.uploaded_at).toLocaleString() : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="水印时间">{order.payment_info.captured_at || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="GPS">
+                    {order.payment_info.gps_latitude && order.payment_info.gps_longitude
+                      ? `${order.payment_info.gps_latitude}, ${order.payment_info.gps_longitude}`
+                      : '-'}
+                  </Descriptions.Item>
                   <Descriptions.Item label="支付凭证">
                     {isValidHttpUrl(order.payment_info.voucher_url) ? (
                       <a href={order.payment_info.voucher_url} target="_blank" rel="noreferrer">
@@ -384,6 +451,15 @@ export default function OrderDetailPage() {
                   <Descriptions.Item label="签收时间">
                     {order.receipt_at ? new Date(order.receipt_at).toLocaleString() : '-'}
                   </Descriptions.Item>
+                  <Descriptions.Item label="上传时间">
+                    {order.receipt_info?.uploaded_at ? new Date(order.receipt_info.uploaded_at).toLocaleString() : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="水印时间">{order.receipt_info?.captured_at || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="GPS">
+                    {order.receipt_info?.gps_latitude && order.receipt_info?.gps_longitude
+                      ? `${order.receipt_info.gps_latitude}, ${order.receipt_info.gps_longitude}`
+                      : '-'}
+                  </Descriptions.Item>
                   <Descriptions.Item label="签收凭证">
                     {isValidHttpUrl(order.receipt_voucher) ? (
                       <a href={order.receipt_voucher} target="_blank" rel="noreferrer">
@@ -400,6 +476,11 @@ export default function OrderDetailPage() {
               <Paragraph className="!mb-0">
                 当前已支持订单创建、支付凭证上传、提货信息录入、出库确认。买家确认收货并上传签收凭证后，订单会进入已完成状态。
               </Paragraph>
+              {order.status === 2 && !order.contract_info?.buyer_signed && (
+                <Button className="mt-4" type="primary" loading={signing} onClick={handleSignContract}>
+                  签署合同
+                </Button>
+              )}
               {order.status === 3 && (
                 <Button className="mt-4" type="primary" icon={<UploadOutlined />} onClick={() => setOpen(true)}>
                   上传支付凭证

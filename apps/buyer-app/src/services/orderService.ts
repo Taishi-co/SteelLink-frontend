@@ -35,7 +35,17 @@ export interface OrderInfo {
   status: number
   expires_at?: string
   created_at: string
+  contract_info?: {
+    contract_no?: string
+    contract_url?: string
+    contract_hash?: string
+    sign_status?: string
+    buyer_signed: boolean
+    seller_signed: boolean
+    signed_at?: string
+  }
   receipt_voucher?: string
+  receipt_info?: VoucherEvidence
   receipt_at?: string
   timeline?: OrderTimelineItem[]
   payment_info?: {
@@ -45,6 +55,11 @@ export interface OrderInfo {
     payee_account: string
     payer_account: string
     voucher_url: string
+    uploaded_by: number
+    uploaded_at: string
+    captured_at?: string
+    gps_latitude?: number
+    gps_longitude?: number
   }
   delivery_info?: {
     driver_name: string
@@ -57,6 +72,15 @@ export interface OrderInfo {
     address: string
     estimated_time: string
   }
+}
+
+export interface VoucherEvidence {
+  voucher_url: string
+  uploaded_by: number
+  uploaded_at: string
+  captured_at?: string
+  gps_latitude?: number
+  gps_longitude?: number
 }
 
 export interface OrderTimelineItem {
@@ -82,6 +106,8 @@ export const orderService = {
   },
   cancel: (id: number) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/cancel`).then((response) => response.data),
+  signContract: (id: number) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/sign-contract`).then((response) => response.data),
   uploadPaymentVoucher: (
     id: number,
     payload: {
@@ -89,6 +115,9 @@ export const orderService = {
       transaction_no?: string
       payer_account?: string
       payee_account?: string
+      captured_at?: string
+      gps_latitude?: number
+      gps_longitude?: number
     },
   ) => api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`orders/${id}/payment-voucher`, payload).then((response) => response.data),
   setDeliveryInfo: (
@@ -104,6 +133,6 @@ export const orderService = {
       estimated_time?: string
     },
   ) => api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/delivery-info`, payload).then((response) => response.data),
-  confirmReceipt: (id: number, payload: { receipt_voucher: string }) =>
+  confirmReceipt: (id: number, payload: { receipt_voucher: string; captured_at?: string; gps_latitude?: number; gps_longitude?: number }) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/confirm-receipt`, payload).then((response) => response.data),
 }
