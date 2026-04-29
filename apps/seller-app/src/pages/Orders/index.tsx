@@ -172,8 +172,12 @@ export default function OrdersPage() {
     if (!confirmAction) return
     const { type, order } = confirmAction
     const lastFour = order.order_no.slice(-4)
-    if (confirmInput !== lastFour) {
+    if (type === 'payment' && confirmInput !== lastFour) {
       message.error(`请输入订单号后 4 位「${lastFour}」以确认操作`)
+      return
+    }
+    if (type === 'outbound' && !confirmInput.trim()) {
+      message.error('请输入提货码')
       return
     }
     setActionLoading(true)
@@ -185,7 +189,7 @@ export default function OrdersPage() {
         setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
         setIsModalOpen(true)
       } else {
-        const detail = await sellerOrderService.confirmOutbound(order.id)
+        const detail = await sellerOrderService.confirmOutbound(order.id, { pickup_code: confirmInput.trim() })
         message.success('已确认出库，订单进入配送中')
         setSelectedOrder(detail)
         setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
@@ -402,10 +406,28 @@ export default function OrdersPage() {
             </div>
 
             <Descriptions bordered column={2} size="middle" style={{ marginTop: 16 }}>
+              <Descriptions.Item label="合同编号">{selectedOrder.contract_info?.contract_no || '-'}</Descriptions.Item>
+              <Descriptions.Item label="合同状态">{selectedOrder.contract_info?.sign_status || '-'}</Descriptions.Item>
+              <Descriptions.Item label="买家签署">{selectedOrder.contract_info?.buyer_signed ? '已签署' : '未签署'}</Descriptions.Item>
+              <Descriptions.Item label="卖家签署">{selectedOrder.contract_info?.seller_signed ? '已签署' : '未签署'}</Descriptions.Item>
+              <Descriptions.Item label="合同文件" span={2}>
+                {selectedOrder.contract_info?.contract_url ? (
+                  <a href={selectedOrder.contract_info.contract_url} target="_blank" rel="noreferrer">
+                    查看合同
+                  </a>
+                ) : (
+                  '-'
+                )}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <Descriptions bordered column={2} size="middle" style={{ marginTop: 16 }}>
               <Descriptions.Item label="交易流水号">{selectedOrder.payment_info?.transaction_no || '-'}</Descriptions.Item>
               <Descriptions.Item label="支付时间">{formatDate(selectedOrder.payment_info?.payment_time)}</Descriptions.Item>
               <Descriptions.Item label="付款账户">{selectedOrder.payment_info?.payer_account || '-'}</Descriptions.Item>
               <Descriptions.Item label="收款账户">{selectedOrder.payment_info?.payee_account || '-'}</Descriptions.Item>
+              <Descriptions.Item label="上传时间">{formatDate(selectedOrder.payment_info?.uploaded_at)}</Descriptions.Item>
+              <Descriptions.Item label="水印时间">{selectedOrder.payment_info?.captured_at || '-'}</Descriptions.Item>
               <Descriptions.Item label="支付凭证" span={2}>
                 {selectedOrder.payment_info?.voucher_url ? (
                   <a href={selectedOrder.payment_info.voucher_url} target="_blank" rel="noreferrer">
@@ -476,13 +498,18 @@ export default function OrdersPage() {
             />
             <div>
               <div style={{ marginBottom: 8, fontWeight: 500 }}>
-                请输入订单号后 4 位以确认操作：<strong>{confirmAction.order.order_no.slice(-4)}</strong>
+                {confirmAction.type === 'payment' ? (
+                  <>
+                    请输入订单号后 4 位以确认操作：<strong>{confirmAction.order.order_no.slice(-4)}</strong>
+                  </>
+                ) : (
+                  '请输入买家提供的提货码以确认出库'
+                )}
               </div>
               <Input
-                placeholder="输入订单号后 4 位"
+                placeholder={confirmAction.type === 'payment' ? '输入订单号后 4 位' : '输入提货码'}
                 value={confirmInput}
                 onChange={(e) => setConfirmInput(e.target.value)}
-                maxLength={4}
                 style={{ width: 200 }}
               />
             </div>

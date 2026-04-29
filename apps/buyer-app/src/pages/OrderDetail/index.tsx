@@ -368,6 +368,27 @@ export default function OrderDetailPage() {
               </Descriptions>
             </Card>
 
+            {order.contract_info && (
+              <Card title="合同信息" className="mt-6">
+                <Descriptions bordered column={2}>
+                  <Descriptions.Item label="合同编号">{order.contract_info.contract_no || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="签署状态">{order.contract_info.sign_status || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="买家签署">{order.contract_info.buyer_signed ? '已签署' : '未签署'}</Descriptions.Item>
+                  <Descriptions.Item label="卖家签署">{order.contract_info.seller_signed ? '已签署' : '未签署'}</Descriptions.Item>
+                  <Descriptions.Item label="签署时间">
+                    {order.contract_info.signed_at ? new Date(order.contract_info.signed_at).toLocaleString() : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="合同文件">
+                    {isValidHttpUrl(order.contract_info.contract_url) ? (
+                      <a href={order.contract_info.contract_url} target="_blank" rel="noreferrer">
+                        查看合同
+                      </a>
+                    ) : '-'}
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+            )}
+
             {order.payment_info && (
               <Card title="支付信息" className="mt-6">
                 <Descriptions bordered column={2}>
@@ -378,6 +399,15 @@ export default function OrderDetailPage() {
                   <Descriptions.Item label="交易流水号">{order.payment_info.transaction_no || '-'}</Descriptions.Item>
                   <Descriptions.Item label="付款账户">{order.payment_info.payer_account || '-'}</Descriptions.Item>
                   <Descriptions.Item label="收款账户">{order.payment_info.payee_account || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="上传时间">
+                    {order.payment_info.uploaded_at ? new Date(order.payment_info.uploaded_at).toLocaleString() : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="水印时间">{order.payment_info.captured_at || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="GPS">
+                    {order.payment_info.gps_latitude && order.payment_info.gps_longitude
+                      ? `${order.payment_info.gps_latitude}, ${order.payment_info.gps_longitude}`
+                      : '-'}
+                  </Descriptions.Item>
                   <Descriptions.Item label="支付凭证">
                     {isValidHttpUrl(order.payment_info.voucher_url) ? (
                       <a href={order.payment_info.voucher_url} target="_blank" rel="noreferrer">
@@ -420,6 +450,15 @@ export default function OrderDetailPage() {
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="签收时间">
                     {order.receipt_at ? new Date(order.receipt_at).toLocaleString() : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="上传时间">
+                    {order.receipt_info?.uploaded_at ? new Date(order.receipt_info.uploaded_at).toLocaleString() : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="水印时间">{order.receipt_info?.captured_at || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="GPS">
+                    {order.receipt_info?.gps_latitude && order.receipt_info?.gps_longitude
+                      ? `${order.receipt_info.gps_latitude}, ${order.receipt_info.gps_longitude}`
+                      : '-'}
                   </Descriptions.Item>
                   <Descriptions.Item label="签收凭证">
                     {isValidHttpUrl(order.receipt_voucher) ? (
