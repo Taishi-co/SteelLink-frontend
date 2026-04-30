@@ -8,6 +8,7 @@ import {
   SettingOutlined,
   ShoppingCartOutlined,
   ShopOutlined,
+  RiseOutlined,
   TeamOutlined,
   TruckOutlined,
   UserOutlined,
@@ -65,6 +66,7 @@ export default function SellerLayout() {
 
     items.push({ key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' })
     items.push({ key: '/products', icon: <ShopOutlined />, label: '商品管理' })
+    items.push({ key: '/bidding', icon: <RiseOutlined />, label: '竞价管理' })
     items.push({ key: '/orders', icon: <ShoppingCartOutlined />, label: '订单管理' })
     items.push({ key: '/fulfillment', icon: <TruckOutlined />, label: '履约核销' })
     items.push({ key: '/enterprise', icon: <TeamOutlined />, label: '企业信息' })

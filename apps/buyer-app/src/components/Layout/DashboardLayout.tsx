@@ -10,6 +10,7 @@ import {
   DollarOutlined,
   ShopOutlined,
   LineChartOutlined,
+  RiseOutlined,
   LogoutOutlined,
   UserOutlined,
   ArrowRightOutlined,
@@ -30,6 +31,7 @@ interface NavItem {
 const allNavItems: NavItem[] = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '工作台' },
   { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
+  { key: '/dashboard/bidding', icon: <RiseOutlined />, label: '竞价管理', roles: ['buyer'] },
   { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单', roles: ['buyer', 'seller'] },
   { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资', roles: ['buyer', 'fund'] },
   { key: '/dashboard/logistics', icon: <ShopOutlined />, label: '仓储物流', roles: ['logistics', 'warehouse', 'seller'] },

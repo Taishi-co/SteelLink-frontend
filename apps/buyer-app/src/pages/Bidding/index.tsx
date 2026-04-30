@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, Card, Col, Empty, Progress, Row, Segmented, Space, Spin, Statistic, Tag, Typography, message } from 'antd'
+import { Button, Card, Col, Descriptions, Drawer, Empty, Progress, Row, Space, Spin, Statistic, Tag, Typography, message } from 'antd'
 import {
-  ArrowRightOutlined,
   BankOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   CrownOutlined,
   RiseOutlined,
-  SafetyCertificateOutlined,
-  ShopOutlined,
   TeamOutlined,
   TrophyOutlined,
   UserSwitchOutlined,
@@ -19,28 +16,8 @@ import type { BiddingActivity, BiddingStats } from '@/services/marketService'
 
 const { Title, Paragraph, Text } = Typography
 
-const moduleCards = [
-  {
-    title: '买家竞价',
-    role: '采购方工作台',
-    description: '发布采购标的、设置最高限价、邀请供应商报价，并跟踪报价排名与成交进度。',
-    href: '/bidding/buyer',
-    icon: <ShopOutlined />,
-    color: 'blue',
-    metrics: ['待发布', '报价中', '待定标'],
-  },
-  {
-    title: '卖家竞价',
-    role: '供应方工作台',
-    description: '查看可参与标的、提交报价、管理保证金与资质文件，并跟进中标结果。',
-    href: '/bidding/seller',
-    icon: <UserSwitchOutlined />,
-    color: 'green',
-    metrics: ['可报名', '已报价', '待签约'],
-  },
-]
-
-const activeStatuses = new Set(['ongoing', 'sprint'])
+const activeStatuses = new Set(['bidding'])
+const successStatuses = new Set(['awarded', 'order_created'])
 
 function formatAmount(value: number) {
   if (value >= 100000000) {
@@ -82,8 +59,33 @@ function getRemainingText(endedAt: string) {
   return `${hours}小时${minutes}分`
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  const maybeError = error as { response?: { data?: { message?: string } }; message?: string }
+  return maybeError.response?.data?.message || maybeError.message || fallback
+}
+
+function statusLabel(status: string) {
+  if (status === 'bidding') return '竞价中'
+  if (status === 'pending_award') return '待定标'
+  if (status === 'awarded') return '已定标'
+  if (status === 'order_created') return '已生成订单'
+  if (status === 'failed') return '已流标'
+  if (status === 'closed') return '已关闭'
+  return status
+}
+
+function statusColor(status: string) {
+  if (status === 'awarded' || status === 'order_created') return 'green'
+  if (status === 'pending_award') return 'gold'
+  if (status === 'failed' || status === 'closed') return 'default'
+  return 'blue'
+}
+
 export default function BiddingPage() {
   const [loading, setLoading] = useState(true)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [selectedActivity, setSelectedActivity] = useState<BiddingActivity | null>(null)
   const [stats, setStats] = useState<BiddingStats>({
     activeCount: 0,
     successCount: 0,
@@ -113,7 +115,21 @@ export default function BiddingPage() {
   }, [loadData])
 
   const hotBiddings = useMemo(() => activities.filter((activity) => activeStatuses.has(activity.status)).slice(0, 3), [activities])
-  const successBiddings = useMemo(() => activities.filter((activity) => activity.status === 'success').slice(0, 3), [activities])
+  const successBiddings = useMemo(() => activities.filter((activity) => successStatuses.has(activity.status)).slice(0, 3), [activities])
+
+  const openBiddingDetail = async (id: number) => {
+    setDetailOpen(true)
+    setDetailLoading(true)
+    try {
+      const detail = await marketService.getBidding(id)
+      setSelectedActivity(detail)
+    } catch (error) {
+      message.error(getErrorMessage(error, '竞价详情加载失败'))
+      setDetailOpen(false)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   const overviewStats = [
     { label: '进行中竞价', value: stats.activeCount, suffix: '场', icon: <ClockCircleOutlined />, color: 'text-blue-600' },
@@ -135,8 +151,8 @@ export default function BiddingPage() {
               </Paragraph>
             </div>
             <Space>
-              <Button type="primary" icon={<RiseOutlined />}>发起竞价</Button>
-              <Button icon={<SafetyCertificateOutlined />}>资质审核</Button>
+              <Link to="/dashboard/bidding"><Button type="primary" icon={<RiseOutlined />}>发起竞价</Button></Link>
+              <a href={import.meta.env.DEV ? 'http://localhost:5174/seller/bidding' : '/seller/bidding'}><Button icon={<UserSwitchOutlined />}>参与报价</Button></a>
             </Space>
           </div>
 
@@ -158,42 +174,6 @@ export default function BiddingPage() {
       </section>
 
       <main className="mx-auto max-w-7xl px-8 py-10">
-        <section>
-          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <Title level={2} className="!mb-2">竞价工作台</Title>
-              <Text type="secondary">按企业角色进入对应模块，处理发起、报名、报价、定标和签约任务。</Text>
-            </div>
-            <Segmented options={['全部模块', '买家侧', '卖家侧']} defaultValue="全部模块" />
-          </div>
-          <Row gutter={[20, 20]}>
-            {moduleCards.map((module) => (
-              <Col key={module.title} xs={24} lg={12}>
-                <Card hoverable className="h-full">
-                  <div className="flex h-full flex-col gap-5">
-                    <Space align="start" size="middle">
-                      <div className="flex h-12 w-12 items-center justify-center rounded bg-gray-100 text-2xl text-primary-600">
-                        {module.icon}
-                      </div>
-                      <div>
-                        <Tag color={module.color}>{module.role}</Tag>
-                        <Title level={3} className="!mb-2 !mt-2">{module.title}</Title>
-                        <Paragraph className="text-gray-500 !mb-0">{module.description}</Paragraph>
-                      </div>
-                    </Space>
-                    <Space wrap>
-                      {module.metrics.map((metric) => <Tag key={metric}>{metric}</Tag>)}
-                    </Space>
-                    <Link to={module.href} className="mt-auto">
-                      <Button type="primary" icon={<ArrowRightOutlined />}>进入模块</Button>
-                    </Link>
-                  </div>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </section>
-
         <Spin spinning={loading}>
           <section className="mt-10">
             <div className="mb-5 flex items-center justify-between">
@@ -214,7 +194,7 @@ export default function BiddingPage() {
                             <Text type="secondary">{item.biddingNo}</Text>
                             <Title level={4} className="!mb-1 !mt-2">{item.title}</Title>
                           </div>
-                          <Tag color={item.status === 'sprint' ? 'red' : 'blue'}>{item.status === 'sprint' ? '冲刺中' : '竞价中'}</Tag>
+                          <Tag color={statusColor(item.status)}>{statusLabel(item.status)}</Tag>
                         </div>
                         <Row gutter={[12, 12]}>
                           <Col span={12}><Text type="secondary">品类</Text><div className="mt-1 font-semibold">{item.category}</div></Col>
@@ -227,7 +207,7 @@ export default function BiddingPage() {
                           <span>{item.participants} 家参与</span>
                           <span>剩余 {getRemainingText(item.endedAt)}</span>
                         </div>
-                        <Button block>查看竞价</Button>
+                        <Button block onClick={() => void openBiddingDetail(item.id)}>查看竞价</Button>
                       </Space>
                     </Card>
                   </Col>
@@ -276,6 +256,7 @@ export default function BiddingPage() {
                             <div className="mt-2 text-sm text-gray-500">{formatTime(item.closedAt)}</div>
                           </div>
                         </div>
+                        <Button block onClick={() => void openBiddingDetail(item.id)}>查看详情</Button>
                       </Space>
                     </Card>
                   </Col>
@@ -287,6 +268,51 @@ export default function BiddingPage() {
           </section>
         </Spin>
       </main>
+
+      <Drawer
+        title="竞价详情"
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        width={760}
+      >
+        <Spin spinning={detailLoading}>
+          {selectedActivity ? (
+            <Space direction="vertical" size="large" className="w-full">
+              <div>
+                <Space className="mb-3">
+                  <Tag color={statusColor(selectedActivity.status)}>{statusLabel(selectedActivity.status)}</Tag>
+                  <Text type="secondary">{selectedActivity.biddingNo}</Text>
+                </Space>
+                <Title level={3} className="!mb-2">{selectedActivity.title}</Title>
+                <Text type="secondary">采购方：{selectedActivity.buyerName || '-'}</Text>
+              </div>
+
+              <Descriptions bordered column={2} size="small">
+                <Descriptions.Item label="品类">{selectedActivity.category}</Descriptions.Item>
+                <Descriptions.Item label="数量">{formatQuantity(selectedActivity)}</Descriptions.Item>
+                <Descriptions.Item label="起始价">{formatPrice(selectedActivity.startPrice, selectedActivity.unit)}</Descriptions.Item>
+                <Descriptions.Item label="当前价">{formatPrice(selectedActivity.currentPrice, selectedActivity.unit)}</Descriptions.Item>
+                <Descriptions.Item label="交付区域" span={2}>{selectedActivity.deliveryRegion || '-'}</Descriptions.Item>
+                <Descriptions.Item label="截止时间">{formatTime(selectedActivity.endedAt)}</Descriptions.Item>
+                <Descriptions.Item label="报价数">{selectedActivity.quoteCount || selectedActivity.quotes?.length || 0} 次</Descriptions.Item>
+              </Descriptions>
+
+              <Card>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <Title level={4} className="!mb-1">进入工作台处理</Title>
+                    <Text type="secondary">报价明细、供应商报价和定标操作已收敛到企业工作台。</Text>
+                  </div>
+                  <Space>
+                    <Link to="/dashboard/bidding"><Button type="primary">买家工作台</Button></Link>
+                    <a href={import.meta.env.DEV ? 'http://localhost:5174/seller/bidding' : '/seller/bidding'}><Button>卖家工作台</Button></a>
+                  </Space>
+                </div>
+              </Card>
+            </Space>
+          ) : null}
+        </Spin>
+      </Drawer>
     </div>
   )
 }

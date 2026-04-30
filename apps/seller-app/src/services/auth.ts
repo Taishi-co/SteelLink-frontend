@@ -232,6 +232,12 @@ export function getSellerEnterpriseRole(): string {
   return getCookie(ENTERPRISE_ROLE_KEY) || sessionStorage.getItem(ENTERPRISE_ROLE_KEY) || localStorage.getItem(ENTERPRISE_ROLE_KEY) || ''
 }
 
+export function getSellerEnterpriseID(): number {
+  const payload = parseJwtPayload(getSellerToken() || '')
+  const id = payload?.enterprise_id
+  return typeof id === 'number' ? id : Number(id || 0)
+}
+
 export function isIdentityVerified(user: SellerUser | null): boolean {
   return user?.identity_status === 2
 }
