@@ -186,6 +186,12 @@ export function isEnterpriseToken() {
   return payload?.user_type === 'enterprise'
 }
 
+export function getBuyerEnterpriseID() {
+  const payload = parseJwtPayload(getBuyerToken() || '')
+  const id = payload?.enterprise_id
+  return typeof id === 'number' ? id : Number(id || 0)
+}
+
 export function hasEnterpriseAccess(user: User | null) {
   return !!user?.enterpriseCode && user.role === 'enterprise' && isEnterpriseToken()
 }

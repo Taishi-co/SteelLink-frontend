@@ -43,12 +43,19 @@ export interface BiddingActivity {
   participants: number
   progress: number
   status: string
+  buyerId: number
   buyerName: string
+  deliveryRegion: string
+  quoteCount: number
+  awardQuoteId: number
+  awardSupplierId: number
+  orderId: number
   supplierName: string
   savingRate: number
   startedAt: string
   endedAt: string
   closedAt?: string
+  quotes?: BiddingQuote[]
 }
 
 interface BackendBiddingActivity {
@@ -65,12 +72,64 @@ interface BackendBiddingActivity {
   participants: number
   progress: number
   status: string
+  buyer_id: number
   buyer_name: string
+  delivery_region: string
+  quote_count: number
+  award_quote_id: number
+  award_supplier_id: number
+  order_id: number
   supplier_name: string
   saving_rate: number
   started_at: string
   ended_at: string
   closed_at?: string
+  quotes?: BackendBiddingQuote[]
+}
+
+export interface BiddingQuote {
+  id: number
+  biddingId: number
+  supplierId: number
+  supplierName: string
+  unitPrice: number
+  quantity: number
+  deliveryDays: number
+  remark: string
+  round: number
+  isAwarded: boolean
+  createdAt: string
+}
+
+interface BackendBiddingQuote {
+  id: number
+  bidding_id: number
+  supplier_id: number
+  supplier_name: string
+  unit_price: number
+  quantity: number
+  delivery_days: number
+  remark: string
+  round: number
+  is_awarded: boolean
+  created_at: string
+}
+
+export interface CreateBiddingPayload {
+  title: string
+  category: string
+  quantity: number
+  unit?: string
+  start_price: number
+  delivery_region: string
+  ended_at: string
+}
+
+export interface SubmitBiddingQuotePayload {
+  unit_price: number
+  quantity: number
+  delivery_days: number
+  remark?: string
 }
 
 export interface ProcurementStats {
@@ -173,6 +232,7 @@ export interface MarketListParams {
   status?: string
   keyword?: string
   category?: string
+  scope?: 'public' | 'workspace'
 }
 
 function mapBidding(activity: BackendBiddingActivity): BiddingActivity {
@@ -190,12 +250,35 @@ function mapBidding(activity: BackendBiddingActivity): BiddingActivity {
     participants: activity.participants,
     progress: activity.progress,
     status: activity.status,
+    buyerId: activity.buyer_id,
     buyerName: activity.buyer_name,
+    deliveryRegion: activity.delivery_region,
+    quoteCount: activity.quote_count,
+    awardQuoteId: activity.award_quote_id,
+    awardSupplierId: activity.award_supplier_id,
+    orderId: activity.order_id,
     supplierName: activity.supplier_name,
     savingRate: activity.saving_rate,
     startedAt: activity.started_at,
     endedAt: activity.ended_at,
     closedAt: activity.closed_at,
+    quotes: (activity.quotes || []).map(mapBiddingQuote),
+  }
+}
+
+function mapBiddingQuote(quote: BackendBiddingQuote): BiddingQuote {
+  return {
+    id: quote.id,
+    biddingId: quote.bidding_id,
+    supplierId: quote.supplier_id,
+    supplierName: quote.supplier_name,
+    unitPrice: quote.unit_price,
+    quantity: quote.quantity,
+    deliveryDays: quote.delivery_days,
+    remark: quote.remark,
+    round: quote.round,
+    isAwarded: quote.is_awarded,
+    createdAt: quote.created_at,
   }
 }
 
@@ -263,6 +346,35 @@ export const marketService = {
   listBiddings: async (params?: MarketListParams) => {
     const response = await api.get<ApiResponse<BackendListResponse<BackendBiddingActivity>>, ApiResponse<BackendListResponse<BackendBiddingActivity>>>('/biddings', { params })
     return mapList(response.data, mapBidding)
+  },
+
+  getBidding: async (id: number) => {
+    const response = await api.get<ApiResponse<BackendBiddingActivity>, ApiResponse<BackendBiddingActivity>>(`/biddings/${id}`)
+    return mapBidding(response.data)
+  },
+
+  createBidding: async (payload: CreateBiddingPayload) => {
+    const response = await api.post<ApiResponse<BackendBiddingActivity>, ApiResponse<BackendBiddingActivity>>('/biddings', payload)
+    return mapBidding(response.data)
+  },
+
+  submitBiddingQuote: async (id: number, payload: SubmitBiddingQuotePayload) => {
+    const response = await api.post<ApiResponse<BackendBiddingActivity>, ApiResponse<BackendBiddingActivity>>(`/biddings/${id}/quotes`, payload)
+    return mapBidding(response.data)
+  },
+
+  awardBidding: async (id: number, quoteId: number) => {
+    const response = await api.post<ApiResponse<BackendBiddingActivity>, ApiResponse<BackendBiddingActivity>>(`/biddings/${id}/award`, { quote_id: quoteId })
+    return mapBidding(response.data)
+  },
+
+  createBiddingOrder: async (id: number) => {
+    const response = await api.post<ApiResponse<{ bidding: BackendBiddingActivity; order_id: number; order_no: string }>, ApiResponse<{ bidding: BackendBiddingActivity; order_id: number; order_no: string }>>(`/biddings/${id}/orders`)
+    return {
+      bidding: mapBidding(response.data.bidding),
+      orderId: response.data.order_id,
+      orderNo: response.data.order_no,
+    }
   },
 
   getProcurementStats: async () => {
