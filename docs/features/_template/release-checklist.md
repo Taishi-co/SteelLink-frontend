@@ -13,6 +13,7 @@
 - [ ] 如涉及配套应用仓，相关 lint/build/测试已通过
 - [ ] 已确认环境变量、CI 或跨仓依赖
 - [ ] 已确认 smoke test 范围
+- [ ] GitHub PR 创建后，已执行 `./harness/lark-pr-doc.sh docs/features/<feature-id> --pr-url <github-pr-url> --pr-title "<pr-title>"` 并写入共享飞书 PR 记录
 
 ## 回滚信息
 

@@ -39,6 +39,7 @@
 - `./harness/verify.sh`
 - `./harness/review.sh docs/features/<feature-id>`
 - `./harness/release.sh docs/features/<feature-id>`
+- `./harness/lark-pr-doc.sh docs/features/<feature-id> --pr-url <github-pr-url> --pr-title "<pr-title>"`
 - `./harness/deploy.sh staging`
 - `./harness/deploy.sh prod`
 
@@ -51,12 +52,14 @@
 - 不要修改与当前任务无关的文档、脚本或业务页面
 - 当前目录若不是 Git worktree，必须在结果中明确说明，不能伪造分支、PR、CI 结论
 - 分支命名规范仍为 `feat|fix|docs|chore|refactor|test|hotfix/<feature-id>-<slug>`，并在实际 Git 仓库中执行
+- 提交 GitHub PR 后必须用 `./harness/lark-pr-doc.sh` 基于 feature PRD 产物创建飞书文档，并把链接写入共享 PR 记录的 `Frontend` 段落
 
 ## 5. 输出要求
 
 提交结果时至少说明：
 
 - 当前对应的 feature 文档路径
+- 飞书 PRD/PR 记录文档链接，或说明为什么未能写入共享 PR 记录
 - 已执行的 harness 命令
 - 是否完成 `./harness/verify.sh`
 - 是否完成 lint/build 验证，或说明因当前仓库不含应用工程而跳过

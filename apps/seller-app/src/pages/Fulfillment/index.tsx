@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, Space, Spin, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons'
@@ -34,7 +34,7 @@ export default function FulfillmentPage() {
   const [selectedOrder, setSelectedOrder] = useState<SellerOrderInfo | null>(null)
   const [searchText, setSearchText] = useState('')
 
-  async function loadOrders() {
+  const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
       const list = await sellerOrderService.list()
@@ -62,11 +62,11 @@ export default function FulfillmentPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [navigate])
 
   useEffect(() => {
     void loadOrders()
-  }, [])
+  }, [loadOrders])
 
   const filteredOrders = useMemo(() => {
     const keyword = searchText.trim()
