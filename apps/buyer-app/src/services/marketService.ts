@@ -49,6 +49,7 @@ export interface BiddingActivity {
   quoteCount: number
   awardQuoteId: number
   awardSupplierId: number
+  awardReason: string
   orderId: number
   supplierName: string
   savingRate: number
@@ -78,6 +79,7 @@ interface BackendBiddingActivity {
   quote_count: number
   award_quote_id: number
   award_supplier_id: number
+  award_reason: string
   order_id: number
   supplier_name: string
   saving_rate: number
@@ -256,6 +258,7 @@ function mapBidding(activity: BackendBiddingActivity): BiddingActivity {
     quoteCount: activity.quote_count,
     awardQuoteId: activity.award_quote_id,
     awardSupplierId: activity.award_supplier_id,
+    awardReason: activity.award_reason,
     orderId: activity.order_id,
     supplierName: activity.supplier_name,
     savingRate: activity.saving_rate,
@@ -363,8 +366,11 @@ export const marketService = {
     return mapBidding(response.data)
   },
 
-  awardBidding: async (id: number, quoteId: number) => {
-    const response = await api.post<ApiResponse<BackendBiddingActivity>, ApiResponse<BackendBiddingActivity>>(`/biddings/${id}/award`, { quote_id: quoteId })
+  awardBidding: async (id: number, quoteId: number, awardReason?: string) => {
+    const response = await api.post<ApiResponse<BackendBiddingActivity>, ApiResponse<BackendBiddingActivity>>(`/biddings/${id}/award`, {
+      quote_id: quoteId,
+      award_reason: awardReason,
+    })
     return mapBidding(response.data)
   },
 

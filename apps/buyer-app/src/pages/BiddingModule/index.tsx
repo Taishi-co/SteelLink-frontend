@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, Col, DatePicker, Descriptions, Drawer, Empty, Form, Input, InputNumber, Modal, Progress, Row, Space, Spin, Statistic, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined, AuditOutlined, CheckCircleOutlined, FileProtectOutlined, FormOutlined, PlusOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons'
 import { marketService } from '@/services/marketService'
@@ -34,6 +34,10 @@ interface CreateBiddingFormValues {
   start_price: number
   delivery_region: string
   ended_at: { toISOString: () => string }
+}
+
+interface AwardFormValues {
+  awardReason?: string
 }
 
 function formatAmount(value: number) {
@@ -116,14 +120,18 @@ function buyerAlertType(status: string): 'info' | 'success' | 'warning' {
 export default function BiddingModulePage() {
   const currentModule = moduleConfig
   const currentEnterpriseID = getBuyerEnterpriseID()
+  const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [awardOpen, setAwardOpen] = useState(false)
+  const [awardQuoteId, setAwardQuoteId] = useState<number | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [activities, setActivities] = useState<BiddingActivity[]>([])
   const [selectedActivity, setSelectedActivity] = useState<BiddingActivity | null>(null)
   const [createForm] = Form.useForm<CreateBiddingFormValues>()
+  const [awardForm] = Form.useForm<AwardFormValues>()
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -195,14 +203,38 @@ export default function BiddingModulePage() {
     }
   }
 
-  const handleAward = async (quoteId: number) => {
+  const selectedAwardQuote = useMemo(() => {
+    return selectedActivity?.quotes?.find((quote) => quote.id === awardQuoteId) || null
+  }, [awardQuoteId, selectedActivity])
+
+  const lowestQuote = useMemo(() => {
+    if (!selectedActivity?.quotes?.length) {
+      return null
+    }
+    return [...selectedActivity.quotes].sort((a, b) => a.unitPrice - b.unitPrice || a.id - b.id)[0]
+  }, [selectedActivity])
+
+  const isAwardingNonLowest = Boolean(selectedAwardQuote && lowestQuote && selectedAwardQuote.id !== lowestQuote.id)
+
+  const openAwardModal = (quoteId: number) => {
     if (!selectedActivity) {
+      return
+    }
+    setAwardQuoteId(quoteId)
+    awardForm.resetFields()
+    setAwardOpen(true)
+  }
+
+  const handleAward = async (values: AwardFormValues) => {
+    if (!selectedActivity || !awardQuoteId) {
       return
     }
     setActionLoading(true)
     try {
-      const updated = await marketService.awardBidding(selectedActivity.id, quoteId)
+      const updated = await marketService.awardBidding(selectedActivity.id, awardQuoteId, values.awardReason)
       setSelectedActivity(updated)
+      setAwardOpen(false)
+      setAwardQuoteId(null)
       message.success('已完成定标')
       await loadData()
     } catch (error) {
@@ -222,6 +254,7 @@ export default function BiddingModulePage() {
       setSelectedActivity(result.bidding)
       message.success(`订单已生成：${result.orderNo}`)
       await loadData()
+      navigate(`/dashboard/orders/${result.orderId}`)
     } catch (error) {
       message.error(getErrorMessage(error, '生成订单失败'))
     } finally {
@@ -409,7 +442,7 @@ export default function BiddingModulePage() {
                           <Space>
                             <Text className="text-lg font-semibold text-red-500">{formatPrice(quote.unitPrice, selectedActivity.unit)}</Text>
                             {selectedActivity.buyerId === currentEnterpriseID && awardableStatuses.has(selectedActivity.status) ? (
-                              <Button type="primary" onClick={() => void handleAward(quote.id)} loading={actionLoading}>定标</Button>
+                              <Button type="primary" onClick={() => openAwardModal(quote.id)} loading={actionLoading}>定标</Button>
                             ) : selectedActivity.status === 'bidding' ? (
                               <Button disabled>截止后可定标</Button>
                             ) : null}
@@ -439,6 +472,42 @@ export default function BiddingModulePage() {
           ) : null}
         </Spin>
       </Drawer>
+
+      <Modal
+        title="确认定标"
+        open={awardOpen}
+        onCancel={() => {
+          setAwardOpen(false)
+          setAwardQuoteId(null)
+        }}
+        onOk={() => awardForm.submit()}
+        confirmLoading={actionLoading}
+      >
+        <Form form={awardForm} layout="vertical" onFinish={handleAward}>
+          {selectedAwardQuote ? (
+            <Descriptions bordered column={1} size="small" className="mb-4">
+              <Descriptions.Item label="供应商">{selectedAwardQuote.supplierName}</Descriptions.Item>
+              <Descriptions.Item label="报价">{formatPrice(selectedAwardQuote.unitPrice, selectedActivity?.unit || '吨')}</Descriptions.Item>
+              <Descriptions.Item label="交付周期">{selectedAwardQuote.deliveryDays} 天</Descriptions.Item>
+            </Descriptions>
+          ) : null}
+          {isAwardingNonLowest ? (
+            <Alert
+              className="mb-4"
+              type="warning"
+              showIcon
+              message="当前选择不是最低价报价，请填写定标原因，便于后续审计。"
+            />
+          ) : null}
+          <Form.Item
+            name="awardReason"
+            label={isAwardingNonLowest ? '非最低价定标原因' : '定标备注'}
+            rules={isAwardingNonLowest ? [{ required: true, message: '请填写非最低价定标原因' }] : undefined}
+          >
+            <Input.TextArea rows={4} maxLength={500} showCount placeholder="例如：交期更短、可供数量更匹配、资质更符合项目要求" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }
