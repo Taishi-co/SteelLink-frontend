@@ -28,21 +28,51 @@ export interface MatchedProduct {
   category: string
   steel_mill: string
   quantity: number
+  available_qty?: number
   unit_price: number
   total_amount: number
   score: number
   match_reason: string
   enterprise_id: number
+  spec?: Record<string, unknown>
+  warehouse?: Record<string, unknown>
+  bundle_no?: string
+  delivery_days?: number
+  quote_validity?: number
+  quality_cert?: string
+  description?: string
+  selected?: boolean
+}
+
+export interface OrderFormPayload {
+  quantity: number
+  contact_name: string
+  contact_phone: string
+  warehouse_name: string
+  delivery_address: string
+  delivery_method: string
+  payment_method: string
+  delivery_note?: string
+  remark?: string
 }
 
 export interface OrderDraft {
+  order_id?: number
   order_no: string
+  product_id?: number
   product_name: string
   quantity: number
   unit: string
   estimated_amount: number
   payment_method: string
   delivery_note: string
+  contact_name?: string
+  contact_phone?: string
+  warehouse_name?: string
+  delivery_address?: string
+  delivery_method?: string
+  remark?: string
+  order_detail?: Record<string, unknown>
 }
 
 export interface FinancePlan {
@@ -97,6 +127,7 @@ export interface AIProcurementInfo {
   finance_plans: FinancePlan[]
   audit_items: AuditItem[]
   stages: StageInfo[]
+  history_saved: boolean
   enterprise_id: number
   created_by: number
   created_at: string
@@ -111,9 +142,41 @@ interface AIProcurementListResponse {
   page_size: number
 }
 
+interface MatchProductsResponse {
+  matched_products: MatchedProduct[]
+  stages: StageInfo[]
+}
+
+interface GenerateOrderResponse {
+  procurement: AIProcurementInfo
+  order_draft: OrderDraft
+}
+
 export const aiProcurementService = {
   parse: async (prompt: string) => {
     const response = await api.post<ApiResponse<AIProcurementParseResult>, ApiResponse<AIProcurementParseResult>>('/ai-procurements/parse', { prompt })
+    return response.data
+  },
+
+  confirmInstruction: async (prompt: string, parsed: ParsedInstruction) => {
+    const response = await api.post<ApiResponse<AIProcurementParseResult>, ApiResponse<AIProcurementParseResult>>('/ai-procurements/confirm-instruction', { prompt, parsed })
+    return response.data
+  },
+
+  matchProducts: async (parsed: ParsedInstruction) => {
+    const response = await api.post<ApiResponse<MatchProductsResponse>, ApiResponse<MatchProductsResponse>>('/ai-procurements/match-products', { parsed })
+    return response.data
+  },
+
+  generateOrder: async (payload: { prompt: string; parsed: ParsedInstruction; selected_product: MatchedProduct; order_form: OrderFormPayload }) => {
+    const response = await api.post<ApiResponse<GenerateOrderResponse>, ApiResponse<GenerateOrderResponse>>('/ai-procurements/generate-order', payload)
+    return response.data
+  },
+
+  matchFinance: async (id: number, financingRequired: boolean) => {
+    const response = await api.post<ApiResponse<AIProcurementInfo>, ApiResponse<AIProcurementInfo>>(`/ai-procurements/${id}/match-finance`, {
+      financing_required: financingRequired,
+    })
     return response.data
   },
 
@@ -127,8 +190,10 @@ export const aiProcurementService = {
     return response.data
   },
 
-  submitReview: async (id: number) => {
-    const response = await api.post<ApiResponse<AIProcurementInfo>, ApiResponse<AIProcurementInfo>>(`/ai-procurements/${id}/submit-review`, {})
+  submitReview: async (id: number, saveHistory = true) => {
+    const response = await api.post<ApiResponse<AIProcurementInfo>, ApiResponse<AIProcurementInfo>>(`/ai-procurements/${id}/submit-review`, {
+      save_history: saveHistory,
+    })
     return response.data
   },
 }
