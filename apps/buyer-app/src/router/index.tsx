@@ -58,6 +58,7 @@ export function AppRouter() {
           <Route path="mall" element={<MallPage />} />
           <Route path="matching" element={<MatchingPage />} />
           <Route path="ai-procurement" element={<AiProcurementPage />} />
+          <Route path="ai-procurement/:step" element={<AiProcurementPage />} />
           <Route path="bidding" element={<BiddingPage />} />
           <Route path="procurement" element={<ProcurementPage />} />
           <Route path="procurement/:id" element={<ProcurementDetailPage />} />
