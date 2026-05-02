@@ -1,21 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Col, Empty, Input, Progress, Row, Space, Spin, Steps, Tag, Timeline, Typography, message } from 'antd'
+import { Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
 import {
   AuditOutlined,
   BankOutlined,
-  CheckCircleOutlined,
-  ClockCircleOutlined,
   FileSearchOutlined,
   LoginOutlined,
   MessageOutlined,
-  RobotOutlined,
   ShoppingCartOutlined,
 } from '@ant-design/icons'
 import { getBuyerToken } from '@/services/auth'
 import { aiProcurementService } from '@/services/aiProcurementService'
-import type { AIProcurementInfo, AIProcurementParseResult, AIProcurementStageCode, StageInfo } from '@/services/aiProcurementService'
+import type {
+  AIProcurementInfo,
+  AIProcurementParseResult,
+  AIProcurementStageCode,
+  MatchedProduct,
+  OrderFormPayload,
+  ParsedInstruction,
+} from '@/services/aiProcurementService'
 
 const { Title, Paragraph, Text } = Typography
 const { TextArea } = Input
@@ -28,11 +32,11 @@ interface ProcurementStep {
 }
 
 const procurementSteps: ProcurementStep[] = [
-  { step: 1, code: 'instruction_parsing', title: '指令解析', description: '识别采购品类、数量、用途和融资意图' },
-  { step: 2, code: 'product_matching', title: '商品匹配', description: '按商品、库存、价格和供应商能力匹配' },
-  { step: 3, code: 'order_generation', title: '订单生成', description: '生成订单草稿和交易要素' },
-  { step: 4, code: 'financing_matching', title: '融资匹配', description: '匹配订单融资和备选金融产品' },
-  { step: 5, code: 'review_submission', title: '审核提交', description: '提交平台审核并进入后续履约' },
+  { step: 1, code: 'instruction_parsing', title: '指令解析', description: '确认商品、数量、用途和融资意图' },
+  { step: 2, code: 'product_matching', title: '商品匹配', description: '召回候选商品并选择下单商品' },
+  { step: 3, code: 'order_generation', title: '订单生成', description: '填写真实订单信息并锁定库存' },
+  { step: 4, code: 'financing_matching', title: '融资匹配', description: '按需匹配订单融资方案' },
+  { step: 5, code: 'review_submission', title: '审核提交', description: '确认订单和融资后提交审核' },
 ]
 
 const stageIcons: Record<AIProcurementStageCode, ReactNode> = {
@@ -49,6 +53,17 @@ const examplePrompts = [
   '找5家可供应热轧卷板的钢厂资源，要求两周内交付并支持账期',
 ]
 
+const defaultParsed: ParsedInstruction = {
+  product_name: '',
+  category: '',
+  quantity: 1,
+  unit: '吨',
+  usage: '',
+  financing_required: false,
+  keywords: [],
+  confidence: 0,
+}
+
 function formatMoney(value?: number) {
   if (!value) {
     return '待计算'
@@ -61,33 +76,6 @@ function formatRate(value: number) {
     return '按授信评估'
   }
   return `年化 ${value.toFixed(1)}%`
-}
-
-function normalizeStages(stages?: StageInfo[]) {
-  if (!stages?.length) {
-    return procurementSteps.map((step) => ({
-      code: step.code,
-      name: step.title,
-      status: 'pending' as const,
-      description: step.description,
-    }))
-  }
-  const stageMap = new Map(stages.map((stage) => [stage.code, stage]))
-  return procurementSteps.map((step) => stageMap.get(step.code) || {
-    code: step.code,
-    name: step.title,
-    status: 'pending' as const,
-    description: step.description,
-  })
-}
-
-function getCurrentStageIndex(stages: StageInfo[]) {
-  const processingIndex = stages.findIndex((stage) => stage.status === 'processing')
-  if (processingIndex >= 0) {
-    return processingIndex
-  }
-  const completedCount = stages.filter((stage) => stage.status === 'completed').length
-  return Math.max(0, Math.min(completedCount, stages.length - 1))
 }
 
 function getStepFromParam(step?: string) {
@@ -109,17 +97,33 @@ function getResultFromProcurement(procurement: AIProcurementInfo): AIProcurement
   }
 }
 
+function toOrderFormPayload(values: OrderFormPayload): OrderFormPayload {
+  return {
+    quantity: Number(values.quantity || 0),
+    contact_name: values.contact_name,
+    contact_phone: values.contact_phone,
+    warehouse_name: values.warehouse_name,
+    delivery_address: values.delivery_address,
+    delivery_method: values.delivery_method,
+    payment_method: values.payment_method,
+    delivery_note: values.delivery_note,
+    remark: values.remark,
+  }
+}
+
 export default function AiProcurementPage() {
   const navigate = useNavigate()
   const params = useParams<{ step?: string }>()
   const activeStep = getStepFromParam(params.step)
+  const [instructionForm] = Form.useForm<ParsedInstruction>()
+  const [orderForm] = Form.useForm<OrderFormPayload>()
   const [prompt, setPrompt] = useState('')
-  const [parsing, setParsing] = useState(false)
-  const [creating, setCreating] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [loadingMine, setLoadingMine] = useState(false)
   const [result, setResult] = useState<AIProcurementParseResult | null>(null)
   const [currentProcurement, setCurrentProcurement] = useState<AIProcurementInfo | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<MatchedProduct | null>(null)
   const [mine, setMine] = useState<AIProcurementInfo[]>([])
   const isLoggedIn = Boolean(getBuyerToken())
 
@@ -143,8 +147,43 @@ export default function AiProcurementPage() {
     void loadMine()
   }, [loadMine])
 
-  const stages = useMemo(() => normalizeStages(result?.stages), [result?.stages])
-  const currentStep = useMemo(() => activeStep ? activeStep - 1 : getCurrentStageIndex(stages), [activeStep, stages])
+  useEffect(() => {
+    if (result?.parsed) {
+      instructionForm.setFieldsValue(result.parsed)
+    }
+  }, [instructionForm, result?.parsed])
+
+  useEffect(() => {
+    if (selectedProduct) {
+      orderForm.setFieldsValue({
+        quantity: selectedProduct.quantity,
+        warehouse_name: String(selectedProduct.warehouse?.warehouse_name || ''),
+        payment_method: '线上合同 + 对公转账',
+        delivery_method: '平台协同配送',
+      })
+    }
+  }, [orderForm, selectedProduct])
+
+  const currentStep = activeStep ? activeStep - 1 : 0
+
+  const updateResult = (patch: Partial<AIProcurementParseResult>) => {
+    setResult((prev) => ({
+      parsed: patch.parsed || prev?.parsed || defaultParsed,
+      matched_products: patch.matched_products || prev?.matched_products || [],
+      order_draft: patch.order_draft || prev?.order_draft || {
+        order_no: '',
+        product_name: '',
+        quantity: 0,
+        unit: '',
+        estimated_amount: 0,
+        payment_method: '',
+        delivery_note: '',
+      },
+      finance_plans: patch.finance_plans || prev?.finance_plans || [],
+      audit_items: patch.audit_items || prev?.audit_items || [],
+      stages: patch.stages || prev?.stages || [],
+    }))
+  }
 
   const handleParse = async () => {
     const value = prompt.trim()
@@ -156,68 +195,139 @@ export default function AiProcurementPage() {
       message.warning('请先输入采购需求')
       return
     }
-    setParsing(true)
+    setBusy(true)
     try {
       const parseResult = await aiProcurementService.parse(value)
       setResult(parseResult)
       setCurrentProcurement(null)
+      setSelectedProduct(null)
       navigate('/ai-procurement/1')
-      message.success('采购指令解析完成')
+      message.success('采购指令解析完成，请确认参数')
     } catch (error) {
       message.error('采购指令解析失败')
     } finally {
-      setParsing(false)
+      setBusy(false)
     }
   }
 
-  const handleCreate = async () => {
-    const value = prompt.trim()
-    if (!isLoggedIn) {
-      message.warning('请先登录后再发起AI采购')
+  const handleConfirmInstruction = async () => {
+    if (!result) {
+      message.warning('请先解析采购需求')
       return
     }
-    if (!value) {
-      message.warning('请先输入采购需求')
-      return
-    }
-    setCreating(true)
+    setBusy(true)
     try {
-      const procurement = await aiProcurementService.create(value)
+      const values = await instructionForm.validateFields()
+      const confirmed = await aiProcurementService.confirmInstruction(prompt, values)
+      const matched = await aiProcurementService.matchProducts(confirmed.parsed)
+      updateResult({
+        parsed: confirmed.parsed,
+        matched_products: matched.matched_products,
+        stages: matched.stages,
+      })
+      setSelectedProduct(null)
+      navigate('/ai-procurement/2')
+      message.success('参数已确认，商品召回完成')
+    } catch (error) {
+      message.error('确认参数或召回商品失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleConfirmProduct = () => {
+    if (!selectedProduct) {
+      message.warning('请选择一个商品')
+      return
+    }
+    navigate('/ai-procurement/3')
+  }
+
+  const handleGenerateOrder = async () => {
+    if (!result || !selectedProduct) {
+      message.warning('请先确认参数并选择商品')
+      return
+    }
+    setBusy(true)
+    try {
+      const values = await orderForm.validateFields()
+      const response = await aiProcurementService.generateOrder({
+        prompt,
+        parsed: result.parsed,
+        selected_product: selectedProduct,
+        order_form: toOrderFormPayload(values),
+      })
+      setCurrentProcurement(response.procurement)
+      setResult(getResultFromProcurement(response.procurement))
+      if (response.procurement.financing_required) {
+        navigate('/ai-procurement/4')
+      } else {
+        navigate('/ai-procurement/5')
+      }
+      message.success('真实订单已生成')
+    } catch (error) {
+      message.error('订单生成失败，请确认商品库存和企业认证状态')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleMatchFinance = async (required: boolean) => {
+    if (!currentProcurement) {
+      message.warning('请先生成订单')
+      return
+    }
+    setBusy(true)
+    try {
+      const procurement = await aiProcurementService.matchFinance(currentProcurement.id, required)
       setCurrentProcurement(procurement)
       setResult(getResultFromProcurement(procurement))
-      await loadMine()
-      navigate('/ai-procurement/3')
-      message.success('AI采购单已创建')
+      navigate('/ai-procurement/5')
+      message.success(required ? '融资方案匹配完成' : '已跳过融资匹配')
     } catch (error) {
-      message.error('AI采购单创建失败，请确认企业账号已完成认证')
+      message.error('融资匹配失败')
     } finally {
-      setCreating(false)
+      setBusy(false)
     }
   }
 
-  const handleSubmitReview = async () => {
+  const submitReviewWithHistoryChoice = (saveHistory: boolean) => {
     if (!currentProcurement) {
-      message.warning('请先创建AI采购单')
+      message.warning('请先生成订单')
       return
     }
     setSubmitting(true)
-    try {
-      const procurement = await aiProcurementService.submitReview(currentProcurement.id)
-      setCurrentProcurement(procurement)
-      setResult(getResultFromProcurement(procurement))
-      await loadMine()
-      message.success('已提交审核')
-    } catch (error) {
-      message.error('提交审核失败')
-    } finally {
-      setSubmitting(false)
-    }
+    aiProcurementService.submitReview(currentProcurement.id, saveHistory)
+      .then(async (procurement) => {
+        setCurrentProcurement(procurement)
+        setResult(getResultFromProcurement(procurement))
+        await loadMine()
+        message.success(saveHistory ? '已提交审核并保存到历史AI采购' : '已提交审核，本次信息不保存到历史AI采购')
+      })
+      .catch(() => message.error('提交审核失败'))
+      .finally(() => setSubmitting(false))
   }
 
-  const openProcurement = (item: AIProcurementInfo, step = 1) => {
+  const handleSubmitReview = () => {
+    if (!currentProcurement) {
+      message.warning('请先生成订单')
+      return
+    }
+    Modal.confirm({
+      title: '提交审核',
+      content: '提交后是否需要保存此次AI采购信息到历史AI采购？',
+      okText: '提交并保存',
+      cancelText: '提交但不保存',
+      onOk: () => submitReviewWithHistoryChoice(true),
+      onCancel: () => submitReviewWithHistoryChoice(false),
+    })
+  }
+
+  const openProcurement = (item: AIProcurementInfo, step = 5) => {
     setCurrentProcurement(item)
     setResult(getResultFromProcurement(item))
     setPrompt(item.prompt)
+    setSelectedProduct(item.matched_products.find((product) => product.selected) || item.matched_products[0] || null)
     navigate(`/ai-procurement/${step}`)
   }
 
@@ -225,6 +335,8 @@ export default function AiProcurementPage() {
     setPrompt(value)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  const showWorkflow = !activeStep || activeStep < 5
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -234,31 +346,29 @@ export default function AiProcurementPage() {
             <div>
               <Title level={1} className="!mb-3">AI采购</Title>
               <Paragraph className="text-lg text-gray-500 !mb-0">
-                用自然语言描述采购目标，按五步完成需求解析、商品匹配、订单生成、融资匹配与审核提交。
+                先确认参数，再选择商品、生成真实订单、按需融资，最后提交审核。
               </Paragraph>
             </div>
-            {!isLoggedIn ? (
+            {!isLoggedIn && (
               <Link to="/login">
                 <Button type="primary" icon={<LoginOutlined />}>登录后使用</Button>
               </Link>
-            ) : (
-              <Button type="primary" icon={<RobotOutlined />} onClick={handleCreate} loading={creating}>
-                发起 AI 采购
-              </Button>
             )}
           </div>
 
-          <Card className="mt-8">
-            <Steps
-              current={currentStep}
-              responsive
-              items={procurementSteps.map((item) => ({
-                title: <Link to={`/ai-procurement/${item.step}`}>{item.title}</Link>,
-                description: item.description,
-                icon: stageIcons[item.code],
-              }))}
-            />
-          </Card>
+          {showWorkflow && (
+            <Card className="mt-8">
+              <Steps
+                current={currentStep}
+                responsive
+                items={procurementSteps.map((item) => ({
+                  title: <Link to={`/ai-procurement/${item.step}`}>{item.title}</Link>,
+                  description: item.description,
+                  icon: stageIcons[item.code],
+                }))}
+              />
+            </Card>
+          )}
 
           {!activeStep && (
             <Card className="mt-6">
@@ -276,7 +386,7 @@ export default function AiProcurementPage() {
                   icon={<MessageOutlined />}
                   className="h-full min-h-[96px]"
                   onClick={handleParse}
-                  loading={parsing}
+                  loading={busy}
                 >
                   解析采购指令
                 </Button>
@@ -292,9 +402,16 @@ export default function AiProcurementPage() {
             activeStep={activeStep}
             result={result}
             currentProcurement={currentProcurement}
-            creating={creating}
+            selectedProduct={selectedProduct}
+            busy={busy}
             submitting={submitting}
-            onCreate={handleCreate}
+            instructionForm={instructionForm}
+            orderForm={orderForm}
+            onConfirmInstruction={handleConfirmInstruction}
+            onSelectProduct={setSelectedProduct}
+            onConfirmProduct={handleConfirmProduct}
+            onGenerateOrder={handleGenerateOrder}
+            onMatchFinance={handleMatchFinance}
             onSubmitReview={handleSubmitReview}
           />
         ) : (
@@ -385,18 +502,32 @@ function StepPage({
   activeStep,
   result,
   currentProcurement,
-  creating,
+  selectedProduct,
+  busy,
   submitting,
-  onCreate,
+  instructionForm,
+  orderForm,
+  onConfirmInstruction,
+  onSelectProduct,
+  onConfirmProduct,
+  onGenerateOrder,
+  onMatchFinance,
   onSubmitReview,
 }: {
   activeStep: number
   result: AIProcurementParseResult | null
   currentProcurement: AIProcurementInfo | null
-  creating: boolean
+  selectedProduct: MatchedProduct | null
+  busy: boolean
   submitting: boolean
-  onCreate: () => Promise<void>
-  onSubmitReview: () => Promise<void>
+  instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
+  orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
+  onConfirmInstruction: () => Promise<void>
+  onSelectProduct: (product: MatchedProduct) => void
+  onConfirmProduct: () => void
+  onGenerateOrder: () => Promise<void>
+  onMatchFinance: (required: boolean) => Promise<void>
+  onSubmitReview: () => void
 }) {
   const step = procurementSteps[activeStep - 1]
 
@@ -409,19 +540,8 @@ function StepPage({
           <Paragraph className="text-gray-500 !mb-0">{step.description}</Paragraph>
         </div>
         <Space wrap>
-          <Link to="/ai-procurement">
-            <Button>返回首页</Button>
-          </Link>
-          {activeStep > 1 && (
-            <Link to={`/ai-procurement/${activeStep - 1}`}>
-              <Button>上一步</Button>
-            </Link>
-          )}
-          {activeStep < procurementSteps.length && (
-            <Link to={`/ai-procurement/${activeStep + 1}`}>
-              <Button type="primary">下一步</Button>
-            </Link>
-          )}
+          <Link to="/ai-procurement"><Button>返回首页</Button></Link>
+          {activeStep > 1 && <Link to={`/ai-procurement/${activeStep - 1}`}><Button>上一步</Button></Link>}
         </Space>
       </div>
 
@@ -430,65 +550,94 @@ function StepPage({
           <Empty description="请先在 AI采购首页输入采购需求并解析，或从我的AI采购中选择历史记录" />
         </Card>
       ) : (
-        renderStepContent(activeStep, result, currentProcurement, creating, submitting, onCreate, onSubmitReview)
+        renderStepContent({
+          activeStep,
+          result,
+          currentProcurement,
+          selectedProduct,
+          busy,
+          submitting,
+          instructionForm,
+          orderForm,
+          onConfirmInstruction,
+          onSelectProduct,
+          onConfirmProduct,
+          onGenerateOrder,
+          onMatchFinance,
+          onSubmitReview,
+        })
       )}
     </section>
   )
 }
 
-function renderStepContent(
-  activeStep: number,
-  selectedResult: AIProcurementParseResult,
-  currentProcurement: AIProcurementInfo | null,
-  creating: boolean,
-  submitting: boolean,
-  onCreate: () => Promise<void>,
-  onSubmitReview: () => Promise<void>,
-) {
+function renderStepContent(props: {
+  activeStep: number
+  result: AIProcurementParseResult
+  currentProcurement: AIProcurementInfo | null
+  selectedProduct: MatchedProduct | null
+  busy: boolean
+  submitting: boolean
+  instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
+  orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
+  onConfirmInstruction: () => Promise<void>
+  onSelectProduct: (product: MatchedProduct) => void
+  onConfirmProduct: () => void
+  onGenerateOrder: () => Promise<void>
+  onMatchFinance: (required: boolean) => Promise<void>
+  onSubmitReview: () => void
+}) {
+  const { activeStep, result, currentProcurement, selectedProduct, busy, submitting, instructionForm, orderForm } = props
+
   if (activeStep === 1) {
     return (
-      <Card title="1. 指令解析">
-        <Space direction="vertical" size="middle" className="w-full">
-          <div className="flex items-center justify-between rounded border border-gray-100 p-3">
-            <Text type="secondary">采购物品</Text>
-            <Text strong>{selectedResult.parsed.product_name || '-'}</Text>
-          </div>
-          <div className="flex items-center justify-between rounded border border-gray-100 p-3">
-            <Text type="secondary">采购数量</Text>
-            <Text strong>{selectedResult.parsed.quantity} {selectedResult.parsed.unit}</Text>
-          </div>
-          <div className="flex items-center justify-between rounded border border-gray-100 p-3">
-            <Text type="secondary">业务用途</Text>
-            <Text strong>{selectedResult.parsed.usage || '-'}</Text>
-          </div>
-          <div className="flex items-center justify-between rounded border border-gray-100 p-3">
-            <Text type="secondary">金融需求</Text>
-            <Text strong>{selectedResult.parsed.financing_required ? '订单融资' : '暂无'}</Text>
-          </div>
-          <Progress percent={Math.round((selectedResult.parsed.confidence || 0) * 100)} size="small" />
-        </Space>
+      <Card title="确认解析参数">
+        <Form form={instructionForm} layout="vertical">
+          <Row gutter={16}>
+            <Col xs={24} md={12}><Form.Item name="product_name" label="采购物品" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="category" label="品类" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="quantity" label="采购数量" rules={[{ required: true }]}><InputNumber className="w-full" min={0.01} /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="unit" label="单位" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="financing_required" label="是否需要融资" valuePropName="checked"><Switch /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="usage" label="业务用途" rules={[{ required: true }]}><Input /></Form.Item></Col>
+          </Row>
+          <Button type="primary" icon={<FileSearchOutlined />} loading={busy} onClick={() => void props.onConfirmInstruction()}>
+            确认参数并召回商品
+          </Button>
+        </Form>
       </Card>
     )
   }
 
   if (activeStep === 2) {
     return (
-      <Card title="2. 商品匹配">
-        {selectedResult.matched_products.length > 0 ? (
+      <Card title="选择召回商品">
+        {result.matched_products.length > 0 ? (
           <Space direction="vertical" size="middle" className="w-full">
-            {selectedResult.matched_products.map((item, index) => (
-              <div key={`${item.product_id || index}-${item.product_name}`} className="grid gap-4 rounded border border-gray-100 p-4 md:grid-cols-[1fr_140px_96px] md:items-center">
-                <div>
-                  <Text strong>{item.product_name}</Text>
-                  <div className="mt-1 text-sm text-gray-500">{item.steel_mill || item.match_reason}</div>
+            {result.matched_products.map((item) => (
+              <div key={`${item.product_id}-${item.product_no}`} className={`rounded border p-4 ${selectedProduct?.product_id === item.product_id ? 'border-primary-500 bg-primary-50' : 'border-gray-100 bg-white'}`}>
+                <div className="grid gap-4 md:grid-cols-[1fr_160px_120px] md:items-center">
+                  <div>
+                    <Text strong>{item.product_name}</Text>
+                    <div className="mt-1 text-sm text-gray-500">{item.steel_mill || '-'} · {item.category || '-'} · {item.match_reason}</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Tag>{item.product_no}</Tag>
+                      <Tag>可用 {item.available_qty || item.quantity}</Tag>
+                      {item.delivery_days ? <Tag>{item.delivery_days}天交付</Tag> : null}
+                    </div>
+                  </div>
+                  <Text strong>{formatMoney(item.unit_price)} / {result.parsed.unit}</Text>
+                  <Space>
+                    <Button onClick={() => showProductDetail(item)}>详情</Button>
+                    <Button type={selectedProduct?.product_id === item.product_id ? 'primary' : 'default'} onClick={() => props.onSelectProduct(item)}>选择</Button>
+                  </Space>
                 </div>
-                <Text strong>{formatMoney(item.unit_price)} / 件</Text>
-                <Progress percent={item.score} size="small" />
               </div>
             ))}
+            <Button type="primary" onClick={props.onConfirmProduct}>确认商品，填写订单</Button>
           </Space>
         ) : (
-          <Empty description="暂无商品匹配结果" />
+          <Empty description="暂无商品匹配结果，请返回上一步调整参数" />
         )}
       </Card>
     )
@@ -496,88 +645,126 @@ function renderStepContent(
 
   if (activeStep === 3) {
     return (
-      <Card title="3. 订单生成">
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12}>
-            <div className="rounded bg-gray-50 p-4">
-              <Text type="secondary">推荐订单金额</Text>
-              <div className="mt-2 text-lg font-semibold text-gray-900">{formatMoney(selectedResult.order_draft.estimated_amount)}</div>
-            </div>
-          </Col>
-          <Col xs={24} sm={12}>
-            <div className="rounded bg-gray-50 p-4">
-              <Text type="secondary">采购数量</Text>
-              <div className="mt-2 text-lg font-semibold text-gray-900">
-                {selectedResult.order_draft.quantity} {selectedResult.order_draft.unit}
-              </div>
-            </div>
-          </Col>
-          <Col xs={24} sm={12}>
-            <div className="rounded bg-gray-50 p-4">
-              <Text type="secondary">付款方式</Text>
-              <div className="mt-2 text-lg font-semibold text-gray-900">{selectedResult.order_draft.payment_method || '-'}</div>
-            </div>
-          </Col>
-          <Col xs={24} sm={12}>
-            <div className="rounded bg-gray-50 p-4">
-              <Text type="secondary">交付说明</Text>
-              <div className="mt-2 text-lg font-semibold text-gray-900">{selectedResult.order_draft.delivery_note || '-'}</div>
-            </div>
-          </Col>
-        </Row>
-        <Button type="primary" block className="mt-5" onClick={() => void onCreate()} loading={creating}>
-          {currentProcurement ? '更新为采购单结果' : '生成采购单'}
-        </Button>
+      <Card title="生成真实订单">
+        {selectedProduct ? (
+          <>
+            <Descriptions bordered size="small" className="mb-5" column={{ xs: 1, md: 2 }}>
+              <Descriptions.Item label="商品">{selectedProduct.product_name}</Descriptions.Item>
+              <Descriptions.Item label="钢厂">{selectedProduct.steel_mill || '-'}</Descriptions.Item>
+              <Descriptions.Item label="单价">{formatMoney(selectedProduct.unit_price)}</Descriptions.Item>
+              <Descriptions.Item label="可用库存">{selectedProduct.available_qty || selectedProduct.quantity} {result.parsed.unit}</Descriptions.Item>
+            </Descriptions>
+            <Form form={orderForm} layout="vertical">
+              <Row gutter={16}>
+                <Col xs={24} md={8}><Form.Item name="quantity" label="下单数量" rules={[{ required: true }]}><InputNumber className="w-full" min={0.01} /></Form.Item></Col>
+                <Col xs={24} md={8}><Form.Item name="contact_name" label="联系人" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                <Col xs={24} md={12}><Form.Item name="warehouse_name" label="提货仓库" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                <Col xs={24} md={12}><Form.Item name="delivery_method" label="物流方式" rules={[{ required: true }]}><Radio.Group><Radio value="平台协同配送">平台协同配送</Radio><Radio value="自行提货">自行提货</Radio></Radio.Group></Form.Item></Col>
+                <Col xs={24}><Form.Item name="delivery_address" label="交付地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                <Col xs={24} md={12}><Form.Item name="payment_method" label="付款方式" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                <Col xs={24} md={12}><Form.Item name="delivery_note" label="交付说明"><Input /></Form.Item></Col>
+                <Col xs={24}><Form.Item name="remark" label="订单备注"><TextArea autoSize={{ minRows: 2, maxRows: 4 }} /></Form.Item></Col>
+              </Row>
+              <Button type="primary" icon={<ShoppingCartOutlined />} loading={busy} onClick={() => void props.onGenerateOrder()}>
+                生成真实订单
+              </Button>
+            </Form>
+          </>
+        ) : (
+          <Empty description="请先在商品匹配阶段选择商品" />
+        )}
       </Card>
     )
   }
 
   if (activeStep === 4) {
+    if (!currentProcurement?.financing_required) {
+      return (
+        <Card title="融资匹配">
+          <Empty description="当前采购参数不需要融资，可直接进入审核提交" />
+          <Button type="primary" className="mt-4" onClick={() => void props.onMatchFinance(false)}>跳过融资，进入审核</Button>
+        </Card>
+      )
+    }
     return (
-      <Card title="4. 融资匹配">
-        {selectedResult.finance_plans.length > 0 ? (
+      <Card title="融资匹配">
+        {result.finance_plans.length > 0 ? (
           <Space direction="vertical" size="middle" className="w-full">
-            {selectedResult.finance_plans.map((item) => (
-              <div key={`${item.provider}-${item.product_name}`} className="flex flex-col gap-3 rounded border border-gray-100 p-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <Text strong>{item.provider} · {item.product_name}</Text>
-                  <div className="mt-1 text-sm text-gray-500">{formatMoney(item.amount)} · {formatRate(item.rate)} · {item.term_days} 天</div>
+            {result.finance_plans.map((item) => (
+              <div key={`${item.provider}-${item.product_name}`} className="rounded border border-gray-100 p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <Text strong>{item.provider} · {item.product_name}</Text>
+                    <div className="mt-1 text-sm text-gray-500">{formatMoney(item.amount)} · {formatRate(item.rate)} · {item.term_days} 天</div>
+                    <div className="mt-1 text-sm text-gray-500">{item.reason}</div>
+                  </div>
+                  <Tag color={item.matched ? 'blue' : 'default'}>{item.matched ? '推荐' : '备选'}</Tag>
                 </div>
-                <Tag color={item.matched ? 'blue' : 'default'}>{item.matched ? '匹配' : '备选'}</Tag>
               </div>
             ))}
+            <Link to="/ai-procurement/5"><Button type="primary">确认融资方案，进入审核</Button></Link>
           </Space>
         ) : (
-          <Empty description="当前采购需求未要求融资或暂无融资方案" />
+          <Button type="primary" icon={<BankOutlined />} loading={busy} onClick={() => void props.onMatchFinance(true)}>
+            召回融资方案
+          </Button>
         )}
       </Card>
     )
   }
 
   return (
-    <Card title="5. 审核提交">
-      {selectedResult.audit_items.length > 0 ? (
-        <Timeline
-          items={selectedResult.audit_items.map((item) => ({
-            color: item.status === 'passed' || item.status === 'submitted' ? 'green' : 'gray',
-            dot: item.status === 'passed' || item.status === 'submitted' ? <CheckCircleOutlined /> : <ClockCircleOutlined />,
-            children: (
-              <div>
-                <Text strong>{item.name}</Text>
-                <div className="text-sm text-gray-500">{item.message}</div>
-              </div>
-            ),
-          }))}
-        />
+    <Card title="审核提交">
+      <Descriptions bordered column={{ xs: 1, md: 2 }}>
+        <Descriptions.Item label="订单号">{result.order_draft.order_no || '-'}</Descriptions.Item>
+        <Descriptions.Item label="商品">{result.order_draft.product_name || '-'}</Descriptions.Item>
+        <Descriptions.Item label="数量">{result.order_draft.quantity} {result.order_draft.unit}</Descriptions.Item>
+        <Descriptions.Item label="金额">{formatMoney(result.order_draft.estimated_amount)}</Descriptions.Item>
+        <Descriptions.Item label="联系人">{result.order_draft.contact_name || '-'}</Descriptions.Item>
+        <Descriptions.Item label="联系电话">{result.order_draft.contact_phone || '-'}</Descriptions.Item>
+        <Descriptions.Item label="交付地址" span={2}>{result.order_draft.delivery_address || '-'}</Descriptions.Item>
+        <Descriptions.Item label="交付说明" span={2}>{result.order_draft.delivery_note || '-'}</Descriptions.Item>
+      </Descriptions>
+
+      <Title level={4} className="!mt-8">融资详情</Title>
+      {result.finance_plans.length > 0 ? (
+        <Space direction="vertical" size="middle" className="w-full">
+          {result.finance_plans.map((item) => (
+            <div key={`${item.provider}-${item.product_name}`} className="rounded border border-gray-100 p-4">
+              <Text strong>{item.provider} · {item.product_name}</Text>
+              <div className="mt-1 text-sm text-gray-500">{formatMoney(item.amount)} · {formatRate(item.rate)} · {item.term_days} 天</div>
+            </div>
+          ))}
+        </Space>
       ) : (
-        <Empty description="暂无审核项" />
+        <Empty description="本次采购未选择融资" />
       )}
-      <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <Text type="secondary">提交前会合并订单、融资与企业资料，由业务和风控共同审核。</Text>
-        <Button type="primary" icon={<AuditOutlined />} onClick={() => void onSubmitReview()} loading={submitting} disabled={!currentProcurement}>
+
+      <div className="mt-6 flex justify-end">
+        <Button type="primary" icon={<AuditOutlined />} loading={submitting} disabled={!currentProcurement} onClick={props.onSubmitReview}>
           提交审核
         </Button>
       </div>
     </Card>
   )
+}
+
+function showProductDetail(item: MatchedProduct) {
+  Modal.info({
+    title: item.product_name,
+    width: 720,
+    content: (
+      <Descriptions column={1} size="small" bordered>
+        <Descriptions.Item label="商品编号">{item.product_no}</Descriptions.Item>
+        <Descriptions.Item label="钢厂">{item.steel_mill || '-'}</Descriptions.Item>
+        <Descriptions.Item label="品类">{item.category || '-'}</Descriptions.Item>
+        <Descriptions.Item label="库存">{item.available_qty || item.quantity}</Descriptions.Item>
+        <Descriptions.Item label="单价">{formatMoney(item.unit_price)}</Descriptions.Item>
+        <Descriptions.Item label="捆包号">{item.bundle_no || '-'}</Descriptions.Item>
+        <Descriptions.Item label="仓库">{String(item.warehouse?.warehouse_name || '-')}</Descriptions.Item>
+        <Descriptions.Item label="描述">{item.description || item.match_reason}</Descriptions.Item>
+      </Descriptions>
+    ),
+  })
 }
