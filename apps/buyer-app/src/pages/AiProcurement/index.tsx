@@ -303,6 +303,7 @@ export default function AiProcurementPage() {
         setResult(getResultFromProcurement(procurement))
         await loadMine()
         message.success(saveHistory ? '已提交审核并保存到历史AI采购' : '已提交审核，本次信息不保存到历史AI采购')
+        navigate('/ai-procurement')
       })
       .catch(() => message.error('提交审核失败'))
       .finally(() => setSubmitting(false))
