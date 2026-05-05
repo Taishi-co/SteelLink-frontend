@@ -45,7 +45,7 @@ export interface MatchedProduct {
 }
 
 export interface OrderFormPayload {
-  quantity: number
+  quantity?: number
   contact_name: string
   contact_phone: string
   warehouse_name: string
@@ -168,7 +168,7 @@ export const aiProcurementService = {
     return response.data
   },
 
-  generateOrder: async (payload: { prompt: string; parsed: ParsedInstruction; selected_product: MatchedProduct; order_form: OrderFormPayload }) => {
+  generateOrder: async (payload: { prompt: string; parsed: ParsedInstruction; selected_product?: MatchedProduct; selected_products?: MatchedProduct[]; order_form: OrderFormPayload }) => {
     const response = await api.post<ApiResponse<GenerateOrderResponse>, ApiResponse<GenerateOrderResponse>>('/ai-procurements/generate-order', payload)
     return response.data
   },

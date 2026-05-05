@@ -111,6 +111,14 @@ function toOrderFormPayload(values: OrderFormPayload): OrderFormPayload {
   }
 }
 
+function sumSelectedQuantity(items: MatchedProduct[]) {
+  return items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+}
+
+function nearlyEqual(left: number, right: number) {
+  return Math.abs(left - right) < 0.0001
+}
+
 export default function AiProcurementPage() {
   const navigate = useNavigate()
   const params = useParams<{ step?: string }>()
@@ -123,7 +131,7 @@ export default function AiProcurementPage() {
   const [loadingMine, setLoadingMine] = useState(false)
   const [result, setResult] = useState<AIProcurementParseResult | null>(null)
   const [currentProcurement, setCurrentProcurement] = useState<AIProcurementInfo | null>(null)
-  const [selectedProduct, setSelectedProduct] = useState<MatchedProduct | null>(null)
+  const [selectedProducts, setSelectedProducts] = useState<MatchedProduct[]>([])
   const [mine, setMine] = useState<AIProcurementInfo[]>([])
   const isLoggedIn = Boolean(getBuyerToken())
 
@@ -154,15 +162,15 @@ export default function AiProcurementPage() {
   }, [instructionForm, result?.parsed])
 
   useEffect(() => {
-    if (selectedProduct) {
+    if (selectedProducts.length > 0) {
       orderForm.setFieldsValue({
-        quantity: selectedProduct.quantity,
-        warehouse_name: String(selectedProduct.warehouse?.warehouse_name || ''),
+        quantity: sumSelectedQuantity(selectedProducts),
+        warehouse_name: String(selectedProducts[0].warehouse?.warehouse_name || ''),
         payment_method: '线上合同 + 对公转账',
         delivery_method: '平台协同配送',
       })
     }
-  }, [orderForm, selectedProduct])
+  }, [orderForm, selectedProducts])
 
   const currentStep = activeStep ? activeStep - 1 : 0
 
@@ -200,7 +208,7 @@ export default function AiProcurementPage() {
       const parseResult = await aiProcurementService.parse(value)
       setResult(parseResult)
       setCurrentProcurement(null)
-      setSelectedProduct(null)
+      setSelectedProducts([])
       navigate('/ai-procurement/1')
       message.success('采购指令解析完成，请确认参数')
     } catch (error) {
@@ -225,7 +233,7 @@ export default function AiProcurementPage() {
         matched_products: matched.matched_products,
         stages: matched.stages,
       })
-      setSelectedProduct(null)
+      setSelectedProducts([])
       navigate('/ai-procurement/2')
       message.success('参数已确认，商品召回完成')
     } catch (error) {
@@ -236,15 +244,20 @@ export default function AiProcurementPage() {
   }
 
   const handleConfirmProduct = () => {
-    if (!selectedProduct) {
-      message.warning('请选择一个商品')
+    const selectedQuantity = sumSelectedQuantity(selectedProducts)
+    if (selectedProducts.length === 0) {
+      message.warning('请选择至少一个商品')
+      return
+    }
+    if (!result || !nearlyEqual(selectedQuantity, result.parsed.quantity)) {
+      message.warning(`拼单数量需要等于采购数量：${result?.parsed.quantity || 0}${result?.parsed.unit || ''}`)
       return
     }
     navigate('/ai-procurement/3')
   }
 
   const handleGenerateOrder = async () => {
-    if (!result || !selectedProduct) {
+    if (!result || selectedProducts.length === 0) {
       message.warning('请先确认参数并选择商品')
       return
     }
@@ -254,8 +267,11 @@ export default function AiProcurementPage() {
       const response = await aiProcurementService.generateOrder({
         prompt,
         parsed: result.parsed,
-        selected_product: selectedProduct,
-        order_form: toOrderFormPayload(values),
+        selected_products: selectedProducts,
+        order_form: {
+          ...toOrderFormPayload(values),
+          quantity: sumSelectedQuantity(selectedProducts),
+        },
       })
       setCurrentProcurement(response.procurement)
       setResult(getResultFromProcurement(response.procurement))
@@ -328,8 +344,28 @@ export default function AiProcurementPage() {
     setCurrentProcurement(item)
     setResult(getResultFromProcurement(item))
     setPrompt(item.prompt)
-    setSelectedProduct(item.matched_products.find((product) => product.selected) || item.matched_products[0] || null)
+    setSelectedProducts(item.matched_products.filter((product) => product.selected))
     navigate(`/ai-procurement/${step}`)
+  }
+
+  const handleToggleProduct = (product: MatchedProduct) => {
+    setSelectedProducts((prev) => {
+      const exists = prev.some((item) => item.product_id === product.product_id)
+      if (exists) {
+        return prev.filter((item) => item.product_id !== product.product_id)
+      }
+      const remaining = Math.max((result?.parsed.quantity || 0) - sumSelectedQuantity(prev), 0)
+      const available = product.available_qty || product.quantity || remaining
+      return [...prev, { ...product, selected: true, quantity: Math.min(remaining || available, available) }]
+    })
+  }
+
+  const handleProductQuantityChange = (product: MatchedProduct, quantity: number | null) => {
+    setSelectedProducts((prev) => prev.map((item) => (
+      item.product_id === product.product_id
+        ? { ...item, quantity: Number(quantity || 0), total_amount: Number(quantity || 0) * item.unit_price }
+        : item
+    )))
   }
 
   const setExamplePrompt = (value: string) => {
@@ -403,13 +439,14 @@ export default function AiProcurementPage() {
             activeStep={activeStep}
             result={result}
             currentProcurement={currentProcurement}
-            selectedProduct={selectedProduct}
+            selectedProducts={selectedProducts}
             busy={busy}
             submitting={submitting}
             instructionForm={instructionForm}
             orderForm={orderForm}
             onConfirmInstruction={handleConfirmInstruction}
-            onSelectProduct={setSelectedProduct}
+            onToggleProduct={handleToggleProduct}
+            onProductQuantityChange={handleProductQuantityChange}
             onConfirmProduct={handleConfirmProduct}
             onGenerateOrder={handleGenerateOrder}
             onMatchFinance={handleMatchFinance}
@@ -503,13 +540,14 @@ function StepPage({
   activeStep,
   result,
   currentProcurement,
-  selectedProduct,
+  selectedProducts,
   busy,
   submitting,
   instructionForm,
   orderForm,
   onConfirmInstruction,
-  onSelectProduct,
+  onToggleProduct,
+  onProductQuantityChange,
   onConfirmProduct,
   onGenerateOrder,
   onMatchFinance,
@@ -518,13 +556,14 @@ function StepPage({
   activeStep: number
   result: AIProcurementParseResult | null
   currentProcurement: AIProcurementInfo | null
-  selectedProduct: MatchedProduct | null
+  selectedProducts: MatchedProduct[]
   busy: boolean
   submitting: boolean
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
   onConfirmInstruction: () => Promise<void>
-  onSelectProduct: (product: MatchedProduct) => void
+  onToggleProduct: (product: MatchedProduct) => void
+  onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
   onConfirmProduct: () => void
   onGenerateOrder: () => Promise<void>
   onMatchFinance: (required: boolean) => Promise<void>
@@ -555,13 +594,14 @@ function StepPage({
           activeStep,
           result,
           currentProcurement,
-          selectedProduct,
+          selectedProducts,
           busy,
           submitting,
           instructionForm,
           orderForm,
           onConfirmInstruction,
-          onSelectProduct,
+          onToggleProduct,
+          onProductQuantityChange,
           onConfirmProduct,
           onGenerateOrder,
           onMatchFinance,
@@ -576,19 +616,20 @@ function renderStepContent(props: {
   activeStep: number
   result: AIProcurementParseResult
   currentProcurement: AIProcurementInfo | null
-  selectedProduct: MatchedProduct | null
+  selectedProducts: MatchedProduct[]
   busy: boolean
   submitting: boolean
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
   onConfirmInstruction: () => Promise<void>
-  onSelectProduct: (product: MatchedProduct) => void
+  onToggleProduct: (product: MatchedProduct) => void
+  onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
   onConfirmProduct: () => void
   onGenerateOrder: () => Promise<void>
   onMatchFinance: (required: boolean) => Promise<void>
   onSubmitReview: () => void
 }) {
-  const { activeStep, result, currentProcurement, selectedProduct, busy, submitting, instructionForm, orderForm } = props
+  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm } = props
 
   if (activeStep === 1) {
     return (
@@ -616,8 +657,8 @@ function renderStepContent(props: {
         {result.matched_products.length > 0 ? (
           <Space direction="vertical" size="middle" className="w-full">
             {result.matched_products.map((item) => (
-              <div key={`${item.product_id}-${item.product_no}`} className={`rounded border p-4 ${selectedProduct?.product_id === item.product_id ? 'border-primary-500 bg-primary-50' : 'border-gray-100 bg-white'}`}>
-                <div className="grid gap-4 md:grid-cols-[1fr_160px_120px] md:items-center">
+              <div key={`${item.product_id}-${item.product_no}`} className={`rounded border p-4 ${selectedProducts.some((product) => product.product_id === item.product_id) ? 'border-primary-500 bg-primary-50' : 'border-gray-100 bg-white'}`}>
+                <div className="grid gap-4 md:grid-cols-[1fr_160px_220px] md:items-center">
                   <div>
                     <Text strong>{item.product_name}</Text>
                     <div className="mt-1 text-sm text-gray-500">{item.steel_mill || '-'} · {item.category || '-'} · {item.match_reason}</div>
@@ -630,11 +671,28 @@ function renderStepContent(props: {
                   <Text strong>{formatMoney(item.unit_price)} / {result.parsed.unit}</Text>
                   <Space>
                     <Button onClick={() => showProductDetail(item)}>详情</Button>
-                    <Button type={selectedProduct?.product_id === item.product_id ? 'primary' : 'default'} onClick={() => props.onSelectProduct(item)}>选择</Button>
+                    <Button type={selectedProducts.some((product) => product.product_id === item.product_id) ? 'primary' : 'default'} onClick={() => props.onToggleProduct(item)}>
+                      {selectedProducts.some((product) => product.product_id === item.product_id) ? '已选' : '选择'}
+                    </Button>
                   </Space>
                 </div>
+                {selectedProducts.some((product) => product.product_id === item.product_id) && (
+                  <div className="mt-4 max-w-xs">
+                    <InputNumber
+                      className="w-full"
+                      min={0.01}
+                      max={item.available_qty || item.quantity}
+                      value={selectedProducts.find((product) => product.product_id === item.product_id)?.quantity}
+                      addonAfter={result.parsed.unit}
+                      onChange={(value) => props.onProductQuantityChange(item, value)}
+                    />
+                  </div>
+                )}
               </div>
             ))}
+            <div className="rounded border border-gray-100 bg-gray-50 p-4">
+              <Text>已选 {selectedProducts.length} 个商品，合计 {sumSelectedQuantity(selectedProducts)} / {result.parsed.quantity} {result.parsed.unit}</Text>
+            </div>
             <Button type="primary" onClick={props.onConfirmProduct}>确认商品，填写订单</Button>
           </Space>
         ) : (
@@ -647,17 +705,21 @@ function renderStepContent(props: {
   if (activeStep === 3) {
     return (
       <Card title="生成真实订单">
-        {selectedProduct ? (
+        {selectedProducts.length > 0 ? (
           <>
-            <Descriptions bordered size="small" className="mb-5" column={{ xs: 1, md: 2 }}>
-              <Descriptions.Item label="商品">{selectedProduct.product_name}</Descriptions.Item>
-              <Descriptions.Item label="钢厂">{selectedProduct.steel_mill || '-'}</Descriptions.Item>
-              <Descriptions.Item label="单价">{formatMoney(selectedProduct.unit_price)}</Descriptions.Item>
-              <Descriptions.Item label="可用库存">{selectedProduct.available_qty || selectedProduct.quantity} {result.parsed.unit}</Descriptions.Item>
-            </Descriptions>
+            <Space direction="vertical" size="small" className="mb-5 w-full">
+              {selectedProducts.map((item) => (
+                <Descriptions key={item.product_id} bordered size="small" column={{ xs: 1, md: 4 }}>
+                  <Descriptions.Item label="商品">{item.product_name}</Descriptions.Item>
+                  <Descriptions.Item label="钢厂">{item.steel_mill || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="数量">{item.quantity} {result.parsed.unit}</Descriptions.Item>
+                  <Descriptions.Item label="金额">{formatMoney(item.quantity * item.unit_price)}</Descriptions.Item>
+                </Descriptions>
+              ))}
+            </Space>
             <Form form={orderForm} layout="vertical">
               <Row gutter={16}>
-                <Col xs={24} md={8}><Form.Item name="quantity" label="下单数量" rules={[{ required: true }]}><InputNumber className="w-full" min={0.01} /></Form.Item></Col>
+                <Col xs={24} md={8}><Form.Item name="quantity" label="下单数量"><InputNumber className="w-full" disabled addonAfter={result.parsed.unit} /></Form.Item></Col>
                 <Col xs={24} md={8}><Form.Item name="contact_name" label="联系人" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="warehouse_name" label="提货仓库" rules={[{ required: true }]}><Input /></Form.Item></Col>
