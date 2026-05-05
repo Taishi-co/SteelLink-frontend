@@ -59,6 +59,7 @@ export interface OrderFormPayload {
 export interface OrderDraft {
   order_id?: number
   order_no: string
+  orders?: OrderSummary[]
   product_id?: number
   product_name: string
   quantity: number
@@ -73,6 +74,18 @@ export interface OrderDraft {
   delivery_method?: string
   remark?: string
   order_detail?: Record<string, unknown>
+}
+
+export interface OrderSummary {
+  order_id: number
+  order_no: string
+  seller_id: number
+  seller_name: string
+  quantity: number
+  total_amount: number
+  product_count: number
+  payment_method?: string
+  delivery_note?: string
 }
 
 export interface FinancePlan {

@@ -779,16 +779,40 @@ function renderStepContent(props: {
 
   return (
     <Card title="审核提交">
-      <Descriptions bordered column={{ xs: 1, md: 2 }}>
-        <Descriptions.Item label="订单号">{result.order_draft.order_no || '-'}</Descriptions.Item>
-        <Descriptions.Item label="商品">{result.order_draft.product_name || '-'}</Descriptions.Item>
-        <Descriptions.Item label="数量">{result.order_draft.quantity} {result.order_draft.unit}</Descriptions.Item>
-        <Descriptions.Item label="金额">{formatMoney(result.order_draft.estimated_amount)}</Descriptions.Item>
-        <Descriptions.Item label="联系人">{result.order_draft.contact_name || '-'}</Descriptions.Item>
-        <Descriptions.Item label="联系电话">{result.order_draft.contact_phone || '-'}</Descriptions.Item>
-        <Descriptions.Item label="交付地址" span={2}>{result.order_draft.delivery_address || '-'}</Descriptions.Item>
-        <Descriptions.Item label="交付说明" span={2}>{result.order_draft.delivery_note || '-'}</Descriptions.Item>
-      </Descriptions>
+      {result.order_draft.orders && result.order_draft.orders.length > 0 ? (
+        <Space direction="vertical" size="small" className="w-full">
+          {result.order_draft.orders.map((order) => (
+            <Descriptions key={order.order_id} bordered column={{ xs: 1, md: 3 }}>
+              <Descriptions.Item label="订单号">{order.order_no}</Descriptions.Item>
+              <Descriptions.Item label="卖家">{order.seller_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="商品数">{order.product_count}</Descriptions.Item>
+              <Descriptions.Item label="数量">{order.quantity} {result.order_draft.unit}</Descriptions.Item>
+              <Descriptions.Item label="金额">{formatMoney(order.total_amount)}</Descriptions.Item>
+              <Descriptions.Item label="付款方式">{order.payment_method || result.order_draft.payment_method || '-'}</Descriptions.Item>
+            </Descriptions>
+          ))}
+          <Descriptions bordered column={{ xs: 1, md: 2 }}>
+            <Descriptions.Item label="商品">{result.order_draft.product_name || '-'}</Descriptions.Item>
+            <Descriptions.Item label="总数量">{result.order_draft.quantity} {result.order_draft.unit}</Descriptions.Item>
+            <Descriptions.Item label="总金额">{formatMoney(result.order_draft.estimated_amount)}</Descriptions.Item>
+            <Descriptions.Item label="联系人">{result.order_draft.contact_name || '-'}</Descriptions.Item>
+            <Descriptions.Item label="联系电话">{result.order_draft.contact_phone || '-'}</Descriptions.Item>
+            <Descriptions.Item label="交付地址" span={2}>{result.order_draft.delivery_address || '-'}</Descriptions.Item>
+            <Descriptions.Item label="交付说明" span={2}>{result.order_draft.delivery_note || '-'}</Descriptions.Item>
+          </Descriptions>
+        </Space>
+      ) : (
+        <Descriptions bordered column={{ xs: 1, md: 2 }}>
+          <Descriptions.Item label="订单号">{result.order_draft.order_no || '-'}</Descriptions.Item>
+          <Descriptions.Item label="商品">{result.order_draft.product_name || '-'}</Descriptions.Item>
+          <Descriptions.Item label="数量">{result.order_draft.quantity} {result.order_draft.unit}</Descriptions.Item>
+          <Descriptions.Item label="金额">{formatMoney(result.order_draft.estimated_amount)}</Descriptions.Item>
+          <Descriptions.Item label="联系人">{result.order_draft.contact_name || '-'}</Descriptions.Item>
+          <Descriptions.Item label="联系电话">{result.order_draft.contact_phone || '-'}</Descriptions.Item>
+          <Descriptions.Item label="交付地址" span={2}>{result.order_draft.delivery_address || '-'}</Descriptions.Item>
+          <Descriptions.Item label="交付说明" span={2}>{result.order_draft.delivery_note || '-'}</Descriptions.Item>
+        </Descriptions>
+      )}
 
       <Title level={4} className="!mt-8">融资详情</Title>
       {result.finance_plans.length > 0 ? (
