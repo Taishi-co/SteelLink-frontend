@@ -16,6 +16,7 @@ const CheckoutPage = lazy(() => import('@/pages/Checkout'))
 const OrderDetailPage = lazy(() => import('@/pages/OrderDetail'))
 const OrdersPage = lazy(() => import('@/pages/Orders'))
 const MatchingPage = lazy(() => import('@/pages/Matching'))
+const ServiceMarketPage = lazy(() => import('@/pages/ServiceMarket'))
 const AiProcurementPage = lazy(() => import('@/pages/AiProcurement'))
 const AboutPage = lazy(() => import('@/pages/About'))
 const IdentityPage = lazy(() => import('@/pages/Identity'))
@@ -57,6 +58,7 @@ export function AppRouter() {
           <Route index element={<HomePage />} />
           <Route path="mall" element={<MallPage />} />
           <Route path="matching" element={<MatchingPage />} />
+          <Route path="service-market" element={<ServiceMarketPage />} />
           <Route path="ai-procurement" element={<AiProcurementPage />} />
           <Route path="ai-procurement/:step" element={<AiProcurementPage />} />
           <Route path="bidding" element={<BiddingPage />} />
