@@ -6,6 +6,7 @@ import {
   PlusOutlined,
   WarningOutlined,
   FileProtectOutlined,
+  RiseOutlined,
   TruckOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -245,6 +246,13 @@ export default function DashboardPage() {
               onClick={() => navigate('/products')}
             >
               发布商品
+            </Button>
+            <Button
+              type="default"
+              icon={<RiseOutlined />}
+              onClick={() => navigate('/bidding')}
+            >
+              参与竞价
             </Button>
             <Button
               type="default"

@@ -1,4 +1,5 @@
 import api from './api'
+import { getSellerEnterpriseID } from './auth'
 
 export interface AuditLogItem {
   id: number
@@ -164,25 +165,6 @@ function mapStatus(status: number): ProductStatus {
   }
 }
 
-function parseJwtPayload(token: string | null): Record<string, unknown> | null {
-  if (!token) return null
-  const parts = token.split('.')
-  if (parts.length < 2) return null
-  try {
-    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
-    return JSON.parse(window.atob(padded))
-  } catch {
-    return null
-  }
-}
-
-function getEnterpriseIdFromToken(): number | undefined {
-  const payload = parseJwtPayload(localStorage.getItem('token'))
-  const enterpriseId = payload?.enterprise_id
-  return typeof enterpriseId === 'number' && enterpriseId > 0 ? enterpriseId : undefined
-}
-
 function toSellerProductRecord(product: BackendProductInfo): SellerProductRecord {
   const mappedStatus = mapStatus(product.status)
   return {
@@ -237,10 +219,12 @@ function toSellerProductRecord(product: BackendProductInfo): SellerProductRecord
 
 export const sellerProductService = {
   list: async (): Promise<SellerProductListServiceResponse> => {
-    const enterpriseId = getEnterpriseIdFromToken()
+    const enterpriseId = getSellerEnterpriseID()
     const response = await api.get<unknown, ApiResponse<BackendProductListResponse>>('/products', {
       params: {
-        enterprise_id: enterpriseId,
+        enterprise_id: enterpriseId || undefined,
+        page_size: 100,
+        sort_by: 'updated_desc',
       },
     })
 

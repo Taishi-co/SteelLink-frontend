@@ -163,8 +163,8 @@ export default function SellerBiddingPage() {
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Tag color="green">供应方工作台</Tag>
-          <Title level={2} className="!mb-2 !mt-3">竞价管理</Title>
-          <Paragraph className="text-gray-500 !mb-0">查看可参与竞价，提交企业报价并跟踪中标结果。</Paragraph>
+          <Title level={2} className="!mb-2 !mt-3">参与竞价</Title>
+          <Paragraph className="text-gray-500 !mb-0">查看其他企业发起的竞价单，提交企业报价并跟踪中标结果。</Paragraph>
         </div>
       </div>
 
@@ -209,7 +209,15 @@ export default function SellerBiddingPage() {
               ))}
             </Row>
           ) : (
-            <Card><Empty description="暂无可参与竞价" /></Card>
+            <Card>
+              <Empty
+                description={
+                  <span>
+                    暂无可参与竞价。这里仅展示其他企业发起且仍在报价期内的竞价单。
+                  </span>
+                }
+              />
+            </Card>
           )}
         </section>
 

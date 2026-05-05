@@ -28,11 +28,13 @@ import {
   PlusOutlined,
   CloseCircleOutlined,
   ReloadOutlined,
+  RiseOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
 import { getErrorMessage } from '@steellink/shared/utils'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload/interface'
+import { useNavigate } from 'react-router-dom'
 import { sellerProductService, type SellerProductRecord } from '@/services/productService'
 import { uploadService, type UploadPurpose } from '@/services/uploadService'
 
@@ -205,6 +207,7 @@ function toDisplayPayload(values: ProductDisplayFormValues, imageURLs: string[],
 }
 
 export default function ProductsPage() {
+  const navigate = useNavigate()
   const [products, setProducts] = useState<SellerProductRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -470,9 +473,14 @@ export default function ProductsPage() {
       <Card
         title="商品管理"
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-            发布商品
-          </Button>
+          <Space>
+            <Button icon={<RiseOutlined />} onClick={() => navigate('/bidding')}>
+              参与竞价
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+              发布商品
+            </Button>
+          </Space>
         }
       >
         <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
