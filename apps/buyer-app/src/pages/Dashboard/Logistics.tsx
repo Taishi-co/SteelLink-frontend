@@ -13,60 +13,44 @@ import {
   NodeIndexOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { logisticsCarriers, registeredWarehouses, type LogisticsCarrier } from '@steellink/shared/serviceFulfillment'
+import { useQuery } from '@tanstack/react-query'
+import { serviceOfferService, type LogisticsServiceItem } from '@/services/serviceOfferService'
+import { serviceFulfillmentService, type LogisticsOrderInfo } from '@/services/serviceFulfillmentService'
 import ServicePanelGate from './ServicePanelGate'
 
 const { Title, Paragraph, Text } = Typography
 
-interface Shipment {
-  key: string
-  orderNo: string
-  route: string
-  cargo: string
-  weight: string
-  status: string
-  eta: string
-  risk: string
-}
-
-const shipments: Shipment[] = [
-  { key: '1', orderNo: 'WL20260506001', route: '上海宝山 -> 苏州昆山', cargo: '热轧板卷', weight: '128 吨', status: '待派车', eta: '今日 16:00', risk: '低' },
-  { key: '2', orderNo: 'WL20260506002', route: '无锡惠山 -> 宁波北仑', cargo: '冷轧卷', weight: '86 吨', status: '在途', eta: '明日 10:30', risk: '中' },
-  { key: '3', orderNo: 'WL20260506003', route: '唐山丰润 -> 天津港', cargo: '螺纹钢', weight: '210 吨', status: '待签收', eta: '今日 19:20', risk: '低' },
-]
-
-const columns: ColumnsType<Shipment> = [
-  { title: '委托单', dataIndex: 'orderNo', key: 'orderNo' },
-  { title: '线路', dataIndex: 'route', key: 'route' },
-  { title: '货物', dataIndex: 'cargo', key: 'cargo' },
-  { title: '重量', dataIndex: 'weight', key: 'weight' },
-  { title: '预计到达', dataIndex: 'eta', key: 'eta' },
+const columns: ColumnsType<LogisticsOrderInfo> = [
+  { title: '委托单', dataIndex: 'logistics_no', key: 'logistics_no' },
+  { title: '线路', key: 'route', render: (_, record) => `${record.origin || '-'} -> ${record.destination || '-'}` },
+  { title: '货物', dataIndex: 'cargo_name', key: 'cargo_name' },
+  { title: '重量', dataIndex: 'weight', key: 'weight', render: (value: number) => `${value} 吨` },
+  { title: '估算价格', dataIndex: 'estimated_price', key: 'estimated_price', render: (value: number) => `¥${Number(value || 0).toLocaleString()}` },
   {
     title: '状态',
     dataIndex: 'status',
     key: 'status',
-    render: (value: string) => <Tag color={value === '在途' ? 'blue' : value === '待签收' ? 'green' : 'orange'}>{value}</Tag>,
+    render: (value: string) => <Tag color={value === 'in_transit' ? 'blue' : value === 'completed' ? 'green' : 'orange'}>{logisticsStatusText[value] || value}</Tag>,
   },
   {
-    title: '风险',
-    dataIndex: 'risk',
-    key: 'risk',
-    render: (value: string) => <Tag color={value === '中' ? 'gold' : 'success'}>{value}</Tag>,
+    title: '承运车辆',
+    key: 'vehicle',
+    render: (_, record) => record.plate_number || '待物流商接单',
   },
 ]
 
-const carrierColumns: ColumnsType<LogisticsCarrier> = [
+const carrierColumns: ColumnsType<LogisticsServiceItem> = [
   { title: '物流商', dataIndex: 'name', key: 'name' },
-  { title: '起始地', dataIndex: 'routeStart', key: 'routeStart' },
-  { title: '目的地', dataIndex: 'routeEnd', key: 'routeEnd' },
-  { title: '车型', dataIndex: 'vehicleType', key: 'vehicleType' },
-  { title: '载重', dataIndex: 'loadCapacity', key: 'loadCapacity', render: (value: number) => `${value} 吨` },
-  { title: '估价', dataIndex: 'pricePerTon', key: 'pricePerTon', render: (value: number) => `¥${value}/吨` },
+  { title: '起始地', dataIndex: 'route_start', key: 'route_start' },
+  { title: '目的地', dataIndex: 'route_end', key: 'route_end' },
+  { title: '车型', dataIndex: 'vehicle_type', key: 'vehicle_type' },
+  { title: '载重', dataIndex: 'load_capacity', key: 'load_capacity', render: (value: number) => `${value || 0} 吨` },
+  { title: '计价规则', dataIndex: 'price_rule', key: 'price_rule' },
   {
     title: '状态',
     dataIndex: 'status',
     key: 'status',
-    render: (value: LogisticsCarrier['status']) => <Tag color={value === 'available' ? 'green' : value === 'assigned' ? 'blue' : 'gold'}>{value === 'available' ? '可接单' : value === 'assigned' ? '已承运' : '审核中'}</Tag>,
+    render: (value: number) => <Tag color={value === 2 ? 'green' : value === 1 ? 'gold' : 'default'}>{value === 2 ? '可接单' : value === 1 ? '审核中' : '停用'}</Tag>,
   },
   {
     title: '操作',
@@ -80,7 +64,47 @@ const carrierColumns: ColumnsType<LogisticsCarrier> = [
   },
 ]
 
+const logisticsStatusText: Record<string, string> = {
+  pending: '待接单',
+  accepted: '已接单',
+  in_transit: '在途',
+  delivered: '已送达',
+  completed: '已完成',
+  cancelled: '已取消',
+}
+
 export default function LogisticsPage() {
+  const { data: carrierData, isLoading: carrierLoading } = useQuery({
+    queryKey: ['dashboard-logistics-services'],
+    queryFn: () => serviceOfferService.listLogistics({ page_size: 100 }),
+  })
+  const carriers = carrierData?.data.list ?? []
+  const { data: warehouseData } = useQuery({
+    queryKey: ['dashboard-logistics-warehouses'],
+    queryFn: () => serviceOfferService.listWarehouses({ page_size: 100 }),
+  })
+  const warehouses = warehouseData?.data.list ?? []
+  const { data: orderData, isLoading: orderLoading } = useQuery({
+    queryKey: ['dashboard-logistics-orders'],
+    queryFn: () => serviceFulfillmentService.listLogisticsOrders({ page_size: 100 }),
+  })
+  const logisticsOrders = orderData?.data.list ?? []
+  const estimateTarget = carriers[0]
+  const estimateWarehouse = warehouses[0]
+  const { data: estimateData } = useQuery({
+    queryKey: ['dashboard-logistics-estimate', estimateTarget?.id, estimateWarehouse?.id],
+    queryFn: () => serviceFulfillmentService.estimateLogistics({
+      logistics_service_id: estimateTarget.id,
+      warehouse_service_id: estimateWarehouse?.id,
+      destination: '买家指定收货地',
+      weight: 100,
+    }),
+    enabled: Boolean(estimateTarget?.id),
+  })
+  const activeOrders = logisticsOrders.filter((item) => item.status === 'in_transit' || item.status === 'accepted')
+  const pendingOrders = logisticsOrders.filter((item) => item.status === 'pending')
+  const completedOrders = logisticsOrders.filter((item) => item.status === 'completed' || item.status === 'delivered')
+
   return (
     <ServicePanelGate serviceKey="logistics">
       <div className="min-w-0">
@@ -92,10 +116,10 @@ export default function LogisticsPage() {
         </Card>
 
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="今日承运委托" value={26} suffix="单" prefix={<NodeIndexOutlined />} /></Card></Col>
-          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="在途车辆" value={18} suffix="辆" prefix={<CarOutlined />} /></Card></Col>
+          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="今日承运委托" value={logisticsOrders.length} suffix="单" prefix={<NodeIndexOutlined />} /></Card></Col>
+          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="在途车辆" value={activeOrders.length} suffix="辆" prefix={<CarOutlined />} /></Card></Col>
           <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="准点率" value={96.4} suffix="%" prefix={<CheckCircleOutlined />} /></Card></Col>
-          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="待结算金额" value={42.8} suffix="万" prefix={<ClockCircleOutlined />} /></Card></Col>
+          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="待结算金额" value={activeOrders.reduce((sum, item) => sum + Number(item.final_price || item.estimated_price || 0), 0)} prefix={<ClockCircleOutlined />} /></Card></Col>
         </Row>
 
         <Row gutter={[16, 16]} className="mt-4">
@@ -105,24 +129,20 @@ export default function LogisticsPage() {
               title="物流商管理"
               extra={<Button type="primary" icon={<CarOutlined />}>新增物流商</Button>}
             >
-              <Table columns={carrierColumns} dataSource={logisticsCarriers} rowKey="id" pagination={false} scroll={{ x: 1080 }} />
+              <Table loading={carrierLoading} columns={carrierColumns} dataSource={carriers} rowKey="id" pagination={false} scroll={{ x: 1080 }} />
             </Card>
           </Col>
           <Col xs={24} xl={9}>
             <Card className="rounded-lg" title="订单价格估算">
               <Space direction="vertical" className="w-full">
-                {[
-                  { route: '唐山仓库A区 -> 苏州昆山', weight: 100, carrier: logisticsCarriers[0] },
-                  { route: '上海宝山监管仓 -> 宁波北仑', weight: 86, carrier: logisticsCarriers[1] },
-                  { route: '未绑定仓库商品 -> 买家指定提货点', weight: 60, carrier: logisticsCarriers[2] },
-                ].map((estimate) => (
-                  <div key={estimate.route} className="rounded-lg border border-gray-100 p-3">
-                    <div className="font-medium text-gray-900">{estimate.route}</div>
+                {estimateData?.data ? (
+                  <div className="rounded-lg border border-gray-100 p-3">
+                    <div className="font-medium text-gray-900">{estimateData.data.origin || estimateWarehouse?.warehouse_name || '买家指定提货点'} {'->'} {estimateData.data.destination}</div>
                     <div className="mt-1 text-sm text-gray-500">
-                      {estimate.weight} 吨 · {estimate.carrier.name} · ¥{(estimate.weight * estimate.carrier.pricePerTon).toLocaleString()}
+                      {estimateData.data.weight} 吨 · {estimateTarget?.name} · ¥{estimateData.data.estimated_price.toLocaleString()}
                     </div>
                   </div>
-                ))}
+                ) : <Text type="secondary">暂无可估价物流商</Text>}
               </Space>
             </Card>
           </Col>
@@ -131,16 +151,16 @@ export default function LogisticsPage() {
         <Row gutter={[16, 16]} className="mt-4">
           <Col xs={24} xl={16}>
             <Card className="rounded-lg" title="运输委托池" extra={<Button type="primary" icon={<CarOutlined />}>智能派车</Button>}>
-              <Table columns={columns} dataSource={shipments} pagination={false} scroll={{ x: 760 }} />
+              <Table loading={orderLoading} columns={columns} dataSource={logisticsOrders} rowKey="id" pagination={false} scroll={{ x: 900 }} />
             </Card>
           </Col>
           <Col xs={24} xl={8}>
             <Card className="rounded-lg" title="待办优先级">
               <List
                 dataSource={[
-                  { title: '待派车委托', description: '3 单需要确认承运车辆与司机资质', icon: <CarOutlined /> },
-                  { title: '在途异常', description: '1 单偏离计划到达时间，需要联系司机', icon: <AlertOutlined /> },
-                  { title: '回单确认', description: '5 单已上传磅单，等待客服核对', icon: <FileDoneOutlined /> },
+                  { title: '待派车委托', description: `${pendingOrders.length} 单需要物流商接单和确认车辆`, icon: <CarOutlined /> },
+                  { title: '在途异常', description: `${activeOrders.filter((item) => !item.tracking_events?.length).length} 单缺少轨迹回传`, icon: <AlertOutlined /> },
+                  { title: '回单确认', description: `${completedOrders.length} 单等待回单归档确认`, icon: <FileDoneOutlined /> },
                 ]}
                 renderItem={(item) => (
                   <List.Item>
@@ -169,18 +189,15 @@ export default function LogisticsPage() {
                 rowKey="orderNo"
                 pagination={false}
                 scroll={{ x: 860 }}
-                dataSource={[
-                  { orderNo: 'FW20260506001', customer: '华东金属贸易', pickup: registeredWarehouses[0].name, destination: '苏州昆山项目地', carrier: '待物流商接单', status: '发单中' },
-                  { orderNo: 'FW20260506002', customer: '昆山制造集团', pickup: registeredWarehouses[1].name, destination: '宁波北仑工厂', carrier: '河北货运集团', status: '已接单' },
-                  { orderNo: 'FW20260506003', customer: '宁波终端厂', pickup: '买家指定提货点', destination: '天津港', carrier: '全国钢铁配送', status: '履约中' },
-                ]}
+                loading={orderLoading}
+                dataSource={logisticsOrders}
                 columns={[
-                  { title: '服务单', dataIndex: 'orderNo' },
-                  { title: '客户', dataIndex: 'customer' },
-                  { title: '提货点', dataIndex: 'pickup' },
+                  { title: '服务单', dataIndex: 'logistics_no' },
+                  { title: '客户企业ID', dataIndex: 'buyer_enterprise_id' },
+                  { title: '提货点', dataIndex: 'origin' },
                   { title: '目的地', dataIndex: 'destination' },
-                  { title: '承运方', dataIndex: 'carrier' },
-                  { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={value === '发单中' ? 'gold' : value === '已接单' ? 'blue' : 'green'}>{value}</Tag> },
+                  { title: '承运企业ID', render: (_: unknown, record: LogisticsOrderInfo) => record.carrier_enterprise_id || '待物流商接单' },
+                  { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={value === 'pending' ? 'gold' : value === 'accepted' ? 'blue' : 'green'}>{logisticsStatusText[value] || value}</Tag> },
                 ]}
               />
             </Card>

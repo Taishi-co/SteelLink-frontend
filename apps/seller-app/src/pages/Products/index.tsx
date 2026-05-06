@@ -35,9 +35,9 @@ import { getErrorMessage } from '@steellink/shared/utils'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { useNavigate } from 'react-router-dom'
-import { registeredWarehouses } from '@steellink/shared/serviceFulfillment'
 import { sellerProductService, type SellerProductRecord } from '@/services/productService'
 import { uploadService, type UploadPurpose } from '@/services/uploadService'
+import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
 
 const { Search } = Input
 const { Paragraph, Text } = Typography
@@ -180,6 +180,7 @@ function toPayload(values: ProductFormValues, imageURLs: string[], qualification
       spec: values.spec,
     },
     warehouse_info: {
+      warehouse_id: values.warehouseBindingMode === 'platform' ? values.platformWarehouseId : 0,
       warehouse_name: values.warehouseName,
       warehouse_code: values.warehouseCode,
       province: values.province,
@@ -212,7 +213,9 @@ function toDisplayPayload(values: ProductDisplayFormValues, imageURLs: string[],
 export default function ProductsPage() {
   const navigate = useNavigate()
   const [products, setProducts] = useState<SellerProductRecord[]>([])
+  const [platformWarehouses, setPlatformWarehouses] = useState<WarehouseServiceItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [warehouseLoading, setWarehouseLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('全部')
@@ -237,8 +240,21 @@ export default function ProductsPage() {
     }
   }
 
+  const loadPlatformWarehouses = async () => {
+    setWarehouseLoading(true)
+    try {
+      const response = await serviceOfferService.listWarehouses({ page_size: 100 })
+      setPlatformWarehouses(response.data.list)
+    } catch {
+      message.warning('平台仓库列表加载失败，可切换为手动填写仓库')
+    } finally {
+      setWarehouseLoading(false)
+    }
+  }
+
   useEffect(() => {
     void loadProducts()
+    void loadPlatformWarehouses()
   }, [])
 
   const filteredProducts = useMemo(
@@ -286,12 +302,12 @@ export default function ProductsPage() {
   }
 
   const handlePlatformWarehouseChange = (warehouseId: number) => {
-    const warehouse = registeredWarehouses.find((item) => item.id === warehouseId)
+    const warehouse = platformWarehouses.find((item) => item.id === warehouseId)
     if (!warehouse) return
 
     form.setFieldsValue({
-      warehouseName: warehouse.name,
-      warehouseCode: warehouse.code,
+      warehouseName: warehouse.warehouse_name,
+      warehouseCode: `WH-${String(warehouse.id).padStart(6, '0')}`,
       province: warehouse.province,
       city: warehouse.city,
       district: warehouse.district,
@@ -651,9 +667,10 @@ export default function ProductsPage() {
                     <Select
                       className="w-72"
                       placeholder="选择后自动回填仓库信息"
+                      loading={warehouseLoading}
                       onChange={handlePlatformWarehouseChange}
-                      options={registeredWarehouses.map((warehouse) => ({
-                        label: `${warehouse.name}（${warehouse.code}）`,
+                      options={platformWarehouses.map((warehouse) => ({
+                        label: `${warehouse.warehouse_name}（WH-${String(warehouse.id).padStart(6, '0')}）`,
                         value: warehouse.id,
                       }))}
                     />

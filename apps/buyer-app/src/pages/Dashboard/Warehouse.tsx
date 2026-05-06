@@ -12,7 +12,9 @@ import {
   InboxOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { inventoryMovements, registeredWarehouses, type InventoryMovement, type RegisteredWarehouse } from '@steellink/shared/serviceFulfillment'
+import { useQuery } from '@tanstack/react-query'
+import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
+import { serviceFulfillmentService, type WarehouseMovementInfo, type WarehouseProductInfo } from '@/services/serviceFulfillmentService'
 import ServicePanelGate from './ServicePanelGate'
 
 const { Title, Paragraph, Text } = Typography
@@ -47,23 +49,23 @@ const columns: ColumnsType<Appointment> = [
   },
 ]
 
-const warehouseColumns: ColumnsType<RegisteredWarehouse> = [
-  { title: '仓库名称', dataIndex: 'name', key: 'name' },
-  { title: '编码', dataIndex: 'code', key: 'code' },
-  { title: '运营方', dataIndex: 'operator', key: 'operator' },
+const warehouseColumns: ColumnsType<WarehouseServiceItem> = [
+  { title: '仓库名称', dataIndex: 'warehouse_name', key: 'warehouse_name' },
+  { title: '编码', key: 'code', render: (_, record) => `WH-${String(record.id).padStart(6, '0')}` },
+  { title: '运营企业', dataIndex: 'enterprise_id', key: 'enterprise_id', render: (value: number) => `企业 ${value}` },
   { title: '区域', key: 'region', render: (_, record) => [record.province, record.city, record.district].filter(Boolean).join(' / ') },
-  { title: '可用/总库容', key: 'capacity', render: (_, record) => `${record.availableCapacity.toLocaleString()} / ${record.capacity.toLocaleString()} 吨` },
+  { title: '可用/总库容', key: 'capacity', render: (_, record) => `${Number(record.available_capacity || 0).toLocaleString()} / ${Number(record.capacity || 0).toLocaleString()} 吨` },
   {
     title: '服务',
-    dataIndex: 'serviceTypes',
-    key: 'serviceTypes',
-    render: (value: string[]) => <Space wrap>{value.map((item) => <Tag key={item}>{item}</Tag>)}</Space>,
+    dataIndex: 'service_types',
+    key: 'service_types',
+    render: (value?: string[]) => <Space wrap>{(value || []).map((item) => <Tag key={item}>{item}</Tag>)}</Space>,
   },
   {
     title: '状态',
     dataIndex: 'status',
     key: 'status',
-    render: (value: RegisteredWarehouse['status']) => <Tag color={value === 'active' ? 'green' : value === 'reviewing' ? 'gold' : 'default'}>{value === 'active' ? '可用' : value === 'reviewing' ? '审核中' : '停用'}</Tag>,
+    render: (value: number) => <Tag color={value === 2 ? 'green' : value === 1 ? 'gold' : 'default'}>{value === 2 ? '可用' : value === 1 ? '审核中' : '停用'}</Tag>,
   },
   {
     title: '操作',
@@ -77,28 +79,49 @@ const warehouseColumns: ColumnsType<RegisteredWarehouse> = [
   },
 ]
 
-const inventoryColumns: ColumnsType<InventoryMovement> = [
-  { title: '记录号', dataIndex: 'id', key: 'id' },
-  { title: '仓库', dataIndex: 'warehouseCode', key: 'warehouseCode' },
-  { title: '商品', dataIndex: 'productName', key: 'productName' },
-  { title: '捆包号', dataIndex: 'bundleNo', key: 'bundleNo' },
+const inventoryColumns: ColumnsType<WarehouseMovementInfo> = [
+  { title: '记录号', dataIndex: 'movement_no', key: 'movement_no' },
+  { title: '仓库ID', dataIndex: 'warehouse_service_id', key: 'warehouse_service_id' },
+  { title: '商品', dataIndex: 'product_name', key: 'product_name' },
+  { title: '捆包号', dataIndex: 'bundle_no', key: 'bundle_no' },
   {
     title: '类型',
-    dataIndex: 'movementType',
-    key: 'movementType',
-    render: (value: InventoryMovement['movementType']) => <Tag color={value === 'inbound' ? 'green' : 'blue'}>{value === 'inbound' ? '入库' : '出库'}</Tag>,
+    dataIndex: 'movement_type',
+    key: 'movement_type',
+    render: (value: string) => <Tag color={value === 'inbound' ? 'green' : 'blue'}>{value === 'inbound' ? '入库' : '出库'}</Tag>,
   },
   { title: '数量', dataIndex: 'quantity', key: 'quantity', render: (value: number) => `${value} 吨` },
-  { title: '关联单据', dataIndex: 'orderNo', key: 'orderNo' },
+  { title: '关联单据', dataIndex: 'order_no', key: 'order_no' },
   {
     title: '状态',
     dataIndex: 'status',
     key: 'status',
-    render: (value: InventoryMovement['status']) => <Tag color={value === 'completed' ? 'green' : value === 'processing' ? 'blue' : 'gold'}>{value === 'completed' ? '已完成' : value === 'processing' ? '作业中' : '待作业'}</Tag>,
+    render: (value: string) => <Tag color={value === 'completed' ? 'green' : value === 'processing' ? 'blue' : 'gold'}>{value === 'completed' ? '已完成' : value === 'processing' ? '作业中' : '待作业'}</Tag>,
   },
 ]
 
 export default function WarehousePage() {
+  const { data: warehouseData, isLoading: warehouseLoading } = useQuery({
+    queryKey: ['dashboard-warehouse-services'],
+    queryFn: () => serviceOfferService.listWarehouses({ page_size: 100 }),
+  })
+  const warehouses = warehouseData?.data.list ?? []
+  const activeWarehouse = warehouses[0]
+  const { data: movementData, isLoading: movementLoading } = useQuery({
+    queryKey: ['dashboard-warehouse-movements'],
+    queryFn: () => serviceFulfillmentService.listWarehouseMovements({ page_size: 100 }),
+  })
+  const movements = movementData?.data.list ?? []
+  const { data: productData, isLoading: productLoading } = useQuery({
+    queryKey: ['dashboard-warehouse-products', activeWarehouse?.id],
+    queryFn: () => serviceFulfillmentService.listWarehouseProducts(activeWarehouse.id),
+    enabled: Boolean(activeWarehouse?.id),
+  })
+  const warehouseProducts = productData?.data.list ?? []
+  const availableCapacity = warehouses.reduce((sum, item) => sum + Number(item.available_capacity || 0), 0)
+  const managedStock = warehouseProducts.reduce((sum, item) => sum + Number(item.available_qty || 0), 0)
+  const todayMovements = movements.length
+
   return (
     <ServicePanelGate serviceKey="warehouse">
       <div className="min-w-0">
@@ -110,9 +133,9 @@ export default function WarehousePage() {
         </Card>
 
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="可用仓容" value={12800} suffix="吨" prefix={<InboxOutlined />} /></Card></Col>
-          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="今日预约" value={17} suffix="单" prefix={<CalendarOutlined />} /></Card></Col>
-          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="监管库存" value={6800} suffix="吨" prefix={<SafetyCertificateOutlined />} /></Card></Col>
+          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="可用仓容" value={availableCapacity} suffix="吨" prefix={<InboxOutlined />} /></Card></Col>
+          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="出入库记录" value={todayMovements} suffix="单" prefix={<CalendarOutlined />} /></Card></Col>
+          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="监管库存" value={managedStock} suffix="吨" prefix={<SafetyCertificateOutlined />} /></Card></Col>
           <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="作业准时率" value={98.1} suffix="%" prefix={<CheckCircleOutlined />} /></Card></Col>
         </Row>
 
@@ -156,7 +179,7 @@ export default function WarehousePage() {
           title="仓库管理"
           extra={<Button type="primary" icon={<DatabaseOutlined />}>新增仓库</Button>}
         >
-          <Table columns={warehouseColumns} dataSource={registeredWarehouses} rowKey="id" pagination={false} scroll={{ x: 1100 }} />
+          <Table loading={warehouseLoading} columns={warehouseColumns} dataSource={warehouses} rowKey="id" pagination={false} scroll={{ x: 1100 }} />
         </Card>
 
         <Row gutter={[16, 16]} className="mt-4">
@@ -166,17 +189,14 @@ export default function WarehousePage() {
                 rowKey="bundleNo"
                 pagination={false}
                 scroll={{ x: 760 }}
-                dataSource={[
-                  { productName: '热轧板卷 SPHC', bundleNo: 'HB-2026-0420-0001', warehouse: '唐山仓库A区', stock: 96, lockStatus: '订单锁定中' },
-                  { productName: '镀锌卷 DX51D', bundleNo: 'DX-2026-0501-0008', warehouse: '唐山仓库A区', stock: 44, lockStatus: '待出库' },
-                  { productName: '螺纹钢 HRB400E', bundleNo: 'HRB-2026-0502-0012', warehouse: '上海宝山监管仓', stock: 180, lockStatus: '监管库存' },
-                ]}
+                loading={productLoading}
+                dataSource={warehouseProducts}
                 columns={[
-                  { title: '商品', dataIndex: 'productName' },
-                  { title: '捆包号', dataIndex: 'bundleNo' },
-                  { title: '绑定仓库', dataIndex: 'warehouse' },
-                  { title: '库存', dataIndex: 'stock', render: (value: number) => `${value} 吨` },
-                  { title: '状态', dataIndex: 'lockStatus', render: (value: string) => <Tag color={value.includes('锁定') ? 'gold' : 'blue'}>{value}</Tag> },
+                  { title: '商品', dataIndex: 'name' },
+                  { title: '捆包号', dataIndex: 'bundle_no' },
+                  { title: '绑定仓库', render: (_: unknown, record: WarehouseProductInfo) => record.warehouse_info?.warehouse_name || activeWarehouse?.warehouse_name || '-' },
+                  { title: '库存', dataIndex: 'available_qty', render: (value: number) => `${value} 吨` },
+                  { title: '状态', render: (_: unknown, record: WarehouseProductInfo) => <Tag color={record.locked_qty > 0 ? 'gold' : 'blue'}>{record.locked_qty > 0 ? '订单锁定中' : '监管库存'}</Tag> },
                 ]}
               />
             </Card>
@@ -193,7 +213,7 @@ export default function WarehousePage() {
         </Row>
 
         <Card className="mt-4 rounded-lg" title="出库 / 入库记录">
-          <Table columns={inventoryColumns} dataSource={inventoryMovements} rowKey="id" pagination={false} scroll={{ x: 980 }} />
+          <Table loading={movementLoading} columns={inventoryColumns} dataSource={movements} rowKey="id" pagination={false} scroll={{ x: 980 }} />
         </Card>
       </div>
     </ServicePanelGate>

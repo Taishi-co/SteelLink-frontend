@@ -8,7 +8,7 @@ import { getErrorMessage, hasFormErrorFields, timelineColor } from '@steellink/s
 import { orderService } from '@/services/orderService'
 import { productService } from '@/services/productService'
 import { uploadService } from '@/services/uploadService'
-import { logisticsCarriers } from '@steellink/shared/serviceFulfillment'
+import { serviceFulfillmentService } from '@/services/serviceFulfillmentService'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -36,6 +36,21 @@ const orderSteps = [
   { title: '配送中' },
   { title: '已完成' },
 ]
+
+const logisticsStatusText: Record<string, string> = {
+  pending: '待接单',
+  accepted: '已接单',
+  in_transit: '在途',
+  delivered: '已送达',
+  completed: '已完成',
+  cancelled: '已取消',
+}
+
+const movementStatusText: Record<string, string> = {
+  pending: '待作业',
+  processing: '作业中',
+  completed: '已完成',
+}
 
 function getCurrentStep(status: number) {
   if (status <= 1) return 0
@@ -156,6 +171,15 @@ export default function OrderDetailPage() {
     queryFn: async () => (await productService.getProduct(Number(item?.product_id))).data,
     enabled: Boolean(item?.product_id),
   })
+  const { data: fulfillmentData } = useQuery({
+    queryKey: ['order-service-fulfillment', id],
+    queryFn: async () => (await serviceFulfillmentService.getOrderFulfillment(Number(id))).data,
+    enabled: Boolean(id),
+  })
+  const fulfillment = fulfillmentData
+  const logisticsOrder = fulfillment?.logistics_orders?.[0]
+  const latestMovement = fulfillment?.warehouse_movements?.[0]
+  const activeGuarantee = fulfillment?.guarantees?.[0]
   const status = statusMap[order?.status || 0] || { label: `状态${order?.status ?? '-'}`, color: 'default' }
   const statusNotice = getStatusNotice(order?.status || 0, Boolean(order?.payment_info?.voucher_url), Boolean(order?.delivery_info), order?.contract_info)
   const pickupWarehouseName = productDetail?.warehouseInfo?.warehouse_name || order?.delivery_info?.warehouse_name || ''
@@ -165,7 +189,6 @@ export default function OrderDetailPage() {
   const pickupWarehouseRegion = [productDetail?.warehouseInfo?.province, productDetail?.warehouseInfo?.city, productDetail?.warehouseInfo?.district]
     .filter(Boolean)
     .join(' ')
-  const recommendedCarrier = logisticsCarriers[0]
   const canCancelOrder = (order?.status === 1 || order?.status === 2 || order?.status === 3) && !order.payment_info?.voucher_url
 
   const handleUploadVoucher = async () => {
@@ -457,22 +480,37 @@ export default function OrderDetailPage() {
                 />
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="仓储节点">{pickupWarehouseName || '待确认提货点'}</Descriptions.Item>
-                  <Descriptions.Item label="推荐承运方">{recommendedCarrier.name}</Descriptions.Item>
+                  <Descriptions.Item label="物流委托">{logisticsOrder?.logistics_no || '待发起物流委托'}</Descriptions.Item>
                   <Descriptions.Item label="估算价格">
-                    ¥{(order.total_quantity * recommendedCarrier.pricePerTon).toLocaleString()}（{recommendedCarrier.pricePerTon} 元/吨）
+                    {logisticsOrder ? `¥${Number(logisticsOrder.estimated_price || 0).toLocaleString()}` : '待物流平台估算'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="保障方式">{recommendedCarrier.guarantee}</Descriptions.Item>
+                  <Descriptions.Item label="保障方式">{activeGuarantee?.guarantee_type || logisticsOrder?.guarantee_type || '待创建履约保障'}</Descriptions.Item>
+                  <Descriptions.Item label="出入库状态">{latestMovement ? movementStatusText[latestMovement.status] || latestMovement.status : '暂无出入库记录'}</Descriptions.Item>
+                  <Descriptions.Item label="物流状态">{logisticsOrder ? logisticsStatusText[logisticsOrder.status] || logisticsOrder.status : '暂无物流订单'}</Descriptions.Item>
                 </Descriptions>
                 <Steps
-                  current={order.status >= 8 ? 4 : order.status >= 6 ? 3 : order.status >= 5 ? 1 : 0}
+                  current={logisticsOrder?.status === 'completed' ? 4 : logisticsOrder?.status === 'in_transit' ? 3 : logisticsOrder?.status === 'accepted' ? 2 : latestMovement?.status === 'completed' ? 1 : 0}
                   items={[
                     { title: '仓库锁货', description: '订单创建后锁定捆包库存', icon: <SafetyCertificateOutlined /> },
-                    { title: '出库作业', description: pickupWarehouseName || '等待提货点', icon: <CarOutlined /> },
-                    { title: '物流接单', description: order.delivery_info?.plate_number || '待录入车辆', icon: <EnvironmentOutlined /> },
-                    { title: '在途跟踪', description: order.status >= 6 ? '轨迹回传中' : '待发车', icon: <CarOutlined /> },
+                    { title: '出库作业', description: latestMovement ? movementStatusText[latestMovement.status] || latestMovement.status : pickupWarehouseName || '等待提货点', icon: <CarOutlined /> },
+                    { title: '物流接单', description: logisticsOrder?.plate_number || order.delivery_info?.plate_number || '待物流商接单', icon: <EnvironmentOutlined /> },
+                    { title: '在途跟踪', description: logisticsOrder?.tracking_events?.[0]?.description || (logisticsOrder ? logisticsStatusText[logisticsOrder.status] : '待发车'), icon: <CarOutlined /> },
                     { title: '签收归档', description: order.receipt_voucher ? '回单已上传' : '待买家确认', icon: <CheckCircleOutlined /> },
                   ]}
                 />
+                {logisticsOrder?.tracking_events?.length ? (
+                  <Timeline
+                    items={logisticsOrder.tracking_events.map((event) => ({
+                      color: 'blue',
+                      children: (
+                        <div>
+                          <div className="font-medium">{event.description || event.event_type}</div>
+                          <Text type="secondary">{event.location || '-'} · {new Date(event.occurred_at).toLocaleString()}</Text>
+                        </div>
+                      ),
+                    }))}
+                  />
+                ) : null}
               </Space>
             </Card>
 
