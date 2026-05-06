@@ -28,10 +28,11 @@ const BiddingModulePage = lazy(() => import('@/pages/BiddingModule'))
 const ProcurementDetailPage = lazy(() => import('@/pages/ProcurementDetail'))
 const PersonalWorkspacePage = lazy(() => import('@/pages/PersonalWorkspace'))
 const DashboardMarket = lazy(() => import('@/pages/Dashboard/Market'))
+const DashboardServices = lazy(() => import('@/pages/Dashboard/Services'))
 const DashboardFinance = lazy(() => import('@/pages/Dashboard/Finance'))
 const DashboardLogistics = lazy(() => import('@/pages/Dashboard/Logistics'))
+const DashboardWarehouse = lazy(() => import('@/pages/Dashboard/Warehouse'))
 const ServiceWorkspacePage = lazy(() => import('@/pages/ServiceWorkspace'))
-const ServiceOverviewPage = lazy(() => import('@/pages/ServiceWorkspace').then((module) => ({ default: module.ServiceOverview })))
 const WarehouseMallPage = lazy(() => import('@/pages/ServiceMall/Warehouse'))
 const LogisticsMallPage = lazy(() => import('@/pages/ServiceMall/Logistics'))
 const WarehouseManagePage = lazy(() => import('@/pages/ServiceManage/Warehouse'))
@@ -90,6 +91,7 @@ export function AppRouter() {
         <Route path="/dashboard" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
           <Route index element={<PersonalWorkspacePage />} />
           <Route path="market" element={<DashboardMarket />} />
+          <Route path="services" element={<DashboardServices />} />
           <Route path="bidding" element={<BiddingModulePage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
@@ -97,7 +99,7 @@ export function AppRouter() {
           <Route path="enterprise" element={<EnterprisePage />} />
           <Route path="finance" element={<DashboardFinance />} />
           <Route path="logistics" element={<DashboardLogistics />} />
-          <Route path="services" element={<ServiceOverviewPage />} />
+          <Route path="warehouse" element={<DashboardWarehouse />} />
           <Route path="services/:service" element={<ServiceWorkspacePage />} />
           <Route path="warehouse-resources" element={<WarehouseManagePage />} />
           <Route path="logistics-resources" element={<LogisticsManagePage />} />

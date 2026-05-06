@@ -95,7 +95,10 @@ export default function ServiceWorkspace() {
   const overview = data?.data
   const permission = overview?.permissions?.find((item) => item.service === service) as EnterpriseServicePermission | undefined
   const status = permission?.status ?? 0
-  const requiredDocuments = overview?.required_documents?.[service] ?? []
+  const requiredDocuments = useMemo(
+    () => overview?.required_documents?.[service] ?? [],
+    [overview?.required_documents, service],
+  )
 
   const { mutate: applyService, isPending } = useMutation({
     mutationFn: (payload: EnterpriseServiceApplicationPayload) => certificationService.applyService(payload),
