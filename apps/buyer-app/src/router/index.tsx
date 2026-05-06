@@ -28,8 +28,10 @@ const BiddingModulePage = lazy(() => import('@/pages/BiddingModule'))
 const ProcurementDetailPage = lazy(() => import('@/pages/ProcurementDetail'))
 const DashboardOverview = lazy(() => import('@/pages/Dashboard/Overview'))
 const DashboardMarket = lazy(() => import('@/pages/Dashboard/Market'))
+const DashboardServices = lazy(() => import('@/pages/Dashboard/Services'))
 const DashboardFinance = lazy(() => import('@/pages/Dashboard/Finance'))
 const DashboardLogistics = lazy(() => import('@/pages/Dashboard/Logistics'))
+const DashboardWarehouse = lazy(() => import('@/pages/Dashboard/Warehouse'))
 
 const SupplyPage = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -82,6 +84,7 @@ export function AppRouter() {
         <Route path="/dashboard" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
           <Route index element={<DashboardOverview />} />
           <Route path="market" element={<DashboardMarket />} />
+          <Route path="services" element={<DashboardServices />} />
           <Route path="bidding" element={<BiddingModulePage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
@@ -89,6 +92,7 @@ export function AppRouter() {
           <Route path="enterprise" element={<EnterprisePage />} />
           <Route path="finance" element={<DashboardFinance />} />
           <Route path="logistics" element={<DashboardLogistics />} />
+          <Route path="warehouse" element={<DashboardWarehouse />} />
         </Route>
       </Routes>
     </Suspense>
