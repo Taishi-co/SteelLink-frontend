@@ -35,6 +35,7 @@ import { getErrorMessage } from '@steellink/shared/utils'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { useNavigate } from 'react-router-dom'
+import { registeredWarehouses } from '@steellink/shared/serviceFulfillment'
 import { sellerProductService, type SellerProductRecord } from '@/services/productService'
 import { uploadService, type UploadPurpose } from '@/services/uploadService'
 
@@ -51,6 +52,8 @@ interface ProductFormValues {
   steelMill: string
   material: string
   spec: string
+  warehouseBindingMode: 'platform' | 'manual' | 'unbound'
+  platformWarehouseId: number
   warehouseName: string
   warehouseCode: string
   province: string
@@ -275,10 +278,25 @@ export default function ProductsPage() {
     setEditingProduct(null)
     form.resetFields()
     form.setFieldsValue({
+      warehouseBindingMode: 'platform',
       imageFiles: [],
       qualificationFiles: [],
     } as Partial<ProductFormValues>)
     setIsModalOpen(true)
+  }
+
+  const handlePlatformWarehouseChange = (warehouseId: number) => {
+    const warehouse = registeredWarehouses.find((item) => item.id === warehouseId)
+    if (!warehouse) return
+
+    form.setFieldsValue({
+      warehouseName: warehouse.name,
+      warehouseCode: warehouse.code,
+      province: warehouse.province,
+      city: warehouse.city,
+      district: warehouse.district,
+      address: warehouse.address,
+    })
   }
 
   const closeModal = () => {
@@ -572,7 +590,7 @@ export default function ProductsPage() {
         okText={editingProduct ? '重新提交审核' : '提交审核'}
         confirmLoading={submitting}
       >
-        <Form<ProductFormValues> form={form} layout="vertical" initialValues={{ imageFiles: [], qualificationFiles: [] }}>
+        <Form<ProductFormValues> form={form} layout="vertical" initialValues={{ warehouseBindingMode: 'platform', imageFiles: [], qualificationFiles: [] }}>
           <Form.Item name="name" label="商品名称" rules={[{ required: true, message: '请输入商品名称' }]}>
             <Input placeholder="例如：Q235B 热轧板卷 3.0*1500*C" />
           </Form.Item>
@@ -606,6 +624,42 @@ export default function ProductsPage() {
             </Form.Item>
             <Form.Item name="minOrderQty" label="最小起订量（吨）" rules={[{ required: true, message: '请输入最小起订量' }]}>
               <InputNumber min={0.01} className="w-60" placeholder="请输入最小起订量" />
+            </Form.Item>
+          </Space>
+          <Alert
+            className="mb-4"
+            type="info"
+            showIcon
+            message="商品可绑定平台登记仓库"
+            description="绑定仓库后，买家下单会自动带出提货仓库并推荐覆盖该仓库线路的物流商；暂不绑定的商品后续需要买家通过物流平台找车确认提货点。当前后端仍要求提交 warehouse_info，暂不绑定仅用于前端业务评审。"
+          />
+          <Space className="w-full" size="large" wrap>
+            <Form.Item name="warehouseBindingMode" label="仓库绑定方式" rules={[{ required: true, message: '请选择仓库绑定方式' }]}>
+              <Select
+                className="w-60"
+                options={[
+                  { label: '绑定平台登记仓库', value: 'platform' },
+                  { label: '手动填写仓库', value: 'manual' },
+                  { label: '暂不绑定仓库', value: 'unbound' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item shouldUpdate={(prev, next) => prev.warehouseBindingMode !== next.warehouseBindingMode}>
+              {({ getFieldValue }) =>
+                getFieldValue('warehouseBindingMode') === 'platform' ? (
+                  <Form.Item name="platformWarehouseId" label="平台登记仓库" rules={[{ required: true, message: '请选择平台登记仓库' }]}>
+                    <Select
+                      className="w-72"
+                      placeholder="选择后自动回填仓库信息"
+                      onChange={handlePlatformWarehouseChange}
+                      options={registeredWarehouses.map((warehouse) => ({
+                        label: `${warehouse.name}（${warehouse.code}）`,
+                        value: warehouse.id,
+                      }))}
+                    />
+                  </Form.Item>
+                ) : null
+              }
             </Form.Item>
           </Space>
           <Space className="w-full" size="large" wrap>

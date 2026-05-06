@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Spin, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
-import { ArrowLeftOutlined, CarOutlined, CheckCircleOutlined, UploadOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Space, Spin, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
+import { ArrowLeftOutlined, CarOutlined, CheckCircleOutlined, EnvironmentOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { getErrorMessage, hasFormErrorFields, timelineColor } from '@steellink/shared/utils'
 import { orderService } from '@/services/orderService'
 import { productService } from '@/services/productService'
 import { uploadService } from '@/services/uploadService'
+import { logisticsCarriers } from '@steellink/shared/serviceFulfillment'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -164,6 +165,7 @@ export default function OrderDetailPage() {
   const pickupWarehouseRegion = [productDetail?.warehouseInfo?.province, productDetail?.warehouseInfo?.city, productDetail?.warehouseInfo?.district]
     .filter(Boolean)
     .join(' ')
+  const recommendedCarrier = logisticsCarriers[0]
   const canCancelOrder = (order?.status === 1 || order?.status === 2 || order?.status === 3) && !order.payment_info?.voucher_url
 
   const handleUploadVoucher = async () => {
@@ -444,6 +446,35 @@ export default function OrderDetailPage() {
                 )}
               </Card>
             )}
+
+            <Card title="物流仓储履约" className="mt-6">
+              <Space direction="vertical" size="middle" className="w-full">
+                <Alert
+                  showIcon
+                  type={pickupWarehouseName ? 'success' : 'warning'}
+                  message={pickupWarehouseName ? '订单已关联提货仓库，物流履约可从仓库出库节点开始追踪。' : '订单商品缺少仓库绑定，需先在物流平台确认提货点。'}
+                  description={pickupWarehouseName ? `${pickupWarehouseName}${pickupWarehouseCode ? `（${pickupWarehouseCode}）` : ''} -> ${order.delivery_info?.address || '买家收货地址待录入'}` : '无仓库商品不会自动推荐仓库线路，买家需发起物流委托后由物流商接单。'}
+                />
+                <Descriptions bordered column={2}>
+                  <Descriptions.Item label="仓储节点">{pickupWarehouseName || '待确认提货点'}</Descriptions.Item>
+                  <Descriptions.Item label="推荐承运方">{recommendedCarrier.name}</Descriptions.Item>
+                  <Descriptions.Item label="估算价格">
+                    ¥{(order.total_quantity * recommendedCarrier.pricePerTon).toLocaleString()}（{recommendedCarrier.pricePerTon} 元/吨）
+                  </Descriptions.Item>
+                  <Descriptions.Item label="保障方式">{recommendedCarrier.guarantee}</Descriptions.Item>
+                </Descriptions>
+                <Steps
+                  current={order.status >= 8 ? 4 : order.status >= 6 ? 3 : order.status >= 5 ? 1 : 0}
+                  items={[
+                    { title: '仓库锁货', description: '订单创建后锁定捆包库存', icon: <SafetyCertificateOutlined /> },
+                    { title: '出库作业', description: pickupWarehouseName || '等待提货点', icon: <CarOutlined /> },
+                    { title: '物流接单', description: order.delivery_info?.plate_number || '待录入车辆', icon: <EnvironmentOutlined /> },
+                    { title: '在途跟踪', description: order.status >= 6 ? '轨迹回传中' : '待发车', icon: <CarOutlined /> },
+                    { title: '签收归档', description: order.receipt_voucher ? '回单已上传' : '待买家确认', icon: <CheckCircleOutlined /> },
+                  ]}
+                />
+              </Space>
+            </Card>
 
             {(order.receipt_voucher || order.receipt_at || order.status === 8) && (
               <Card title="签收信息" className="mt-6">

@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Row, Col, Card, Typography, Form, Input, Button, Select, Space, Divider, Descriptions, message, Modal } from 'antd'
+import { Alert, Row, Col, Card, Typography, Form, Input, Button, Select, Space, Divider, Descriptions, message, Modal, Tag } from 'antd'
 import {
   ArrowLeftOutlined,
   ShoppingOutlined,
   EnvironmentOutlined,
   SafetyCertificateOutlined,
+  TruckOutlined,
 } from '@ant-design/icons'
+import { logisticsCarriers, registeredWarehouses } from '@steellink/shared/serviceFulfillment'
 
 const { Title, Paragraph, Text } = Typography
 const { Option } = Select
@@ -17,6 +19,7 @@ interface CheckoutItem {
   specs: string
   price: number
   quantity: number
+  warehouseId?: number
   warehouse: string
   mill: string
   bundleNos: string[]
@@ -29,32 +32,35 @@ const mockCheckoutItems: CheckoutItem[] = [
     specs: '材质：SPHC | 厚度：3.0mm | 宽度：1250mm',
     price: 3850,
     quantity: 100,
+    warehouseId: 101,
     warehouse: '唐山仓库A区',
     mill: '河钢集团',
     bundleNos: ['HB-2026-0420-0001', 'HB-2026-0420-0002', 'HB-2026-0420-0003'],
   },
 ]
 
-const mockWarehouses = [
-  { id: 1, name: '唐山仓库A区', address: '唐山市丰润区工业路88号', phone: '0315-12345678' },
-  { id: 2, name: '石家庄仓库', address: '石家庄市栾城区钢铁路12号', phone: '0311-87654321' },
-  { id: 3, name: '天津港仓库', address: '天津市滨海新区天津港第五大街', phone: '022-12345678' },
-]
-
-const mockLogistics = [
-  { id: 1, name: '唐山物流有限公司', price: 80 },
-  { id: 2, name: '河北货运集团', price: 75 },
-  { id: 3, name: '全国钢铁配送', price: 85 },
-]
-
 export default function CheckoutPage() {
   const [form] = Form.useForm()
   const navigate = useNavigate()
-  const [selectedLogistics, setSelectedLogistics] = useState(1)
+  const [selectedLogistics, setSelectedLogistics] = useState(201)
   const [loading, setLoading] = useState(false)
 
+  const totalQuantity = mockCheckoutItems.reduce((sum, item) => sum + item.quantity, 0)
   const totalPrice = mockCheckoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const logisticsPrice = mockLogistics.find((item) => item.id === selectedLogistics)?.price || 0
+  const pickupWarehouse = registeredWarehouses.find((warehouse) => warehouse.id === mockCheckoutItems[0]?.warehouseId)
+  const hasWarehouseBinding = Boolean(pickupWarehouse)
+  const recommendedLogistics = useMemo(() => {
+    if (!pickupWarehouse) {
+      return logisticsCarriers
+    }
+
+    return logisticsCarriers.filter((carrier) => {
+      const routeText = `${carrier.routeStart} ${carrier.routeEnd} ${carrier.serviceScope}`
+      return routeText.includes(pickupWarehouse.city.replace('市', '')) || routeText.includes(pickupWarehouse.province.replace('省', ''))
+    })
+  }, [pickupWarehouse])
+  const logisticsPricePerTon = logisticsCarriers.find((item) => item.id === selectedLogistics)?.pricePerTon || 0
+  const logisticsPrice = logisticsPricePerTon * totalQuantity
   const finalPrice = totalPrice + logisticsPrice
 
   const handleSubmit = async () => {
@@ -67,7 +73,7 @@ export default function CheckoutPage() {
         content: (
           <div>
             <Paragraph className="mb-2">
-              确认下单后，系统将自动锁定对应捆包号库存 24 小时，请确认订单信息无误。
+              确认下单后，系统将自动锁定对应捆包号库存 24 小时，并生成仓库提货与物流履约待办。
             </Paragraph>
             <Paragraph className="text-gray-500 text-sm">
               订单总金额：<Text className="text-red-500 font-bold">¥{finalPrice.toLocaleString()}</Text>
@@ -146,6 +152,58 @@ export default function CheckoutPage() {
               ))}
             </Card>
 
+            <Card title="物流与仓储服务" className="mb-6">
+              <Space direction="vertical" size="middle" className="w-full">
+                <Alert
+                  type={hasWarehouseBinding ? 'success' : 'warning'}
+                  showIcon
+                  message={hasWarehouseBinding ? '商品已绑定平台登记仓库，优先推荐可覆盖该仓库的物流商。' : '商品暂未绑定仓库，请通过物流平台发布运输委托或自行安排物流。'}
+                  description={hasWarehouseBinding && pickupWarehouse
+                    ? `${pickupWarehouse.name}（${pickupWarehouse.code}） · ${pickupWarehouse.address}`
+                    : '后端仓库关系完善前，未绑定仓库的商品无法自动生成提货点和推荐线路。'}
+                />
+                {hasWarehouseBinding && pickupWarehouse ? (
+                  <Descriptions bordered column={2} size="small">
+                    <Descriptions.Item label="提货仓库">{pickupWarehouse.name}</Descriptions.Item>
+                    <Descriptions.Item label="仓库编码">{pickupWarehouse.code}</Descriptions.Item>
+                    <Descriptions.Item label="仓库运营方">{pickupWarehouse.operator}</Descriptions.Item>
+                    <Descriptions.Item label="可用库容">{pickupWarehouse.availableCapacity.toLocaleString()} 吨</Descriptions.Item>
+                    <Descriptions.Item label="仓库地址" span={2}>{pickupWarehouse.address}</Descriptions.Item>
+                  </Descriptions>
+                ) : null}
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  {recommendedLogistics.map((carrier) => (
+                    <button
+                      key={carrier.id}
+                      type="button"
+                      onClick={() => setSelectedLogistics(carrier.id)}
+                      className={`rounded-lg border p-4 text-left transition ${
+                        selectedLogistics === carrier.id ? 'border-blue-400 bg-blue-50' : 'border-gray-100 bg-white hover:border-blue-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <Text strong>{carrier.name}</Text>
+                        <Tag color={carrier.status === 'available' ? 'green' : 'gold'}>{carrier.status === 'available' ? '可接单' : '待确认'}</Tag>
+                      </div>
+                      <div className="mt-2 text-sm text-gray-500">{carrier.serviceScope}</div>
+                      <div className="mt-3 flex items-center justify-between text-sm">
+                        <span>{carrier.vehicleType}</span>
+                        <span className="font-mono text-red-600">¥{carrier.pricePerTon}/吨</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Link to="/service-market">
+                    <Button icon={<TruckOutlined />}>去物流平台找物流</Button>
+                  </Link>
+                  <Link to="/dashboard/logistics">
+                    <Button>进入物流工作台发单</Button>
+                  </Link>
+                </div>
+              </Space>
+            </Card>
+
             <Card title="收货信息" className="mb-6">
               <Form form={form} layout="vertical">
                 <Row gutter={16}>
@@ -173,18 +231,13 @@ export default function CheckoutPage() {
                 </Row>
                 <Row gutter={16}>
                   <Col span={24}>
-                    <Form.Item
-                      name="warehouse"
-                      label="提货仓库"
-                      rules={[{ required: true, message: '请选择提货仓库' }]}
-                      initialValue={1}
-                    >
-                      <Select size="large" placeholder="请选择提货仓库">
-                        {mockWarehouses.map((wh) => (
-                          <Option key={wh.id} value={wh.id}>
+                    <Form.Item name="warehouse" label="提货仓库" initialValue={pickupWarehouse?.id}>
+                      <Select size="large" placeholder="未绑定仓库时请在物流平台确认提货点" disabled={hasWarehouseBinding}>
+                        {registeredWarehouses.map((warehouse) => (
+                          <Option key={warehouse.id} value={warehouse.id}>
                             <div>
-                              <div className="font-medium">{wh.name}</div>
-                              <div className="text-gray-500 text-xs">{wh.address}</div>
+                              <div className="font-medium">{warehouse.name}</div>
+                              <div className="text-gray-500 text-xs">{warehouse.address}</div>
                             </div>
                           </Option>
                         ))}
@@ -198,18 +251,18 @@ export default function CheckoutPage() {
                       name="logistics"
                       label="物流配送"
                       rules={[{ required: true, message: '请选择物流配送' }]}
-                      initialValue={1}
+                      initialValue={201}
                     >
                       <Select
                         size="large"
                         placeholder="请选择物流配送"
                         onChange={setSelectedLogistics}
                       >
-                        {mockLogistics.map((log) => (
+                        {logisticsCarriers.map((log) => (
                           <Option key={log.id} value={log.id}>
                             <div className="flex justify-between">
                               <span>{log.name}</span>
-                              <span className="text-gray-500">¥{log.price}/吨</span>
+                              <span className="text-gray-500">¥{log.pricePerTon}/吨</span>
                             </div>
                           </Option>
                         ))}
@@ -267,6 +320,12 @@ export default function CheckoutPage() {
                 </Descriptions.Item>
                 <Descriptions.Item label="物流费用">
                   <span className="font-mono">{selectedLogistics === 0 ? '自行安排' : `¥${logisticsPrice.toLocaleString()}`}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="提货仓库">
+                  <span>{pickupWarehouse?.name || '待物流平台确认'}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="履约保障">
+                  <span>{selectedLogistics === 0 ? '自行保障' : '平台承运险 + 回单归档'}</span>
                 </Descriptions.Item>
               </Descriptions>
 
