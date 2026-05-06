@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Col, List, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { useState } from 'react'
+import { Alert, Button, Card, Col, Form, Input, InputNumber, List, Modal, Progress, Row, Space, Statistic, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   AlertOutlined,
@@ -13,7 +14,7 @@ import {
   NodeIndexOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { serviceOfferService, type LogisticsServiceItem } from '@/services/serviceOfferService'
 import { serviceFulfillmentService, type LogisticsOrderInfo } from '@/services/serviceFulfillmentService'
 import ServicePanelGate from './ServicePanelGate'
@@ -39,31 +40,6 @@ const columns: ColumnsType<LogisticsOrderInfo> = [
   },
 ]
 
-const carrierColumns: ColumnsType<LogisticsServiceItem> = [
-  { title: '物流商', dataIndex: 'name', key: 'name' },
-  { title: '起始地', dataIndex: 'route_start', key: 'route_start' },
-  { title: '目的地', dataIndex: 'route_end', key: 'route_end' },
-  { title: '车型', dataIndex: 'vehicle_type', key: 'vehicle_type' },
-  { title: '载重', dataIndex: 'load_capacity', key: 'load_capacity', render: (value: number) => `${value || 0} 吨` },
-  { title: '计价规则', dataIndex: 'price_rule', key: 'price_rule' },
-  {
-    title: '状态',
-    dataIndex: 'status',
-    key: 'status',
-    render: (value: number) => <Tag color={value === 2 ? 'green' : value === 1 ? 'gold' : 'default'}>{value === 2 ? '可接单' : value === 1 ? '审核中' : '停用'}</Tag>,
-  },
-  {
-    title: '操作',
-    key: 'action',
-    render: () => (
-      <Space>
-        <Button size="small" icon={<EditOutlined />}>编辑</Button>
-        <Button size="small" danger icon={<DeleteOutlined />}>下线</Button>
-      </Space>
-    ),
-  },
-]
-
 const logisticsStatusText: Record<string, string> = {
   pending: '待接单',
   accepted: '已接单',
@@ -74,6 +50,10 @@ const logisticsStatusText: Record<string, string> = {
 }
 
 export default function LogisticsPage() {
+  const [form] = Form.useForm<Partial<LogisticsServiceItem>>()
+  const queryClient = useQueryClient()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingCarrier, setEditingCarrier] = useState<LogisticsServiceItem | null>(null)
   const { data: carrierData, isError: carrierError, isLoading: carrierLoading } = useQuery({
     queryKey: ['dashboard-logistics-services'],
     queryFn: () => serviceOfferService.listLogistics({ page_size: 100 }),
@@ -114,6 +94,74 @@ export default function LogisticsPage() {
     description: `${item.guarantee_type || '未配置保障'} · ${logisticsStatusText[item.status] || item.status}`,
     icon: item.status === 'pending' ? <AuditOutlined /> : item.tracking_events?.length ? <EnvironmentOutlined /> : <SafetyCertificateOutlined />,
   }))
+  const saveCarrierMutation = useMutation({
+    mutationFn: (payload: Partial<LogisticsServiceItem>) =>
+      editingCarrier ? serviceOfferService.updateLogistics(editingCarrier.id, payload) : serviceOfferService.createLogistics(payload),
+    onSuccess: () => {
+      message.success(editingCarrier ? '物流商已更新并重新提交审核' : '物流商已提交审核')
+      setModalOpen(false)
+      setEditingCarrier(null)
+      form.resetFields()
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-logistics-services'] })
+    },
+  })
+  const deleteCarrierMutation = useMutation({
+    mutationFn: (id: number) => serviceOfferService.deleteLogistics(id),
+    onSuccess: () => {
+      message.success('物流商已下线')
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-logistics-services'] })
+    },
+  })
+
+  const openCreateCarrier = () => {
+    setEditingCarrier(null)
+    form.resetFields()
+    setModalOpen(true)
+  }
+
+  const openEditCarrier = (carrier: LogisticsServiceItem) => {
+    setEditingCarrier(carrier)
+    form.setFieldsValue(carrier)
+    setModalOpen(true)
+  }
+
+  const carrierColumns: ColumnsType<LogisticsServiceItem> = [
+    { title: '物流商', dataIndex: 'name', key: 'name' },
+    { title: '起始地', dataIndex: 'route_start', key: 'route_start' },
+    { title: '目的地', dataIndex: 'route_end', key: 'route_end' },
+    { title: '车型', dataIndex: 'vehicle_type', key: 'vehicle_type' },
+    { title: '载重', dataIndex: 'load_capacity', key: 'load_capacity', render: (value: number) => `${value || 0} 吨` },
+    { title: '计价规则', dataIndex: 'price_rule', key: 'price_rule' },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (value: number) => <Tag color={value === 2 ? 'green' : value === 1 ? 'gold' : 'default'}>{value === 2 ? '可接单' : value === 1 ? '审核中' : '停用'}</Tag>,
+    },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_, record) => (
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={() => openEditCarrier(record)}>编辑</Button>
+          <Button
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            loading={deleteCarrierMutation.isPending}
+            onClick={() => Modal.confirm({
+              title: '确认下线物流商？',
+              okText: '确认下线',
+              cancelText: '取消',
+              onOk: () => deleteCarrierMutation.mutate(record.id),
+            })}
+          >
+            下线
+          </Button>
+        </Space>
+      ),
+    },
+  ]
 
   return (
     <ServicePanelGate serviceKey="logistics">
@@ -146,7 +194,7 @@ export default function LogisticsPage() {
             <Card
               className="rounded-lg"
               title="物流商管理"
-              extra={<Button type="primary" icon={<CarOutlined />}>新增物流商</Button>}
+              extra={<Button type="primary" icon={<CarOutlined />} onClick={openCreateCarrier}>新增物流商</Button>}
             >
               <Table loading={carrierLoading} columns={carrierColumns} dataSource={carriers} rowKey="id" pagination={false} scroll={{ x: 1080 }} />
             </Card>
@@ -234,6 +282,48 @@ export default function LogisticsPage() {
             </Card>
           </Col>
         </Row>
+        <Modal
+          title={editingCarrier ? '编辑物流商' : '新增物流商'}
+          open={modalOpen}
+          okText={editingCarrier ? '保存并提交审核' : '提交审核'}
+          cancelText="取消"
+          confirmLoading={saveCarrierMutation.isPending}
+          onCancel={() => {
+            setModalOpen(false)
+            setEditingCarrier(null)
+            form.resetFields()
+          }}
+          onOk={() => form.validateFields().then((values) => saveCarrierMutation.mutate(values))}
+        >
+          <Form form={form} layout="vertical">
+            <Form.Item label="服务名称" name="name" rules={[{ required: true, message: '请输入服务名称' }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item label="起始地" name="route_start" rules={[{ required: true, message: '请输入起始地' }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item label="目的地" name="route_end" rules={[{ required: true, message: '请输入目的地' }]}>
+              <Input />
+            </Form.Item>
+            <Space className="w-full" size="large" wrap>
+              <Form.Item label="车型" name="vehicle_type">
+                <Input className="w-60" />
+              </Form.Item>
+              <Form.Item label="载重能力（吨）" name="load_capacity">
+                <InputNumber className="w-60" min={0} />
+              </Form.Item>
+            </Space>
+            <Form.Item label="服务范围" name="service_scope">
+              <Input />
+            </Form.Item>
+            <Form.Item label="价格规则" name="price_rule">
+              <Input placeholder="例如：80 元/吨" />
+            </Form.Item>
+            <Form.Item label="资源描述" name="description">
+              <Input.TextArea rows={3} />
+            </Form.Item>
+          </Form>
+        </Modal>
       </div>
     </ServicePanelGate>
   )
