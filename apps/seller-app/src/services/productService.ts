@@ -80,6 +80,7 @@ interface BackendProductInfo {
     spec: string
   }
   warehouse_info: {
+    warehouse_id?: number
     warehouse_name: string
     warehouse_code: string
     province: string
@@ -122,6 +123,7 @@ export interface UpsertProductPayload {
     spec: string
   }
   warehouse_info: {
+    warehouse_id?: number
     warehouse_name: string
     warehouse_code: string
     province: string

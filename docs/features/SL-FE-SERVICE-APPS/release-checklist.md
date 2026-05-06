@@ -13,6 +13,9 @@
 - [x] `./harness/verify.sh` 已通过
 - [x] buyer-app build 已通过
 - [x] seller-app build 已通过
+- [x] buyer-app lint 已通过
+- [x] seller-app lint 已通过
+- [x] 已完成服务器真实接口 smoke test
 - [x] 已确认本阶段不新增独立生产应用，只进入 buyer-app dashboard 路由
 - [x] 已确认 smoke test 范围
 - [x] GitHub PR 创建后，已执行 `./harness/lark-pr-doc.sh docs/features/SL-FE-SERVICE-APPS --pr-url https://github.com/Taishi-co/SteelLink-frontend/pull/43 --pr-title "feat: adapt logistics warehouse fulfillment frontend"` 并写入共享飞书 PR 记录
@@ -21,7 +24,7 @@
 ## 回滚信息
 
 - 回滚目标版本: 合并前版本
-- 回滚步骤: 回滚共享履约数据、买家下单/订单详情物流仓储适配、物流/仓储 dashboard 深化、卖家商品仓库绑定 UI 和 feature 文档改动
+- 回滚步骤: 回滚物流仓储接口封装、买家下单/订单详情物流仓储适配、物流/仓储 dashboard 深化、卖家商品仓库绑定 UI 和 feature 文档改动
 - 回滚后验证: `pnpm --filter @steellink/buyer-app build`、`pnpm --filter @steellink/seller-app build`
 
 ## 发布后验证

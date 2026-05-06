@@ -13,7 +13,7 @@ SteelLink 买家工作台已预留 `/dashboard/finance` 与 `/dashboard/logistic
 
 参考外部公开信息，欧冶物流平台面向大宗物资流通，覆盖仓储服务、运输服务、加工服务、物流交易、控货监管等范围。本 feature 只参考业务分类和买家入口形态，不复制页面资产或交互实现。
 
-本次深化物流与仓储逻辑时，后端服务尚未具备完整仓储、物流和履约保障 API，因此前端先补齐可评审的业务对象、状态和链路：卖家商品可表达是否绑定平台登记仓库；买家下单时根据商品仓库绑定状态推荐物流商或引导到物流平台发单；订单详情展示商品从仓库出库、物流承运、买家签收、履约保障归档的端到端追踪能力。
+本次深化物流与仓储逻辑时，前端已切换到后端仓储、物流和履约 API：卖家商品可绑定平台登记仓库；买家下单时根据商品仓库绑定状态推荐物流商或引导到物流平台发单；订单详情展示商品从仓库出库、物流承运、买家签收、履约保障归档的端到端追踪能力。
 
 ## 范围
 
@@ -33,7 +33,7 @@ SteelLink 买家工作台已预留 `/dashboard/finance` 与 `/dashboard/logistic
 
 ### Out of Scope
 
-- 后端 API、数据库、鉴权、真实订单状态流转。
+- 独立履约结算、赔付仲裁和完整订单自动状态机。
 - 独立 logistics-app、warehouse-app、finance-app 应用与生产部署脚本。
 - 角色登录体系合并与权限矩阵落库。
 
@@ -59,10 +59,10 @@ SteelLink 买家工作台已预留 `/dashboard/finance` 与 `/dashboard/logistic
 
 ## 数据与接口影响
 
-- 受影响 API: 当前不新增真实 API；继续复用现有商品 `warehouse_info` 与订单 `delivery_info` 字段做前端适配。
-- 请求/响应变化: 卖家商品发布仍向后端提交 `warehouse_info`；新增的仓库 CRUD、商品仓库关系、出入库、物流商、发单/接单、价格估算和履约保障均为前端静态结构，后续需收敛为真实 API。
+- 受影响 API: 使用 `warehouse-services`、`logistics-services`、`warehouse-movements`、`warehouses/:id/products`、`logistics/orders`、`logistics/estimate`、`orders/:id/service-fulfillment` 等真实接口。
+- 请求/响应变化: 卖家商品发布继续向后端提交 `warehouse_info`，平台登记仓库会额外提交 `warehouse_id`；仓库 CRUD、物流商 CRUD、商品仓库关系、出入库、运输委托、价格估算和订单履约追踪均读取后端接口。
 - 环境变量变化: 无
-- 当前数据来源: 前端静态模拟数据与浏览器本地服务开通状态，用于业务逻辑讨论和页面评审。
+- 当前数据来源: 后端接口与浏览器本地服务开通状态。服务开通状态后续仍需替换为企业服务订阅接口。
 
 ## 权限影响
 
@@ -75,7 +75,7 @@ SteelLink 买家工作台已预留 `/dashboard/finance` 与 `/dashboard/logistic
 2. 用户可在 `/dashboard/services` 开通物流、仓储、资金服务。
 3. 开通后可在 `/dashboard/logistics`、`/dashboard/warehouse`、`/dashboard/finance` 看到对应面板。
 4. 每个面板都有概览指标、待办事项、核心业务表格和下一步业务判断入口。
-5. 不依赖后端即可完成前端业务讨论和页面走查。
+5. 页面依赖真实后端接口，接口异常时保留空态或提示。
 6. 仓储平台页面能看到仓库 CRUD 入口、商品绑定关系、入库/出库记录和待处理作业。
 7. 物流平台页面能看到物流商 CRUD 入口、运输跟踪、估价、发单/接单和履约保障。
 8. 买家确认订单能根据商品仓库绑定状态展示推荐物流商或物流平台找车入口。
