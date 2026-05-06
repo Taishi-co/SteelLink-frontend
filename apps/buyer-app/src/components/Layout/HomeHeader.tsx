@@ -35,7 +35,7 @@ export default function HomeHeader() {
     || (location.pathname === '/' ? '/' : '')
 
   const userMenuItems = [
-    { key: 'dashboard', label: '工作台', icon: <DashboardOutlined />, onClick: () => navigate('/dashboard') },
+    { key: 'dashboard', label: '个人工作台', icon: <DashboardOutlined />, onClick: () => navigate('/dashboard') },
     ...(hasEnterpriseAccess(user) ? [{ key: 'seller', label: '卖家中心', icon: <ShopOutlined />, onClick: () => { window.location.href = sellerDashboardHref } }] : []),
     { key: 'identity', label: `实名认证 (${getIdentityStatusLabel(user?.identityStatus ?? 0)})`, icon: <SafetyCertificateOutlined />, onClick: () => navigate('/dashboard/identity') },
     { key: 'enterprise', label: user?.enterpriseCode ? '企业信息' : '企业入驻', icon: <BankOutlined />, onClick: () => navigate(user?.enterpriseCode ? '/dashboard/enterprise' : '/enterprise') },
@@ -71,7 +71,7 @@ export default function HomeHeader() {
                 icon={<DashboardOutlined />}
                 onClick={() => navigate('/dashboard')}
               >
-                工作台
+                个人工作台
               </Button>
               {hasEnterpriseAccess(user) && (
                 <a href={sellerDashboardHref}>
