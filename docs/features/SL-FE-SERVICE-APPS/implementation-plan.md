@@ -16,6 +16,9 @@
   - `apps/buyer-app/src/pages/Dashboard/Finance.tsx`
   - `apps/buyer-app/src/pages/Dashboard/Logistics.tsx`
   - `apps/buyer-app/src/pages/Dashboard/Warehouse.tsx`
+  - `apps/buyer-app/src/pages/Checkout/index.tsx`
+  - `apps/buyer-app/src/pages/OrderDetail/index.tsx`
+  - `apps/seller-app/src/pages/Products/index.tsx`
   - `apps/buyer-app/src/router/index.tsx`
   - `apps/buyer-app/src/components/Layout/HomeHeader.tsx`
   - `apps/buyer-app/src/components/Layout/DashboardLayout.tsx`
@@ -30,15 +33,22 @@
 2. 在 buyer-app 增加物流仓储服务市场页面和主导航入口。
 3. 新增 dashboard 服务入口与本地开通状态，按开通状态显示侧边栏菜单。
 4. 将物流、仓储、资金面板放入 `/dashboard/logistics`、`/dashboard/warehouse`、`/dashboard/finance`。
-5. 执行应用级 build 验证，并按耗时情况执行 harness gate。
+5. 补充仓储平台仓库管理、商品绑定关系、入库/出库记录和作业待办。
+6. 补充物流平台物流商管理、运输跟踪、估价、发单/接单和履约保障。
+7. 调整买家订单确认页，展示有仓库商品的推荐物流和无仓库商品的物流平台找车入口。
+8. 调整订单详情，展示仓库到物流再到买家的追踪链路和履约保障。
+9. 调整卖家商品发布，支持选择平台登记仓库并回填 `warehouse_info`。
+10. 执行应用级 build 验证，并按耗时情况执行 harness gate。
 
 ## 验证计划
 
 - `pnpm --filter @steellink/buyer-app build`
+- `pnpm --filter @steellink/seller-app build`
 - `./harness/verify.sh`
-- 需要的人工验证: 后续浏览器走查 `/dashboard/services`、`/dashboard/logistics`、`/dashboard/warehouse`、`/dashboard/finance`
+- 需要的人工验证: 后续浏览器走查 `/dashboard/services`、`/dashboard/logistics`、`/dashboard/warehouse`、`/dashboard/finance`、`/checkout`、`/orders/:id`、seller-app 商品发布弹窗
 
 ## 风险与回滚关注点
 
 - 当前是前端静态原型，后续接后端时要收敛 API 契约、企业服务订阅与权限模型。
 - 本地开通状态只用于前端验证，不能作为真实权限或计费依据。
+- 卖家商品发布仍受现有后端 `warehouse_info` 必填约束影响；“暂不绑定”目前是前端业务讨论状态，后端放开前不能作为真实无仓商品提交路径。

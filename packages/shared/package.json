@@ -17,6 +17,10 @@
     "./utils": {
       "types": "./src/utils/index.ts",
       "import": "./src/utils/index.ts"
+    },
+    "./serviceFulfillment": {
+      "types": "./src/serviceFulfillment.ts",
+      "import": "./src/serviceFulfillment.ts"
     }
   },
   "scripts": {
