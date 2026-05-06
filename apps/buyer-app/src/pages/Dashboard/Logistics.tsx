@@ -1,4 +1,4 @@
-import { Button, Card, Col, List, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Col, List, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   AlertOutlined,
@@ -74,19 +74,19 @@ const logisticsStatusText: Record<string, string> = {
 }
 
 export default function LogisticsPage() {
-  const { data: carrierData, isLoading: carrierLoading } = useQuery({
+  const { data: carrierData, isError: carrierError, isLoading: carrierLoading } = useQuery({
     queryKey: ['dashboard-logistics-services'],
     queryFn: () => serviceOfferService.listLogistics({ page_size: 100 }),
   })
   const carriers = carrierData?.data.list ?? []
-  const { data: warehouseData } = useQuery({
+  const { data: warehouseData, isError: warehouseError } = useQuery({
     queryKey: ['dashboard-logistics-warehouses'],
     queryFn: () => serviceOfferService.listWarehouses({ page_size: 100 }),
   })
   const warehouses = warehouseData?.data.list ?? []
-  const { data: orderData, isLoading: orderLoading } = useQuery({
+  const { data: orderData, isError: orderError, isLoading: orderLoading } = useQuery({
     queryKey: ['dashboard-logistics-orders'],
-    queryFn: () => serviceFulfillmentService.listLogisticsOrders({ page_size: 100 }),
+    queryFn: () => serviceFulfillmentService.listLogisticsOrders({ page_size: 100, role: 'carrier' }),
   })
   const logisticsOrders = orderData?.data.list ?? []
   const estimateTarget = carriers[0]
@@ -104,6 +104,16 @@ export default function LogisticsPage() {
   const activeOrders = logisticsOrders.filter((item) => item.status === 'in_transit' || item.status === 'accepted')
   const pendingOrders = logisticsOrders.filter((item) => item.status === 'pending')
   const completedOrders = logisticsOrders.filter((item) => item.status === 'completed' || item.status === 'delivered')
+  const trackedOrders = logisticsOrders.filter((item) => item.tracking_events?.length)
+  const trackingCoverage = logisticsOrders.length > 0 ? Math.round((trackedOrders.length / logisticsOrders.length) * 100) : 0
+  const acceptanceRate = logisticsOrders.length > 0 ? Math.round(((logisticsOrders.length - pendingOrders.length) / logisticsOrders.length) * 100) : 0
+  const completionRate = logisticsOrders.length > 0 ? Math.round((completedOrders.length / logisticsOrders.length) * 100) : 0
+  const guaranteeRows = logisticsOrders.map((item) => ({
+    id: item.id,
+    title: item.logistics_no,
+    description: `${item.guarantee_type || '未配置保障'} · ${logisticsStatusText[item.status] || item.status}`,
+    icon: item.status === 'pending' ? <AuditOutlined /> : item.tracking_events?.length ? <EnvironmentOutlined /> : <SafetyCertificateOutlined />,
+  }))
 
   return (
     <ServicePanelGate serviceKey="logistics">
@@ -114,6 +124,15 @@ export default function LogisticsPage() {
             在买家工作台内承接物流服务：运输委托、派车、在途跟踪、异常处理、签收回单和费用结算。
           </Paragraph>
         </Card>
+        {(carrierError || warehouseError || orderError) ? (
+          <Alert
+            className="mb-4"
+            type="warning"
+            showIcon
+            message="物流接口数据未完整返回"
+            description="请确认当前登录企业已开通物流服务，并且后端已部署 logistics service-fulfillment 接口。"
+          />
+        ) : null}
 
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="今日承运委托" value={logisticsOrders.length} suffix="单" prefix={<NodeIndexOutlined />} /></Card></Col>
@@ -171,12 +190,12 @@ export default function LogisticsPage() {
             </Card>
             <Card className="mt-4 rounded-lg" title="线路履约健康度">
               <Space direction="vertical" className="w-full">
-                <Text>华东短驳</Text>
-                <Progress percent={94} />
-                <Text>港口干线</Text>
-                <Progress percent={88} status="active" />
-                <Text>跨省长途</Text>
-                <Progress percent={76} status="exception" />
+                <Text>接单率</Text>
+                <Progress percent={acceptanceRate} />
+                <Text>轨迹覆盖率</Text>
+                <Progress percent={trackingCoverage} status={trackingCoverage < 60 && logisticsOrders.length ? 'exception' : 'active'} />
+                <Text>送达完成率</Text>
+                <Progress percent={completionRate} status={completionRate < 50 && logisticsOrders.length ? 'exception' : 'normal'} />
               </Space>
             </Card>
           </Col>
@@ -186,7 +205,7 @@ export default function LogisticsPage() {
           <Col xs={24} xl={14}>
             <Card className="rounded-lg" title="客户发单 / 物流接单">
               <Table
-                rowKey="orderNo"
+                rowKey="id"
                 pagination={false}
                 scroll={{ x: 860 }}
                 loading={orderLoading}
@@ -205,11 +224,7 @@ export default function LogisticsPage() {
           <Col xs={24} xl={10}>
             <Card className="rounded-lg" title="履约保障">
               <List
-                dataSource={[
-                  { title: '保证金覆盖', description: '已接入物流商需保留履约保证金和承运险证明', icon: <SafetyCertificateOutlined /> },
-                  { title: '轨迹回传', description: '发车、到仓、离仓、到货、签收节点均需回传', icon: <EnvironmentOutlined /> },
-                  { title: '异常仲裁', description: '货损、延期、拒收进入平台保障工单并关联订单', icon: <AuditOutlined /> },
-                ]}
+                dataSource={guaranteeRows}
                 renderItem={(item) => (
                   <List.Item>
                     <List.Item.Meta avatar={item.icon} title={item.title} description={item.description} />
