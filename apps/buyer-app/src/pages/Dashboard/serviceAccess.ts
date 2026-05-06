@@ -49,7 +49,7 @@ export const serviceDefinitions: ServiceDefinition[] = [
   },
 ]
 
-export const defaultEnabledServices: ServiceKey[] = ['finance', 'logistics']
+export const defaultEnabledServices: ServiceKey[] = ['finance', 'logistics', 'warehouse']
 
 export function getServiceDefinition(key: ServiceKey) {
   return serviceDefinitions.find((item) => item.key === key)
@@ -62,7 +62,8 @@ export function readEnabledServices(): ServiceKey[] {
   try {
     const parsed = JSON.parse(raw) as string[]
     const valid = parsed.filter((item): item is ServiceKey => serviceDefinitions.some((service) => service.key === item))
-    return valid.length ? valid : defaultEnabledServices
+    if (!valid.length) return defaultEnabledServices
+    return Array.from(new Set([...valid, 'warehouse']))
   } catch {
     return defaultEnabledServices
   }
