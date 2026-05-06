@@ -13,6 +13,7 @@ const navItems = [
   { key: '/warehouses', label: '仓储服务' },
   { key: '/logistics-services', label: '物流服务' },
   { key: '/matching', label: '供求信息' },
+  { key: '/service-market', label: '物流仓储' },
   { key: '/ai-procurement', label: 'AI采购' },
   { key: '/bidding', label: '竞价交易' },
   { key: '/procurement', label: '集采大厅' },
