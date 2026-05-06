@@ -1,4 +1,4 @@
-import { Button, Card, Col, List, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Col, List, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   AuditOutlined,
@@ -19,33 +19,28 @@ import ServicePanelGate from './ServicePanelGate'
 
 const { Title, Paragraph, Text } = Typography
 
-interface Appointment {
-  key: string
-  no: string
-  company: string
-  cargo: string
-  action: string
-  slot: string
-  status: string
+const movementStatusText: Record<string, string> = {
+  pending: '待作业',
+  processing: '作业中',
+  completed: '已完成',
 }
 
-const appointments: Appointment[] = [
-  { key: '1', no: 'CK20260506001', company: '华东金属贸易', cargo: '热轧板卷 96 吨', action: '入库预约', slot: '10:00-12:00', status: '待确认' },
-  { key: '2', no: 'CK20260506002', company: '昆山制造集团', cargo: '镀锌卷 44 吨', action: '出库提货', slot: '14:00-16:00', status: '已排库位' },
-  { key: '3', no: 'CK20260506003', company: '宁波终端厂', cargo: '螺纹钢 180 吨', action: '监管盘点', slot: '明日 09:00', status: '待作业' },
-]
-
-const columns: ColumnsType<Appointment> = [
-  { title: '预约单', dataIndex: 'no', key: 'no' },
-  { title: '企业', dataIndex: 'company', key: 'company' },
-  { title: '货物', dataIndex: 'cargo', key: 'cargo' },
-  { title: '作业类型', dataIndex: 'action', key: 'action' },
-  { title: '作业窗口', dataIndex: 'slot', key: 'slot' },
+const appointmentColumns: ColumnsType<WarehouseMovementInfo> = [
+  { title: '作业单', dataIndex: 'movement_no', key: 'movement_no' },
+  { title: '关联订单', dataIndex: 'order_no', key: 'order_no', render: (value: string) => value || '-' },
+  { title: '货物', key: 'cargo', render: (_, record) => `${record.product_name || '-'} ${record.quantity || 0} 吨` },
+  {
+    title: '作业类型',
+    dataIndex: 'movement_type',
+    key: 'movement_type',
+    render: (value: string) => (value === 'inbound' ? '入库预约' : '出库提货'),
+  },
+  { title: '作业窗口', dataIndex: 'scheduled_at', key: 'scheduled_at', render: (value: string) => value || '-' },
   {
     title: '状态',
     dataIndex: 'status',
     key: 'status',
-    render: (value: string) => <Tag color={value === '待确认' ? 'orange' : value === '待作业' ? 'blue' : 'green'}>{value}</Tag>,
+    render: (value: string) => <Tag color={value === 'pending' ? 'orange' : value === 'processing' ? 'blue' : 'green'}>{movementStatusText[value] || value}</Tag>,
   },
 ]
 
@@ -96,23 +91,23 @@ const inventoryColumns: ColumnsType<WarehouseMovementInfo> = [
     title: '状态',
     dataIndex: 'status',
     key: 'status',
-    render: (value: string) => <Tag color={value === 'completed' ? 'green' : value === 'processing' ? 'blue' : 'gold'}>{value === 'completed' ? '已完成' : value === 'processing' ? '作业中' : '待作业'}</Tag>,
+    render: (value: string) => <Tag color={value === 'completed' ? 'green' : value === 'processing' ? 'blue' : 'gold'}>{movementStatusText[value] || value}</Tag>,
   },
 ]
 
 export default function WarehousePage() {
-  const { data: warehouseData, isLoading: warehouseLoading } = useQuery({
+  const { data: warehouseData, isError: warehouseError, isLoading: warehouseLoading } = useQuery({
     queryKey: ['dashboard-warehouse-services'],
     queryFn: () => serviceOfferService.listWarehouses({ page_size: 100 }),
   })
   const warehouses = warehouseData?.data.list ?? []
   const activeWarehouse = warehouses[0]
-  const { data: movementData, isLoading: movementLoading } = useQuery({
+  const { data: movementData, isError: movementError, isLoading: movementLoading } = useQuery({
     queryKey: ['dashboard-warehouse-movements'],
     queryFn: () => serviceFulfillmentService.listWarehouseMovements({ page_size: 100 }),
   })
   const movements = movementData?.data.list ?? []
-  const { data: productData, isLoading: productLoading } = useQuery({
+  const { data: productData, isError: productError, isLoading: productLoading } = useQuery({
     queryKey: ['dashboard-warehouse-products', activeWarehouse?.id],
     queryFn: () => serviceFulfillmentService.listWarehouseProducts(activeWarehouse.id),
     enabled: Boolean(activeWarehouse?.id),
@@ -121,6 +116,14 @@ export default function WarehousePage() {
   const availableCapacity = warehouses.reduce((sum, item) => sum + Number(item.available_capacity || 0), 0)
   const managedStock = warehouseProducts.reduce((sum, item) => sum + Number(item.available_qty || 0), 0)
   const todayMovements = movements.length
+  const pendingMovements = movements.filter((item) => item.status === 'pending')
+  const processingMovements = movements.filter((item) => item.status === 'processing')
+  const capacityRows = warehouses.slice(0, 4).map((warehouse) => {
+    const capacity = Number(warehouse.capacity || 0)
+    const available = Number(warehouse.available_capacity || 0)
+    const usedPercent = capacity > 0 ? Math.round(((capacity - available) / capacity) * 100) : 0
+    return { id: warehouse.id, label: warehouse.warehouse_name, usedPercent }
+  })
 
   return (
     <ServicePanelGate serviceKey="warehouse">
@@ -131,6 +134,15 @@ export default function WarehousePage() {
             在买家工作台内管理仓容、入出库预约、库存监管、仓单资料和费用结算，为物流与资金服务提供履约依据。
           </Paragraph>
         </Card>
+        {(warehouseError || movementError || productError) ? (
+          <Alert
+            className="mb-4"
+            type="warning"
+            showIcon
+            message="仓储接口数据未完整返回"
+            description="请确认当前登录企业已开通仓储服务，并且后端已部署 service-fulfillment 接口。"
+          />
+        ) : null}
 
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="可用仓容" value={availableCapacity} suffix="吨" prefix={<InboxOutlined />} /></Card></Col>
@@ -142,27 +154,25 @@ export default function WarehousePage() {
         <Row gutter={[16, 16]} className="mt-4">
           <Col xs={24} xl={16}>
             <Card className="rounded-lg" title="入出库预约" extra={<Button type="primary" icon={<BarcodeOutlined />}>分配库位</Button>}>
-              <Table columns={columns} dataSource={appointments} pagination={false} scroll={{ x: 720 }} />
+              <Table loading={movementLoading} columns={appointmentColumns} dataSource={movements} rowKey="id" pagination={false} scroll={{ x: 820 }} />
             </Card>
           </Col>
           <Col xs={24} xl={8}>
             <Card className="rounded-lg" title="库区容量">
               <Space direction="vertical" className="w-full">
-                <Text>A 区板卷</Text>
-                <Progress percent={82} />
-                <Text>B 区型材</Text>
-                <Progress percent={64} />
-                <Text>监管仓</Text>
-                <Progress percent={91} status="active" />
-                <Text>临时周转</Text>
-                <Progress percent={38} />
+                {capacityRows.length ? capacityRows.map((item) => (
+                  <div key={item.id}>
+                    <Text>{item.label}</Text>
+                    <Progress percent={item.usedPercent} status={item.usedPercent > 90 ? 'exception' : item.usedPercent > 75 ? 'active' : 'normal'} />
+                  </div>
+                )) : <Text type="secondary">暂无仓库容量数据</Text>}
               </Space>
             </Card>
             <Card className="mt-4 rounded-lg" title="库存监管待办">
               <List
                 dataSource={[
-                  { title: '仓单资料待补齐', description: '2 笔质押库存缺少最新质检报告', icon: <AuditOutlined /> },
-                  { title: '货权变更确认', description: '1 笔订单完成付款后等待过户', icon: <DatabaseOutlined /> },
+                  { title: '待出入库作业', description: `${pendingMovements.length} 笔出入库记录等待仓库处理`, icon: <AuditOutlined /> },
+                  { title: '作业中记录', description: `${processingMovements.length} 笔出入库记录正在处理`, icon: <DatabaseOutlined /> },
                 ]}
                 renderItem={(item) => (
                   <List.Item>
@@ -186,7 +196,7 @@ export default function WarehousePage() {
           <Col xs={24} xl={15}>
             <Card className="rounded-lg" title="商品与仓库关系">
               <Table
-                rowKey="bundleNo"
+                rowKey="id"
                 pagination={false}
                 scroll={{ x: 760 }}
                 loading={productLoading}
