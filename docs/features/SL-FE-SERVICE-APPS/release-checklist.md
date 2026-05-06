@@ -14,7 +14,7 @@
 - [x] 已确认本阶段不新增独立生产应用，只进入 buyer-app dashboard 路由
 - [x] 已确认 smoke test 范围
 - [x] GitHub PR 创建后，已执行 `./harness/lark-pr-doc.sh docs/features/SL-FE-SERVICE-APPS --pr-url https://github.com/Taishi-co/SteelLink-frontend/pull/39 --pr-title "feat: add service platform frontend apps"` 并写入共享飞书 PR 记录
-- 飞书 PRD/PR 记录: https://www.feishu.cn/wiki/BCnrwTQ5xioZX7k843AcqZybnpb
+- 飞书 PRD/PR 记录: https://www.feishu.cn/wiki/Nmv3wyCnYiJ8qxkWfIxcUJB3nwd
 
 ## 回滚信息
 
