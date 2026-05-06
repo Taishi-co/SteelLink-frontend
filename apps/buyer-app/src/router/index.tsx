@@ -25,10 +25,16 @@ const ProcurementPage = lazy(() => import('@/pages/Procurement'))
 const BiddingPage = lazy(() => import('@/pages/Bidding'))
 const BiddingModulePage = lazy(() => import('@/pages/BiddingModule'))
 const ProcurementDetailPage = lazy(() => import('@/pages/ProcurementDetail'))
-const DashboardOverview = lazy(() => import('@/pages/Dashboard/Overview'))
+const PersonalWorkspacePage = lazy(() => import('@/pages/PersonalWorkspace'))
 const DashboardMarket = lazy(() => import('@/pages/Dashboard/Market'))
 const DashboardFinance = lazy(() => import('@/pages/Dashboard/Finance'))
 const DashboardLogistics = lazy(() => import('@/pages/Dashboard/Logistics'))
+const ServiceWorkspacePage = lazy(() => import('@/pages/ServiceWorkspace'))
+const ServiceOverviewPage = lazy(() => import('@/pages/ServiceWorkspace').then((module) => ({ default: module.ServiceOverview })))
+const WarehouseMallPage = lazy(() => import('@/pages/ServiceMall/Warehouse'))
+const LogisticsMallPage = lazy(() => import('@/pages/ServiceMall/Logistics'))
+const WarehouseManagePage = lazy(() => import('@/pages/ServiceManage/Warehouse'))
+const LogisticsManagePage = lazy(() => import('@/pages/ServiceManage/Logistics'))
 
 const SupplyPage = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -56,6 +62,8 @@ export function AppRouter() {
         <Route path="/" element={<HomeLayout />}>
           <Route index element={<HomePage />} />
           <Route path="mall" element={<MallPage />} />
+          <Route path="warehouses" element={<WarehouseMallPage />} />
+          <Route path="logistics-services" element={<LogisticsMallPage />} />
           <Route path="matching" element={<MatchingPage />} />
           <Route path="ai-procurement" element={<AiProcurementPage />} />
           <Route path="ai-procurement/:step" element={<AiProcurementPage />} />
@@ -78,7 +86,7 @@ export function AppRouter() {
         </Route>
 
         <Route path="/dashboard" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
-          <Route index element={<DashboardOverview />} />
+          <Route index element={<PersonalWorkspacePage />} />
           <Route path="market" element={<DashboardMarket />} />
           <Route path="bidding" element={<BiddingModulePage />} />
           <Route path="orders" element={<OrdersPage />} />
@@ -87,6 +95,10 @@ export function AppRouter() {
           <Route path="enterprise" element={<EnterprisePage />} />
           <Route path="finance" element={<DashboardFinance />} />
           <Route path="logistics" element={<DashboardLogistics />} />
+          <Route path="services" element={<ServiceOverviewPage />} />
+          <Route path="services/:service" element={<ServiceWorkspacePage />} />
+          <Route path="warehouse-resources" element={<WarehouseManagePage />} />
+          <Route path="logistics-resources" element={<LogisticsManagePage />} />
         </Route>
       </Routes>
     </Suspense>

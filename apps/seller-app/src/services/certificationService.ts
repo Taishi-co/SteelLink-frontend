@@ -61,6 +61,31 @@ export interface JoinEnterprisePayload {
   enterprise_code: string
 }
 
+export interface EnterpriseServicePermission {
+  id: number
+  enterprise_id: number
+  enterprise_code: string
+  service: 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
+  supply_role: 'supplier' | 'buyer' | 'logistics' | 'warehouse' | 'fund'
+  status: number
+  audit_reason: string
+  approved_at?: string
+  updated_at: string
+}
+
+export interface EnterpriseServiceOverview {
+  permissions: EnterpriseServicePermission[]
+  required_documents: Record<string, string[]>
+}
+
+export interface EnterpriseServiceApplicationPayload {
+  service: EnterpriseServicePermission['service']
+  documents: Array<{
+    document_type: string
+    file_url: string
+  }>
+}
+
 const identityStatusMap: Record<number, { label: string; color: string }> = {
   0: { label: '未认证', color: 'default' },
   1: { label: '审核中', color: 'processing' },
@@ -151,4 +176,10 @@ export const certificationService = {
 
   joinEnterprise: (payload: JoinEnterprisePayload) =>
     api.post<unknown, ApiResponse<{ message: string }>>('/users/me/enterprise/join', payload),
+
+  getMyServices: () =>
+    api.get<unknown, ApiResponse<EnterpriseServiceOverview>>('/enterprises/me/services'),
+
+  applyService: (payload: EnterpriseServiceApplicationPayload) =>
+    api.post<unknown, ApiResponse<unknown>>('/enterprises/me/services/applications', payload),
 }

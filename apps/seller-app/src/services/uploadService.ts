@@ -1,6 +1,13 @@
 import api from './api'
 
-export type UploadPurpose = 'payment_voucher' | 'receipt_voucher' | 'product_image' | 'product_qualification' | 'identity_card' | 'enterprise_license'
+export type UploadPurpose =
+  | 'payment_voucher'
+  | 'receipt_voucher'
+  | 'product_image'
+  | 'product_qualification'
+  | 'identity_card'
+  | 'enterprise_license'
+  | 'enterprise_service_document'
 
 export interface UploadResult {
   bucket: string
