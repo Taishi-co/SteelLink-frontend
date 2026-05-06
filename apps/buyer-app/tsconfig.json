@@ -9,5 +9,11 @@
     "types": ["vite/client"]
   },
   "include": ["src"],
+  "exclude": [
+    "src/pages/PersonalWorkspace",
+    "src/pages/ServiceMall",
+    "src/pages/ServiceManage",
+    "src/pages/ServiceWorkspace"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
