@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { Layout, Menu, Avatar, Tooltip } from 'antd'
 import {
@@ -8,17 +8,20 @@ import {
   SafetyCertificateOutlined,
   BankOutlined,
   DollarOutlined,
+  AppstoreAddOutlined,
+  CloudServerOutlined,
   ShopOutlined,
   LineChartOutlined,
   RiseOutlined,
+  TruckOutlined,
   LogoutOutlined,
   UserOutlined,
   ArrowRightOutlined,
-  AppstoreOutlined,
 } from '@ant-design/icons'
 import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
 import { useUserStore } from '@/stores'
 import { getIdentityStatusLabel } from '@/services/certificationService'
+import { readEnabledServices, SERVICE_ACCESS_EVENT, type ServiceKey } from '@/pages/Dashboard/serviceAccess'
 
 const { Sider, Content } = Layout
 
@@ -32,12 +35,16 @@ interface NavItem {
 const allNavItems: NavItem[] = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '个人工作台' },
   { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
+  { key: '/dashboard/services', icon: <AppstoreAddOutlined />, label: '服务入口' },
   { key: '/dashboard/bidding', icon: <RiseOutlined />, label: '竞价管理', roles: ['buyer'] },
   { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单', roles: ['buyer', 'seller'] },
-  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资', roles: ['buyer', 'fund'] },
-  { key: '/dashboard/logistics', icon: <ShopOutlined />, label: '仓储物流', roles: ['logistics', 'warehouse', 'seller'] },
-  { key: '/dashboard/services', icon: <AppstoreOutlined />, label: '服务入口', roles: ['enterprise'] },
 ]
+
+const serviceNavItems: Record<ServiceKey, NavItem> = {
+  logistics: { key: '/dashboard/logistics', icon: <TruckOutlined />, label: '物流平台' },
+  warehouse: { key: '/dashboard/warehouse', icon: <CloudServerOutlined />, label: '仓储平台' },
+  finance: { key: '/dashboard/finance', icon: <DollarOutlined />, label: '资金服务' },
+}
 
 const accountItems = [
   { key: '/dashboard/identity', icon: <SafetyCertificateOutlined />, label: '实名认证' },
@@ -51,13 +58,26 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useUserStore()
+  const [enabledServices, setEnabledServices] = useState<ServiceKey[]>(() => readEnabledServices())
+
+  useEffect(() => {
+    const handleAccessChange = () => setEnabledServices(readEnabledServices())
+    window.addEventListener('storage', handleAccessChange)
+    window.addEventListener(SERVICE_ACCESS_EVENT, handleAccessChange)
+    return () => {
+      window.removeEventListener('storage', handleAccessChange)
+      window.removeEventListener(SERVICE_ACCESS_EVENT, handleAccessChange)
+    }
+  }, [])
 
   const navItems = useMemo(() => {
-    if (hasEnterpriseAccess(user)) return allNavItems
+    const serviceItems = enabledServices.map((key) => serviceNavItems[key])
+    const baseItems = [...allNavItems, ...serviceItems]
+    if (hasEnterpriseAccess(user)) return baseItems
     const er = user?.enterpriseRole || ''
-    if (!er) return allNavItems.filter(item => !item.roles)
-    return allNavItems.filter(item => !item.roles || item.roles.includes(er))
-  }, [user])
+    if (!er) return baseItems.filter(item => !item.roles)
+    return baseItems.filter(item => !item.roles || item.roles.includes(er))
+  }, [enabledServices, user])
 
   const handleLogout = () => {
     clearBuyerSession()
