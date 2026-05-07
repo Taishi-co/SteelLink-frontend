@@ -47,13 +47,13 @@ type ProductStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'off
 
 interface ProductFormValues {
   name: string
+  goodsType: 'spot' | 'futures'
   category: string
   subCategory: string
   steelMill: string
   material: string
   spec: string
-  warehouseBindingMode: 'platform' | 'manual' | 'unbound'
-  platformWarehouseId: number
+  warehouseServiceId?: number
   warehouseName: string
   warehouseCode: string
   province: string
@@ -80,6 +80,11 @@ interface ProductDisplayFormValues {
 }
 
 const categoryOptions = ['全部', '热轧板卷', '冷轧板卷', '中厚板', '型材', '管材', '建材']
+
+const goodsTypeMeta: Record<'spot' | 'futures', { color: string; text: string }> = {
+  spot: { color: 'blue', text: '现货' },
+  futures: { color: 'purple', text: '期货' },
+}
 
 const statusMeta: Record<ProductStatus, { color: string; text: string }> = {
   draft: { color: 'default', text: '草稿' },
@@ -172,6 +177,7 @@ async function resolveUploadedURLs(fileList: UploadFile[] = [], purpose: UploadP
 function toPayload(values: ProductFormValues, imageURLs: string[], qualificationURLs: string[]) {
   return {
     name: values.name,
+    goods_type: values.goodsType || 'spot',
     category: values.category,
     sub_category: values.subCategory,
     steel_mill: values.steelMill,
@@ -179,8 +185,9 @@ function toPayload(values: ProductFormValues, imageURLs: string[], qualification
       material: values.material,
       spec: values.spec,
     },
+    warehouse_service_id: values.warehouseServiceId || undefined,
     warehouse_info: {
-      warehouse_id: values.warehouseBindingMode === 'platform' ? values.platformWarehouseId : 0,
+      warehouse_service_id: values.warehouseServiceId || undefined,
       warehouse_name: values.warehouseName,
       warehouse_code: values.warehouseCode,
       province: values.province,
@@ -294,7 +301,7 @@ export default function ProductsPage() {
     setEditingProduct(null)
     form.resetFields()
     form.setFieldsValue({
-      warehouseBindingMode: 'platform',
+      goodsType: 'spot',
       imageFiles: [],
       qualificationFiles: [],
     } as Partial<ProductFormValues>)
@@ -386,6 +393,10 @@ export default function ProductsPage() {
           <Text type="secondary" className="text-xs">
             {record.sku_id} · 卖家UID {record.seller_uid}
           </Text>
+          <div className="mt-1">
+            <Tag color={goodsTypeMeta[record.goods_type].color}>{goodsTypeMeta[record.goods_type].text}</Tag>
+            {record.warehouse_service_id ? <Tag color="cyan">仓储资源 #{record.warehouse_service_id}</Tag> : null}
+          </div>
         </div>
       ),
     },
@@ -606,9 +617,21 @@ export default function ProductsPage() {
         okText={editingProduct ? '重新提交审核' : '提交审核'}
         confirmLoading={submitting}
       >
-        <Form<ProductFormValues> form={form} layout="vertical" initialValues={{ warehouseBindingMode: 'platform', imageFiles: [], qualificationFiles: [] }}>
+        <Form<ProductFormValues>
+          form={form}
+          layout="vertical"
+          initialValues={{ goodsType: 'spot', imageFiles: [], qualificationFiles: [] }}
+        >
           <Form.Item name="name" label="商品名称" rules={[{ required: true, message: '请输入商品名称' }]}>
             <Input placeholder="例如：Q235B 热轧板卷 3.0*1500*C" />
+          </Form.Item>
+          <Form.Item name="goodsType" label="货品类型" rules={[{ required: true, message: '请选择货品类型' }]}>
+            <Select
+              options={[
+                { label: '现货', value: 'spot' },
+                { label: '期货', value: 'futures' },
+              ]}
+            />
           </Form.Item>
           <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择品类' }]}>
             <Select
@@ -680,14 +703,17 @@ export default function ProductsPage() {
             </Form.Item>
           </Space>
           <Space className="w-full" size="large" wrap>
+            <Form.Item name="warehouseServiceId" label="绑定仓储资源 ID">
+              <InputNumber min={1} precision={0} className="w-60" placeholder="已审核仓储资源 ID" />
+            </Form.Item>
             <Form.Item name="warehouseName" label="仓库名称" rules={[{ required: true, message: '请输入仓库名称' }]}>
               <Input placeholder="例如：唐山仓库A区" className="w-60" />
             </Form.Item>
+          </Space>
+          <Space className="w-full" size="large" wrap>
             <Form.Item name="warehouseCode" label="仓库编码">
               <Input placeholder="例如：TS-A-01" className="w-60" />
             </Form.Item>
-          </Space>
-          <Space className="w-full" size="large" wrap>
             <Form.Item name="province" label="省份" rules={[{ required: true, message: '请输入省份' }]}>
               <Input placeholder="例如：河北省" className="w-60" />
             </Form.Item>
@@ -852,6 +878,9 @@ export default function ProductsPage() {
             <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="商品名称">{drawerProduct.name}</Descriptions.Item>
               <Descriptions.Item label="SKU">{drawerProduct.sku_id}</Descriptions.Item>
+              <Descriptions.Item label="货品类型">
+                <Tag color={goodsTypeMeta[drawerProduct.goods_type].color}>{goodsTypeMeta[drawerProduct.goods_type].text}</Tag>
+              </Descriptions.Item>
               <Descriptions.Item label="主品类">{drawerProduct.category || '-'}</Descriptions.Item>
               <Descriptions.Item label="子品类">{drawerProduct.sub_category || '-'}</Descriptions.Item>
               <Descriptions.Item label="钢厂">{drawerProduct.steel_mill || '-'}</Descriptions.Item>
@@ -859,6 +888,12 @@ export default function ProductsPage() {
               <Descriptions.Item label="规格">{drawerProduct.specs || '-'}</Descriptions.Item>
               <Descriptions.Item label="捆包号">{drawerProduct.bundle_no || '-'}</Descriptions.Item>
               <Descriptions.Item label="最小起订量">{drawerProduct.min_order_qty ? `${drawerProduct.min_order_qty} 吨` : '-'}</Descriptions.Item>
+              <Descriptions.Item label="绑定仓储资源">
+                {drawerProduct.warehouse_service_id ? `#${drawerProduct.warehouse_service_id}` : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="仓储方企业">
+                {drawerProduct.warehouse_enterprise_id ? `#${drawerProduct.warehouse_enterprise_id}` : '-'}
+              </Descriptions.Item>
               <Descriptions.Item label="仓库名称">{drawerProduct.warehouse_name || '-'}</Descriptions.Item>
               <Descriptions.Item label="仓库编码">{drawerProduct.warehouse_code || '-'}</Descriptions.Item>
               <Descriptions.Item label="仓库地区">

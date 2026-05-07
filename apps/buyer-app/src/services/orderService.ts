@@ -68,7 +68,14 @@ export interface OrderInfo {
     plate_number: string
     pickup_code: string
     warehouse_id: number
+    warehouse_service_id?: number
+    warehouse_enterprise_id?: number
     warehouse_name: string
+    warehouse_code?: string
+    warehouse_province?: string
+    warehouse_city?: string
+    warehouse_district?: string
+    warehouse_address?: string
     address: string
     estimated_time: string
   }
@@ -128,6 +135,7 @@ export const orderService = {
       driver_id_card?: string
       plate_number: string
       warehouse_id?: number
+      warehouse_service_id?: number
       warehouse_name: string
       address: string
       estimated_time?: string

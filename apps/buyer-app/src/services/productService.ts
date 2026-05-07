@@ -5,6 +5,7 @@ interface BackendProduct {
   id: number
   product_no: string
   name: string
+  goods_type?: 'spot' | 'futures'
   category: string
   sub_category: string
   steel_mill: string
@@ -20,6 +21,8 @@ interface BackendProduct {
   }
   warehouse_info: {
     warehouse_id: number
+    warehouse_service_id?: number
+    warehouse_enterprise_id?: number
     warehouse_name: string
     warehouse_code: string
     address: string
@@ -27,6 +30,8 @@ interface BackendProduct {
     city: string
     district: string
   }
+  warehouse_service_id?: number
+  warehouse_enterprise_id?: number
   bundle_no: string
   quantity: number
   available_qty: number
@@ -52,10 +57,13 @@ function mapProduct(product: BackendProduct): Product {
     id: product.id,
     productNo: product.product_no,
     name: product.name,
+    goodsType: product.goods_type || 'spot',
     category: product.category,
     subCategory: product.sub_category,
     steelMill: product.steel_mill,
     spec: product.spec,
+    warehouseServiceId: product.warehouse_service_id || product.warehouse_info?.warehouse_service_id,
+    warehouseEnterpriseId: product.warehouse_enterprise_id || product.warehouse_info?.warehouse_enterprise_id,
     warehouseInfo: product.warehouse_info,
     bundleNo: product.bundle_no,
     quantity: product.quantity,
@@ -92,6 +100,8 @@ export const productService = {
     page?: number
     page_size?: number
     sort_by?: string
+    goods_type?: 'spot' | 'futures'
+    warehouse_service_id?: number
   }) => {
     const response = await api.get<ApiResponse<PaginatedResponse<BackendProduct>>, ApiResponse<PaginatedResponse<BackendProduct>>>('/products', { params })
     return {

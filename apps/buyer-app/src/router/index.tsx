@@ -35,8 +35,11 @@ const DashboardWarehouse = lazy(() => import('@/pages/Dashboard/Warehouse'))
 const ServiceWorkspacePage = lazy(() => import('@/pages/ServiceWorkspace'))
 const WarehouseMallPage = lazy(() => import('@/pages/ServiceMall/Warehouse'))
 const LogisticsMallPage = lazy(() => import('@/pages/ServiceMall/Logistics'))
+const WarehouseDetailPage = lazy(() => import('@/pages/ServiceMall/WarehouseDetail'))
+const LogisticsDetailPage = lazy(() => import('@/pages/ServiceMall/LogisticsDetail'))
 const WarehouseManagePage = lazy(() => import('@/pages/ServiceManage/Warehouse'))
 const LogisticsManagePage = lazy(() => import('@/pages/ServiceManage/Logistics'))
+const FinanceManagePage = lazy(() => import('@/pages/ServiceManage/Finance'))
 
 const SupplyPage = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -65,7 +68,9 @@ export function AppRouter() {
           <Route index element={<HomePage />} />
           <Route path="mall" element={<MallPage />} />
           <Route path="warehouses" element={<WarehouseMallPage />} />
+          <Route path="warehouses/:id" element={<WarehouseDetailPage />} />
           <Route path="logistics-services" element={<LogisticsMallPage />} />
+          <Route path="logistics-services/:id" element={<LogisticsDetailPage />} />
           <Route path="matching" element={<MatchingPage />} />
           <Route path="service-market" element={<ServiceMarketPage />} />
           <Route path="ai-procurement" element={<AiProcurementPage />} />
@@ -103,6 +108,7 @@ export function AppRouter() {
           <Route path="services/:service" element={<ServiceWorkspacePage />} />
           <Route path="warehouse-resources" element={<WarehouseManagePage />} />
           <Route path="logistics-resources" element={<LogisticsManagePage />} />
+          <Route path="finance-products" element={<FinanceManagePage />} />
         </Route>
       </Routes>
     </Suspense>

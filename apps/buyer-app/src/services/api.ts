@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { clearBuyerSession, getBuyerToken } from './auth'
+import { clearBuyerSession, getBuyerToken, saveBuyerToken } from './auth'
 
 const defaultBaseURL = import.meta.env.DEV ? 'http://localhost:8080/api/v1' : '/api/v1'
 
@@ -11,7 +11,6 @@ const api = axios.create({
   },
 })
 
-// Request interceptor
 api.interceptors.request.use(
   (config) => {
     const token = getBuyerToken()
@@ -23,9 +22,14 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// Response interceptor
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const refreshedToken = response.headers['x-token-refreshed']
+    if (refreshedToken) {
+      saveBuyerToken(refreshedToken)
+    }
+    return response.data
+  },
   (error) => {
     if (error.response?.status === 401) {
       clearBuyerSession()

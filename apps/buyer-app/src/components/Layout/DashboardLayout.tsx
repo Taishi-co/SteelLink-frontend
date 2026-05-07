@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { Layout, Menu, Avatar, Tooltip } from 'antd'
 import {
@@ -20,8 +20,8 @@ import {
 } from '@ant-design/icons'
 import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
 import { useUserStore } from '@/stores'
-import { getIdentityStatusLabel } from '@/services/certificationService'
-import { readEnabledServices, SERVICE_ACCESS_EVENT, type ServiceKey } from '@/pages/Dashboard/serviceAccess'
+import { getIdentityStatusLabel, certificationService } from '@/services/certificationService'
+import type { EnterpriseServicePermission } from '@/services/certificationService'
 
 const { Sider, Content } = Layout
 
@@ -30,14 +30,17 @@ interface NavItem {
   icon: React.ReactNode
   label: string
   roles?: string[]
+  services?: string[]
 }
 
 const allNavItems: NavItem[] = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '个人工作台' },
   { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
-  { key: '/dashboard/services', icon: <AppstoreAddOutlined />, label: '服务入口' },
-  { key: '/dashboard/bidding', icon: <RiseOutlined />, label: '竞价管理', roles: ['buyer'] },
-  { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单', roles: ['buyer', 'seller'] },
+  { key: '/dashboard/bidding', icon: <RiseOutlined />, label: '竞价管理', services: ['procurement'] },
+  { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单', services: ['procurement', 'sales'] },
+  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资', services: ['finance'] },
+  { key: '/dashboard/logistics', icon: <ShopOutlined />, label: '仓储物流', services: ['logistics', 'warehouse'] },
+  { key: '/dashboard/services', icon: <AppstoreOutlined />, label: '服务入口', roles: ['enterprise'] },
 ]
 
 const serviceNavItems: Record<ServiceKey, NavItem> = {
@@ -55,6 +58,7 @@ const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/
 
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
+  const [servicePermissions, setServicePermissions] = useState<EnterpriseServicePermission[]>([])
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useUserStore()
@@ -70,14 +74,33 @@ export default function DashboardLayout() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!hasEnterpriseAccess(user)) {
+      setServicePermissions([])
+      return
+    }
+    certificationService.getMyServices().then((res) => {
+      if (res.code === 0 && res.data?.permissions) {
+        setServicePermissions(res.data.permissions)
+      }
+    }).catch(() => {})
+  }, [user?.role, user?.enterpriseCode])
+
+  const approvedServices = useMemo(() => {
+    return new Set<string>(
+      servicePermissions
+        .filter((p) => p.status === 2)
+        .map((p) => p.service)
+    )
+  }, [servicePermissions])
+
   const navItems = useMemo(() => {
-    const serviceItems = enabledServices.map((key) => serviceNavItems[key])
-    const baseItems = [...allNavItems, ...serviceItems]
-    if (hasEnterpriseAccess(user)) return baseItems
-    const er = user?.enterpriseRole || ''
-    if (!er) return baseItems.filter(item => !item.roles)
-    return baseItems.filter(item => !item.roles || item.roles.includes(er))
-  }, [enabledServices, user])
+    return allNavItems.filter((item) => {
+      if (item.roles && !item.roles.includes(user?.role || '')) return false
+      if (item.services && !item.services.some((s) => approvedServices.has(s))) return false
+      return true
+    })
+  }, [user?.role, approvedServices])
 
   const handleLogout = () => {
     clearBuyerSession()

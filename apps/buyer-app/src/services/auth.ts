@@ -49,6 +49,7 @@ const TOKEN_KEY = 'token'
 const USER_KEY = 'buyer_user'
 const SELLER_USER_KEY = 'seller_user'
 const SELLER_ENTERPRISE_ROLE_KEY = 'seller_enterprise_role'
+export const BUYER_TOKEN_REFRESH_EVENT = 'buyer-token-refreshed'
 let memoryToken: string | null = null
 let memoryUser: User | null = null
 
@@ -166,6 +167,36 @@ export function getBuyerToken() {
     setCookie(TOKEN_KEY, token)
   }
   return token
+}
+
+export function saveBuyerToken(token: string) {
+  memoryToken = token
+  setStorageItem(TOKEN_KEY, token)
+  setCookie(TOKEN_KEY, token)
+
+  const payload = parseJwtPayload(token)
+  const currentUser = getBuyerUser()
+  if (currentUser) {
+    const updatedUser = {
+      ...currentUser,
+      role: ((payload?.user_type as User['role']) || currentUser.role) as User['role'],
+      enterpriseCode: (payload?.enterprise_code as string) || currentUser.enterpriseCode || '',
+      enterpriseRole: (payload?.enterprise_role as string) || currentUser.enterpriseRole || '',
+    }
+    memoryUser = updatedUser
+    setStorageItem(USER_KEY, JSON.stringify(updatedUser))
+    setCookie(USER_KEY, JSON.stringify(updatedUser))
+  }
+
+  if (payload?.enterprise_role) {
+    setStorageItem(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+    setCookie(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+  } else {
+    removeStorageItem(SELLER_ENTERPRISE_ROLE_KEY)
+    removeCookie(SELLER_ENTERPRISE_ROLE_KEY)
+  }
+
+  window.dispatchEvent(new Event(BUYER_TOKEN_REFRESH_EVENT))
 }
 
 export function clearBuyerSession() {

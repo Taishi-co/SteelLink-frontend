@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Space, Spin, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
 import { ArrowLeftOutlined, CarOutlined, CheckCircleOutlined, EnvironmentOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
@@ -181,12 +181,17 @@ export default function OrderDetailPage() {
   const latestMovement = fulfillment?.warehouse_movements?.[0]
   const activeGuarantee = fulfillment?.guarantees?.[0]
   const status = statusMap[order?.status || 0] || { label: `状态${order?.status ?? '-'}`, color: 'default' }
-  const statusNotice = getStatusNotice(order?.status || 0, Boolean(order?.payment_info?.voucher_url), Boolean(order?.delivery_info), order?.contract_info)
-  const pickupWarehouseName = productDetail?.warehouseInfo?.warehouse_name || order?.delivery_info?.warehouse_name || ''
-  const pickupWarehouseId = productDetail?.warehouseInfo?.warehouse_id || 0
-  const pickupWarehouseAddress = productDetail?.warehouseInfo?.address || ''
-  const pickupWarehouseCode = productDetail?.warehouseInfo?.warehouse_code || ''
-  const pickupWarehouseRegion = [productDetail?.warehouseInfo?.province, productDetail?.warehouseInfo?.city, productDetail?.warehouseInfo?.district]
+  const statusNotice = getStatusNotice(order?.status || 0, Boolean(order?.payment_info?.voucher_url), Boolean(order?.delivery_info?.pickup_code), order?.contract_info)
+  const pickupWarehouseName = order?.delivery_info?.warehouse_name || productDetail?.warehouseInfo?.warehouse_name || ''
+  const pickupWarehouseId = order?.delivery_info?.warehouse_id || productDetail?.warehouseInfo?.warehouse_id || 0
+  const pickupWarehouseServiceId = order?.delivery_info?.warehouse_service_id || productDetail?.warehouseServiceId || 0
+  const pickupWarehouseAddress = order?.delivery_info?.warehouse_address || productDetail?.warehouseInfo?.address || ''
+  const pickupWarehouseCode = order?.delivery_info?.warehouse_code || productDetail?.warehouseInfo?.warehouse_code || ''
+  const pickupWarehouseRegion = [
+    order?.delivery_info?.warehouse_province || productDetail?.warehouseInfo?.province,
+    order?.delivery_info?.warehouse_city || productDetail?.warehouseInfo?.city,
+    order?.delivery_info?.warehouse_district || productDetail?.warehouseInfo?.district,
+  ]
     .filter(Boolean)
     .join(' ')
   const canCancelOrder = (order?.status === 1 || order?.status === 2 || order?.status === 3) && !order.payment_info?.voucher_url
@@ -222,6 +227,7 @@ export default function OrderDetailPage() {
       await orderService.setDeliveryInfo(Number(id), {
         ...values,
         warehouse_id: pickupWarehouseId,
+        warehouse_service_id: pickupWarehouseServiceId,
         warehouse_name: pickupWarehouseName,
       })
       message.success('提货信息已保存，提货码已生成')
@@ -380,6 +386,23 @@ export default function OrderDetailPage() {
               </Descriptions>
             </Card>
 
+            {order.delivery_info && (
+              <Card title="订单仓库快照" className="mt-6">
+                <Descriptions bordered column={2}>
+                  <Descriptions.Item label="提货仓库">{pickupWarehouseName || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="仓库编码">{pickupWarehouseCode || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="仓储资源">
+                    {pickupWarehouseServiceId ? <Link to={`/warehouses/${pickupWarehouseServiceId}`}>#{pickupWarehouseServiceId}</Link> : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="仓储方企业">
+                    {order.delivery_info.warehouse_enterprise_id ? `#${order.delivery_info.warehouse_enterprise_id}` : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="仓库地区">{pickupWarehouseRegion || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="仓库地址">{pickupWarehouseAddress || '-'}</Descriptions.Item>
+                </Descriptions>
+              </Card>
+            )}
+
             <Card title="交易双方" className="mt-6">
               <Descriptions bordered column={2}>
                 <Descriptions.Item label="买家企业">{order.buyer_name}</Descriptions.Item>
@@ -446,23 +469,29 @@ export default function OrderDetailPage() {
               </Card>
             )}
 
-            {(order.delivery_info || order.status >= 5) && (
+            {order.status >= 5 && (
               <Card title="提货信息" className="mt-6">
                 {order.delivery_info ? (
                   <Descriptions bordered column={2}>
-                    <Descriptions.Item label="司机姓名">{order.delivery_info.driver_name}</Descriptions.Item>
-                    <Descriptions.Item label="司机电话">{order.delivery_info.driver_phone}</Descriptions.Item>
+                    <Descriptions.Item label="司机姓名">{order.delivery_info.driver_name || '-'}</Descriptions.Item>
+                    <Descriptions.Item label="司机电话">{order.delivery_info.driver_phone || '-'}</Descriptions.Item>
                     <Descriptions.Item label="司机身份证">{order.delivery_info.driver_id_card || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="车牌号">{order.delivery_info.plate_number}</Descriptions.Item>
-                    <Descriptions.Item label="提货仓库">{order.delivery_info.warehouse_name}</Descriptions.Item>
+                    <Descriptions.Item label="车牌号">{order.delivery_info.plate_number || '-'}</Descriptions.Item>
+                    <Descriptions.Item label="提货仓库">{order.delivery_info.warehouse_name || '-'}</Descriptions.Item>
                     <Descriptions.Item label="仓库编码">{pickupWarehouseCode || '-'}</Descriptions.Item>
+                    <Descriptions.Item label="仓储资源">
+                      {pickupWarehouseServiceId ? <Link to={`/warehouses/${pickupWarehouseServiceId}`}>#{pickupWarehouseServiceId}</Link> : '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="仓储方企业">
+                      {order.delivery_info.warehouse_enterprise_id ? `#${order.delivery_info.warehouse_enterprise_id}` : '-'}
+                    </Descriptions.Item>
                     <Descriptions.Item label="提货码">
-                      <Text strong copyable>{order.delivery_info.pickup_code}</Text>
+                      {order.delivery_info.pickup_code ? <Text strong copyable>{order.delivery_info.pickup_code}</Text> : '-'}
                     </Descriptions.Item>
                     <Descriptions.Item label="仓库地区">{pickupWarehouseRegion || '-'}</Descriptions.Item>
                     <Descriptions.Item label="预计提货时间">{order.delivery_info.estimated_time || '-'}</Descriptions.Item>
                     <Descriptions.Item label="仓库地址">{pickupWarehouseAddress || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="送达地址" span={2}>{order.delivery_info.address}</Descriptions.Item>
+                    <Descriptions.Item label="送达地址" span={2}>{order.delivery_info.address || '-'}</Descriptions.Item>
                   </Descriptions>
                 ) : (
                   <Empty description="待录入提货信息" />
@@ -562,7 +591,7 @@ export default function OrderDetailPage() {
               )}
               {order.status === 5 && (
                 <Button className="mt-4 ml-3" type="primary" icon={<CarOutlined />} onClick={openDeliveryModal}>
-                  {order.delivery_info ? '修改提货信息' : '录入提货信息'}
+                  {order.delivery_info?.pickup_code ? '修改提货信息' : '录入提货信息'}
                 </Button>
               )}
               {order.status === 6 && (

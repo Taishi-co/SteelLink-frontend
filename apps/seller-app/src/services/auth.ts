@@ -121,7 +121,33 @@ export function saveSellerSession(token: string, user: SellerUser) {
     localStorage.removeItem(ENTERPRISE_ROLE_KEY)
     sessionStorage.removeItem(ENTERPRISE_ROLE_KEY)
     removeCookie(ENTERPRISE_ROLE_KEY)
-  }
+	}
+}
+
+export function saveSellerToken(token: string) {
+	localStorage.setItem(TOKEN_KEY, token)
+	sessionStorage.setItem(TOKEN_KEY, token)
+	setCookie(TOKEN_KEY, token)
+
+	const payload = parseJwtPayload(token)
+	const user = getSellerUser()
+	if (user) {
+		updateSellerUser({
+			...user,
+			role: (payload?.user_type as string) || user.role,
+			enterprise_code: (payload?.enterprise_code as string) || user.enterprise_code || '',
+		})
+	}
+
+	if (payload?.enterprise_role) {
+		localStorage.setItem(ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+		sessionStorage.setItem(ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+		setCookie(ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+	} else {
+		localStorage.removeItem(ENTERPRISE_ROLE_KEY)
+		sessionStorage.removeItem(ENTERPRISE_ROLE_KEY)
+		removeCookie(ENTERPRISE_ROLE_KEY)
+	}
 }
 
 export function updateSellerUser(user: SellerUser) {

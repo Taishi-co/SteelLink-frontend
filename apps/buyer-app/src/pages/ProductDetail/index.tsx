@@ -192,6 +192,13 @@ export default function ProductDetailPage() {
                             <Descriptions.Item label="仓库编码">{product.warehouseInfo?.warehouse_code || '-'}</Descriptions.Item>
                             <Descriptions.Item label="仓库地区">{warehouseRegion}</Descriptions.Item>
                             <Descriptions.Item label="仓库地址">{product.warehouseInfo?.address || '-'}</Descriptions.Item>
+                            <Descriptions.Item label="绑定仓储">
+                              {product.warehouseServiceId ? (
+                                <Link to={`/warehouses/${product.warehouseServiceId}`}>仓储资源 #{product.warehouseServiceId}</Link>
+                              ) : (
+                                '-'
+                              )}
+                            </Descriptions.Item>
                             <Descriptions.Item label="捆包号">{product.bundleNo || '-'}</Descriptions.Item>
                           </Descriptions>
                         </div>
@@ -328,6 +335,11 @@ export default function ProductDetailPage() {
                           <Descriptions.Item label="仓库编码">{product.warehouseInfo?.warehouse_code || '-'}</Descriptions.Item>
                           <Descriptions.Item label="仓库地区">{warehouseRegion}</Descriptions.Item>
                           <Descriptions.Item label="仓库地址">{product.warehouseInfo?.address || '-'}</Descriptions.Item>
+                          <Descriptions.Item label="绑定仓储资源">
+                            {product.warehouseServiceId ? (
+                              <Link to={`/warehouses/${product.warehouseServiceId}`}>#{product.warehouseServiceId}</Link>
+                            ) : '未绑定'}
+                          </Descriptions.Item>
                           <Descriptions.Item label="质保书">
                             {product.qualityCert ? (
                               <a href={product.qualityCert} target="_blank" rel="noreferrer">查看质保书</a>

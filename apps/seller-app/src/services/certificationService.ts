@@ -13,13 +13,6 @@ export interface IdentityStatus {
   identity_reject: string
 }
 
-export interface SubmitIdentityPayload {
-  real_name: string
-  id_card: string
-  id_card_front_url: string
-  id_card_back_url: string
-}
-
 export interface EnterpriseInfo {
   id: number
   enterprise_code: string
@@ -42,31 +35,12 @@ export interface EnterpriseInfo {
   }
 }
 
-export interface CreateEnterprisePayload {
-  enterprise_name: string
-  enterprise_role: string
-  unified_social_credit_code: string
-  legal_person: string
-  legal_id_card: string
-  business_license_url: string
-  bank_account_name: string
-  bank_account_no: string
-  bank_name: string
-  contact_phone: string
-  contact_email?: string
-  registered_address: string
-}
-
-export interface JoinEnterprisePayload {
-  enterprise_code: string
-}
-
 export interface EnterpriseServicePermission {
   id: number
   enterprise_id: number
   enterprise_code: string
   service: 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
-  supply_role: 'supplier' | 'buyer' | 'logistics' | 'warehouse' | 'fund'
+  enterprise_role: 'buyer' | 'seller' | 'logistics' | 'warehouse' | 'fund'
   status: number
   audit_reason: string
   approved_at?: string
@@ -76,14 +50,6 @@ export interface EnterpriseServicePermission {
 export interface EnterpriseServiceOverview {
   permissions: EnterpriseServicePermission[]
   required_documents: Record<string, string[]>
-}
-
-export interface EnterpriseServiceApplicationPayload {
-  service: EnterpriseServicePermission['service']
-  documents: Array<{
-    document_type: string
-    file_url: string
-  }>
 }
 
 const identityStatusMap: Record<number, { label: string; color: string }> = {
@@ -117,9 +83,6 @@ export const certificationService = {
   getIdentityStatus: () =>
     api.get<unknown, ApiResponse<IdentityStatus>>('/users/me/identity'),
 
-  submitIdentity: (payload: SubmitIdentityPayload) =>
-    api.post<unknown, ApiResponse<{ message: string }>>('/users/me/identity', payload),
-
   getMyEnterprise: () =>
     api.get<unknown, ApiResponse<EnterpriseListResponse>>('/enterprises'),
 
@@ -137,49 +100,6 @@ export const certificationService = {
     } as ApiResponse<EnterpriseInfo | null>
   },
 
-  verifyEnterprise: async (enterpriseId: number, payload: CreateEnterprisePayload) => {
-    const verifyRes = await api.post<unknown, ApiResponse<EnterpriseInfo>>(`/enterprises/${enterpriseId}/verify`, {
-      legal_person: payload.legal_person,
-      legal_id_card: payload.legal_id_card,
-      business_license: payload.business_license_url,
-      bank_account: payload.bank_account_no,
-      bank_name: payload.bank_name,
-      contact_name: payload.legal_person,
-      contact_phone: payload.contact_phone,
-      address: payload.registered_address,
-    })
-    return {
-      ...verifyRes,
-      data: verifyRes.data ? normalizeEnterpriseInfo(verifyRes.data) : verifyRes.data,
-    }
-  },
-
-  createEnterprise: async (payload: CreateEnterprisePayload) => {
-    const createRes = await api.post<unknown, ApiResponse<EnterpriseInfo>>('/enterprises', {
-      name: payload.enterprise_name,
-      credit_code: payload.unified_social_credit_code,
-      enterprise_role: payload.enterprise_role,
-      contact_name: payload.legal_person,
-      contact_phone: payload.contact_phone,
-      address: payload.registered_address,
-    })
-
-    if (createRes.code === 0 && createRes.data?.id) {
-      return certificationService.verifyEnterprise(createRes.data.id, payload)
-    }
-
-    return {
-      ...createRes,
-      data: createRes.data ? normalizeEnterpriseInfo(createRes.data) : createRes.data,
-    }
-  },
-
-  joinEnterprise: (payload: JoinEnterprisePayload) =>
-    api.post<unknown, ApiResponse<{ message: string }>>('/users/me/enterprise/join', payload),
-
   getMyServices: () =>
     api.get<unknown, ApiResponse<EnterpriseServiceOverview>>('/enterprises/me/services'),
-
-  applyService: (payload: EnterpriseServiceApplicationPayload) =>
-    api.post<unknown, ApiResponse<unknown>>('/enterprises/me/services/applications', payload),
 }

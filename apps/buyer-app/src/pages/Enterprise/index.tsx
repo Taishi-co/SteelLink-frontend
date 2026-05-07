@@ -18,6 +18,35 @@ import type { CreateEnterprisePayload, EnterpriseInfo } from '@/services/certifi
 const { Title, Text, Paragraph } = Typography
 const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
 
+const enterpriseRoleDocumentMap: Record<string, Array<{ type: string; label: string }>> = {
+  buyer: [
+    { type: 'business_license', label: '营业执照' },
+    { type: 'invoice_info', label: '开票信息' },
+    { type: 'authorization_letter', label: '授权书' },
+  ],
+  seller: [
+    { type: 'business_license', label: '营业执照' },
+    { type: 'legal_person_id', label: '法人身份证' },
+    { type: 'bank_account', label: '银行账户信息' },
+    { type: 'authorization_letter', label: '授权书' },
+  ],
+  logistics: [
+    { type: 'business_license', label: '营业执照' },
+    { type: 'transport_license', label: '运输许可证' },
+    { type: 'carrier_certificate', label: '承运资质' },
+  ],
+  warehouse: [
+    { type: 'business_license', label: '营业执照' },
+    { type: 'warehouse_site_certificate', label: '仓储场地证明' },
+    { type: 'safety_certificate', label: '安全资质' },
+  ],
+  fund: [
+    { type: 'finance_license_or_agreement', label: '金融许可证/合作协议' },
+    { type: 'risk_contact_info', label: '风控联系人信息' },
+    { type: 'credit_documents', label: '信用材料' },
+  ],
+}
+
 type CreateEnterpriseFormValues = Omit<CreateEnterprisePayload, 'business_license_url'>
 type ApiError = { response?: { data?: { message?: string } } }
 
@@ -30,6 +59,8 @@ export default function EnterprisePage() {
   const [hasEnterprise, setHasEnterprise] = useState(false)
   const [enterpriseInfo, setEnterpriseInfo] = useState<EnterpriseInfo | null>(null)
   const [licenseUrl, setLicenseUrl] = useState('')
+  const [serviceDocuments, setServiceDocuments] = useState<Record<string, string>>({})
+  const [selectedRole, setSelectedRole] = useState<string>('')
   const [resubmitEnterpriseId, setResubmitEnterpriseId] = useState<number | null>(null)
   const navigate = useNavigate()
   const user = useUserStore((s) => s.user)
@@ -99,11 +130,25 @@ export default function EnterprisePage() {
       message.warning('请上传营业执照')
       return
     }
+
+    const requiredDocs = enterpriseRoleDocumentMap[values.enterprise_role] || []
+    const missingDocs = requiredDocs.filter((doc) => !serviceDocuments[doc.type])
+    if (missingDocs.length > 0) {
+      message.warning(`请上传以下资质: ${missingDocs.map((d) => d.label).join('、')}`)
+      return
+    }
+
+    const documents = requiredDocs.map((doc) => ({
+      document_type: doc.type,
+      file_url: serviceDocuments[doc.type] || '',
+    }))
+
     setLoading(true)
     try {
       const payload = {
         ...values,
         business_license_url: licenseUrl,
+        documents,
       }
       const res = resubmitEnterpriseId
         ? await certificationService.verifyEnterprise(resubmitEnterpriseId, payload)
@@ -263,7 +308,7 @@ export default function EnterprisePage() {
                 </Form.Item>
 
                 <Form.Item label="供应链身份" name="enterprise_role" rules={[{ required: true, message: '请选择供应链身份' }]}>
-                  <Select placeholder="请选择供应链身份" size="large" options={[
+                  <Select placeholder="请选择供应链身份" size="large" onChange={(val) => { setSelectedRole(val); setServiceDocuments({}) }} options={[
                     { value: 'buyer', label: '采购方/贸易商' },
                     { value: 'seller', label: '供应商' },
                     { value: 'logistics', label: '物流商' },
@@ -294,6 +339,35 @@ export default function EnterprisePage() {
                     <Button icon={<UploadOutlined />}>{licenseUrl ? '已上传营业执照（点击更换）' : '上传营业执照'}</Button>
                   </Upload>
                 </Form.Item>
+
+                {selectedRole && enterpriseRoleDocumentMap[selectedRole] && (
+                  <>
+                    <Divider orientation="left">平台服务资质</Divider>
+                    {enterpriseRoleDocumentMap[selectedRole].map((doc) => (
+                      <Form.Item key={doc.type} label={doc.label} required>
+                        <Upload
+                          beforeUpload={async (file: File) => {
+                            try {
+                              const result = await uploadService.upload(file, 'enterprise_service_document')
+                              setServiceDocuments((prev) => ({ ...prev, [doc.type]: result.url }))
+                              message.success(`${doc.label}上传成功`)
+                            } catch {
+                              message.error(`${doc.label}上传失败`)
+                            }
+                            return false
+                          }}
+                          maxCount={1}
+                          accept="image/*,.pdf"
+                          showUploadList={!!serviceDocuments[doc.type]}
+                        >
+                          <Button icon={<UploadOutlined />}>
+                            {serviceDocuments[doc.type] ? `${doc.label}已上传（点击更换）` : `上传${doc.label}`}
+                          </Button>
+                        </Upload>
+                      </Form.Item>
+                    ))}
+                  </>
+                )}
 
                 <Divider />
 

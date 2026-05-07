@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 
 const { Footer: AntFooter } = Layout
 const { Text } = Typography
-const sellerEntryHref = import.meta.env.DEV ? 'http://localhost:5174/seller/enterprise' : '/seller/enterprise'
+const sellerEntryHref = '/dashboard/enterprise'
 const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
 
 export default function HomeFooter() {

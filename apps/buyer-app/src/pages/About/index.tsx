@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons'
 
 const { Title, Paragraph, Text } = Typography
-const sellerEntryHref = import.meta.env.DEV ? 'http://localhost:5174/seller/enterprise' : '/seller/enterprise'
+const sellerEntryHref = '/dashboard/enterprise'
 
 const platformMetrics = [
   { value: '5000+', label: '入驻商家' },
