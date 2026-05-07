@@ -30,16 +30,6 @@ export default function LogisticsManagePage() {
     },
   })
 
-  const startEdit = (row: LogisticsServiceItem) => {
-    setEditing(row)
-    form.setFieldsValue(row)
-  }
-
-  const cancelEdit = () => {
-    setEditing(null)
-    form.resetFields()
-  }
-
   const submit = (values: Partial<LogisticsServiceItem> & { quote_rules_text?: string }) => {
     const { quote_rules_text, ...payload } = values
     if (quote_rules_text?.trim()) {
@@ -116,7 +106,15 @@ export default function LogisticsManagePage() {
             { title: '司机资质', dataIndex: 'driver_certs', render: (v?: string[]) => v?.length ? `${v.length} 项` : '-' },
             { title: '状态', dataIndex: 'status', render: (v: number) => <Tag>{statusText[v] || '未知'}</Tag> },
             { title: '审核备注', dataIndex: 'audit_remark', render: (v?: string) => v || '-' },
-            { title: '操作', render: (_, record) => <Button type="link" size="small" onClick={() => startEdit(record)}>编辑</Button> },
+            {
+              title: '操作',
+              render: (_, record) => (
+                <div className="flex gap-2">
+                  <Button type="link" size="small" onClick={() => startEdit(record)}>编辑</Button>
+                  <Button type="link" danger size="small" loading={deleteMutation.isPending} onClick={() => deleteMutation.mutate(record.id)}>下线</Button>
+                </div>
+              ),
+            },
           ]}
         />
       </Card>

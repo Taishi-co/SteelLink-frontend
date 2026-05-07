@@ -36,7 +36,7 @@ export interface LogisticsServiceItem {
   vehicle_type?: string
   load_capacity?: number
   price_rule?: string
-  quote_rules?: Record<string, any>
+  quote_rules?: Record<string, object | undefined>
   fleet_name?: string
   vehicle_certs?: string[]
   driver_certs?: string[]
@@ -87,6 +87,8 @@ export const serviceOfferService = {
     api.post<unknown, ApiResponse<WarehouseServiceItem>>('/warehouse-services', payload),
   updateWarehouse: (id: number, payload: Partial<WarehouseServiceItem>) =>
     api.put<unknown, ApiResponse<WarehouseServiceItem>>(`/warehouse-services/${id}`, payload),
+  deleteWarehouse: (id: number) =>
+    api.delete<unknown, ApiResponse<WarehouseServiceItem>>(`/warehouse-services/${id}`),
   listLogistics: (params?: Record<string, unknown>) =>
     api.get<unknown, ApiResponse<PageResponse<LogisticsServiceItem>>>('/logistics-services', { params }),
   getLogistics: (id: number) =>
@@ -97,6 +99,8 @@ export const serviceOfferService = {
     api.post<unknown, ApiResponse<LogisticsServiceItem>>('/logistics-services', payload),
   updateLogistics: (id: number, payload: Partial<LogisticsServiceItem>) =>
     api.put<unknown, ApiResponse<LogisticsServiceItem>>(`/logistics-services/${id}`, payload),
+  deleteLogistics: (id: number) =>
+    api.delete<unknown, ApiResponse<LogisticsServiceItem>>(`/logistics-services/${id}`),
   listFinance: (params?: Record<string, unknown>) =>
     api.get<unknown, ApiResponse<PageResponse<FinanceServiceItem>>>('/finance-services', { params }),
   listMyFinance: () =>
