@@ -30,16 +30,6 @@ export default function WarehouseManagePage() {
     },
   })
 
-  const startEdit = (row: WarehouseServiceItem) => {
-    setEditing(row)
-    form.setFieldsValue(row)
-  }
-
-  const cancelEdit = () => {
-    setEditing(null)
-    form.resetFields()
-  }
-
   const startEdit = (record: WarehouseServiceItem) => {
     setEditing(record)
     form.setFieldsValue(record)
@@ -99,7 +89,15 @@ export default function WarehouseManagePage() {
             { title: '质押监管', dataIndex: 'pledge_supervision', render: (v?: boolean) => <Tag color={v ? 'green' : undefined}>{v ? '支持' : '不支持'}</Tag> },
             { title: '状态', dataIndex: 'status', render: (v: number) => <Tag>{statusText[v] || '未知'}</Tag> },
             { title: '审核备注', dataIndex: 'audit_remark', render: (v?: string) => v || '-' },
-            { title: '操作', render: (_, record) => <Button type="link" size="small" onClick={() => startEdit(record)}>编辑</Button> },
+            {
+              title: '操作',
+              render: (_, record) => (
+                <div className="flex gap-2">
+                  <Button type="link" size="small" onClick={() => startEdit(record)}>编辑</Button>
+                  <Button type="link" danger size="small" loading={deleteMutation.isPending} onClick={() => deleteMutation.mutate(record.id)}>下线</Button>
+                </div>
+              ),
+            },
           ]}
         />
       </Card>

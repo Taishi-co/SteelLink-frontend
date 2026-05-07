@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
+import { Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
 import {
   AuditOutlined,
   BankOutlined,
@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import { getBuyerToken } from '@/services/auth'
 import { aiProcurementService } from '@/services/aiProcurementService'
+import { serviceOfferService } from '@/services/serviceOfferService'
 import type {
   AIProcurementInfo,
   AIProcurementParseResult,
@@ -20,6 +21,7 @@ import type {
   OrderFormPayload,
   ParsedInstruction,
 } from '@/services/aiProcurementService'
+import type { WarehouseServiceItem } from '@/services/serviceOfferService'
 
 const { Title, Paragraph, Text } = Typography
 const { TextArea } = Input
@@ -62,6 +64,10 @@ const defaultParsed: ParsedInstruction = {
   financing_required: false,
   keywords: [],
   confidence: 0,
+  delivery_address: '',
+  delivery_address_source: 'manual',
+  delivery_warehouse_id: undefined,
+  delivery_warehouse_name: '',
 }
 
 function formatMoney(value?: number) {
@@ -119,6 +125,21 @@ function nearlyEqual(left: number, right: number) {
   return Math.abs(left - right) < 0.0001
 }
 
+function warehouseAddress(item: WarehouseServiceItem) {
+  return [item.province, item.city, item.district, item.address].filter(Boolean).join('')
+}
+
+function productLandedTotal(item: MatchedProduct) {
+  return item.landed_total || item.total_amount || item.quantity * item.unit_price
+}
+
+function scaledFreightEstimate(item: MatchedProduct, quantity: number) {
+  if (!item.freight_estimate || !item.quantity) {
+    return 0
+  }
+  return (item.freight_estimate / item.quantity) * quantity
+}
+
 export default function AiProcurementPage() {
   const navigate = useNavigate()
   const params = useParams<{ step?: string }>()
@@ -133,6 +154,7 @@ export default function AiProcurementPage() {
   const [currentProcurement, setCurrentProcurement] = useState<AIProcurementInfo | null>(null)
   const [selectedProducts, setSelectedProducts] = useState<MatchedProduct[]>([])
   const [mine, setMine] = useState<AIProcurementInfo[]>([])
+  const [warehouses, setWarehouses] = useState<WarehouseServiceItem[]>([])
   const isLoggedIn = Boolean(getBuyerToken())
 
   const loadMine = useCallback(async () => {
@@ -156,6 +178,12 @@ export default function AiProcurementPage() {
   }, [loadMine])
 
   useEffect(() => {
+    serviceOfferService.listWarehouses({ page: 1, page_size: 50 })
+      .then((response) => setWarehouses(response.data.list))
+      .catch(() => setWarehouses([]))
+  }, [])
+
+  useEffect(() => {
     if (result?.parsed) {
       instructionForm.setFieldsValue(result.parsed)
     }
@@ -165,12 +193,13 @@ export default function AiProcurementPage() {
     if (selectedProducts.length > 0) {
       orderForm.setFieldsValue({
         quantity: sumSelectedQuantity(selectedProducts),
-        warehouse_name: String(selectedProducts[0].warehouse?.warehouse_name || ''),
+        warehouse_name: selectedProducts.map((item) => item.origin_warehouse_name || String(item.warehouse?.warehouse_name || '')).filter(Boolean).join('；'),
+        delivery_address: result?.parsed.delivery_address || '',
         payment_method: '线上合同 + 对公转账',
         delivery_method: '平台协同配送',
       })
     }
-  }, [orderForm, selectedProducts])
+  }, [orderForm, result?.parsed.delivery_address, selectedProducts])
 
   const currentStep = activeStep ? activeStep - 1 : 0
 
@@ -361,9 +390,17 @@ export default function AiProcurementPage() {
   }
 
   const handleProductQuantityChange = (product: MatchedProduct, quantity: number | null) => {
+    const nextQuantity = Number(quantity || 0)
     setSelectedProducts((prev) => prev.map((item) => (
       item.product_id === product.product_id
-        ? { ...item, quantity: Number(quantity || 0), total_amount: Number(quantity || 0) * item.unit_price }
+        ? {
+            ...item,
+            quantity: nextQuantity,
+            total_amount: nextQuantity * item.unit_price,
+            freight_estimate: scaledFreightEstimate(item, nextQuantity),
+            landed_total: nextQuantity * item.unit_price + scaledFreightEstimate(item, nextQuantity),
+            unit_landed_price: item.unit_price + scaledFreightEstimate(item, nextQuantity) / (nextQuantity || 1),
+          }
         : item
     )))
   }
@@ -444,6 +481,7 @@ export default function AiProcurementPage() {
             submitting={submitting}
             instructionForm={instructionForm}
             orderForm={orderForm}
+            warehouses={warehouses}
             onConfirmInstruction={handleConfirmInstruction}
             onToggleProduct={handleToggleProduct}
             onProductQuantityChange={handleProductQuantityChange}
@@ -545,6 +583,7 @@ function StepPage({
   submitting,
   instructionForm,
   orderForm,
+  warehouses,
   onConfirmInstruction,
   onToggleProduct,
   onProductQuantityChange,
@@ -561,6 +600,7 @@ function StepPage({
   submitting: boolean
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
+  warehouses: WarehouseServiceItem[]
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
@@ -599,6 +639,7 @@ function StepPage({
           submitting,
           instructionForm,
           orderForm,
+          warehouses,
           onConfirmInstruction,
           onToggleProduct,
           onProductQuantityChange,
@@ -621,6 +662,7 @@ function renderStepContent(props: {
   submitting: boolean
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
+  warehouses: WarehouseServiceItem[]
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
@@ -629,7 +671,7 @@ function renderStepContent(props: {
   onMatchFinance: (required: boolean) => Promise<void>
   onSubmitReview: () => void
 }) {
-  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm } = props
+  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm, warehouses } = props
 
   if (activeStep === 1) {
     return (
@@ -642,6 +684,47 @@ function renderStepContent(props: {
             <Col xs={24} md={8}><Form.Item name="unit" label="单位" rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="financing_required" label="是否需要融资" valuePropName="checked"><Switch /></Form.Item></Col>
             <Col xs={24}><Form.Item name="usage" label="业务用途" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={8}>
+              <Form.Item name="delivery_address_source" label="收货地址类型">
+                <Radio.Group>
+                  <Radio value="manual">手动地址</Radio>
+                  <Radio value="buyer_warehouse">平台仓库</Radio>
+                </Radio.Group>
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={16}>
+              <Form.Item name="delivery_warehouse_id" label="选择收货仓库">
+                <Select
+                  allowClear
+                  placeholder="可选择平台已审核仓库作为收货地址"
+                  options={warehouses.map((item) => ({
+                    value: item.id,
+                    label: `${item.warehouse_name} · ${warehouseAddress(item) || item.city || '-'}`,
+                  }))}
+                  onChange={(value) => {
+                    const selected = warehouses.find((item) => item.id === value)
+                    if (!selected) {
+                      instructionForm.setFieldsValue({
+                        delivery_address_source: 'manual',
+                        delivery_warehouse_name: '',
+                      })
+                      return
+                    }
+                    instructionForm.setFieldsValue({
+                      delivery_address_source: 'buyer_warehouse',
+                      delivery_warehouse_name: selected.warehouse_name,
+                      delivery_address: warehouseAddress(selected),
+                    })
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24}>
+              <Form.Item name="delivery_address" label="收货地址" rules={[{ required: true, message: '请输入收货地址，用于估算物流到手价' }]}>
+                <Input placeholder="例如：上海市宝山区月罗公路钢材园区，或选择平台仓库自动填入" />
+              </Form.Item>
+            </Col>
+            <Form.Item name="delivery_warehouse_name" hidden><Input /></Form.Item>
           </Row>
           <Button type="primary" icon={<FileSearchOutlined />} loading={busy} onClick={() => void props.onConfirmInstruction()}>
             确认参数并召回商品
@@ -658,7 +741,7 @@ function renderStepContent(props: {
           <Space direction="vertical" size="middle" className="w-full">
             {result.matched_products.map((item) => (
               <div key={`${item.product_id}-${item.product_no}`} className={`rounded border p-4 ${selectedProducts.some((product) => product.product_id === item.product_id) ? 'border-primary-500 bg-primary-50' : 'border-gray-100 bg-white'}`}>
-                <div className="grid gap-4 md:grid-cols-[1fr_160px_220px] md:items-center">
+                <div className="grid gap-4 md:grid-cols-[1fr_220px_220px] md:items-center">
                   <div>
                     <Text strong>{item.product_name}</Text>
                     <div className="mt-1 text-sm text-gray-500">{item.steel_mill || '-'} · {item.category || '-'} · {item.match_reason}</div>
@@ -666,9 +749,15 @@ function renderStepContent(props: {
                       <Tag>{item.product_no}</Tag>
                       <Tag>可用 {item.available_qty || item.quantity}</Tag>
                       {item.delivery_days ? <Tag>{item.delivery_days}天交付</Tag> : null}
+                      {item.origin_warehouse_name ? <Tag>{item.origin_warehouse_name}发货</Tag> : null}
+                      {item.logistics_service_name ? <Tag color="blue">{item.logistics_service_name}</Tag> : null}
                     </div>
                   </div>
-                  <Text strong>{formatMoney(item.unit_price)} / {result.parsed.unit}</Text>
+                  <div>
+                    <Text strong>{formatMoney(item.unit_landed_price || item.unit_price)} / {result.parsed.unit}</Text>
+                    <div className="mt-1 text-sm text-gray-500">商品 {formatMoney(item.total_amount)} · 运费 {formatMoney(item.freight_estimate)}</div>
+                    <div className="mt-1 text-sm text-gray-500">到手 {formatMoney(productLandedTotal(item))}</div>
+                  </div>
                   <Space>
                     <Button onClick={() => showProductDetail(item)}>详情</Button>
                     <Button type={selectedProducts.some((product) => product.product_id === item.product_id) ? 'primary' : 'default'} onClick={() => props.onToggleProduct(item)}>
@@ -691,7 +780,10 @@ function renderStepContent(props: {
               </div>
             ))}
             <div className="rounded border border-gray-100 bg-gray-50 p-4">
-              <Text>已选 {selectedProducts.length} 个商品，合计 {sumSelectedQuantity(selectedProducts)} / {result.parsed.quantity} {result.parsed.unit}</Text>
+              <Text>
+                已选 {selectedProducts.length} 个商品，合计 {sumSelectedQuantity(selectedProducts)} / {result.parsed.quantity} {result.parsed.unit}
+                ，预估到手 {formatMoney(selectedProducts.reduce((sum, item) => sum + productLandedTotal(item), 0))}
+              </Text>
             </div>
             <Button type="primary" onClick={props.onConfirmProduct}>确认商品，填写订单</Button>
           </Space>
@@ -713,7 +805,11 @@ function renderStepContent(props: {
                   <Descriptions.Item label="商品">{item.product_name}</Descriptions.Item>
                   <Descriptions.Item label="钢厂">{item.steel_mill || '-'}</Descriptions.Item>
                   <Descriptions.Item label="数量">{item.quantity} {result.parsed.unit}</Descriptions.Item>
-                  <Descriptions.Item label="金额">{formatMoney(item.quantity * item.unit_price)}</Descriptions.Item>
+                  <Descriptions.Item label="到手金额">{formatMoney(productLandedTotal(item))}</Descriptions.Item>
+                  <Descriptions.Item label="发货仓库">{item.origin_warehouse_name || String(item.warehouse?.warehouse_name || '-')}</Descriptions.Item>
+                  <Descriptions.Item label="起运地址">{item.origin_address || String(item.warehouse?.address || '-')}</Descriptions.Item>
+                  <Descriptions.Item label="推荐物流">{item.logistics_service_name || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="预估运费">{formatMoney(item.freight_estimate)}</Descriptions.Item>
                 </Descriptions>
               ))}
             </Space>
@@ -722,9 +818,9 @@ function renderStepContent(props: {
                 <Col xs={24} md={8}><Form.Item name="quantity" label="下单数量"><InputNumber className="w-full" disabled addonAfter={result.parsed.unit} /></Form.Item></Col>
                 <Col xs={24} md={8}><Form.Item name="contact_name" label="联系人" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                <Col xs={24} md={12}><Form.Item name="warehouse_name" label="提货仓库" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                <Col xs={24} md={12}><Form.Item name="warehouse_name" label="卖家发货仓库" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="delivery_method" label="物流方式" rules={[{ required: true }]}><Radio.Group><Radio value="平台协同配送">平台协同配送</Radio><Radio value="自行提货">自行提货</Radio></Radio.Group></Form.Item></Col>
-                <Col xs={24}><Form.Item name="delivery_address" label="交付地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                <Col xs={24}><Form.Item name="delivery_address" label="收货地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="payment_method" label="付款方式" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="delivery_note" label="交付说明"><Input /></Form.Item></Col>
                 <Col xs={24}><Form.Item name="remark" label="订单备注"><TextArea autoSize={{ minRows: 2, maxRows: 4 }} /></Form.Item></Col>
@@ -848,6 +944,11 @@ function showProductDetail(item: MatchedProduct) {
         <Descriptions.Item label="品类">{item.category || '-'}</Descriptions.Item>
         <Descriptions.Item label="库存">{item.available_qty || item.quantity}</Descriptions.Item>
         <Descriptions.Item label="单价">{formatMoney(item.unit_price)}</Descriptions.Item>
+        <Descriptions.Item label="预估运费">{formatMoney(item.freight_estimate)}</Descriptions.Item>
+        <Descriptions.Item label="到手总价">{formatMoney(productLandedTotal(item))}</Descriptions.Item>
+        <Descriptions.Item label="推荐物流">{item.logistics_service_name || '-'}</Descriptions.Item>
+        <Descriptions.Item label="起运地址">{item.origin_address || '-'}</Descriptions.Item>
+        <Descriptions.Item label="收货地址">{item.destination_address || '-'}</Descriptions.Item>
         <Descriptions.Item label="捆包号">{item.bundle_no || '-'}</Descriptions.Item>
         <Descriptions.Item label="仓库">{String(item.warehouse?.warehouse_name || '-')}</Descriptions.Item>
         <Descriptions.Item label="描述">{item.description || item.match_reason}</Descriptions.Item>

@@ -8,12 +8,10 @@ import {
   SafetyCertificateOutlined,
   BankOutlined,
   DollarOutlined,
-  AppstoreAddOutlined,
-  CloudServerOutlined,
+  AppstoreOutlined,
   ShopOutlined,
   LineChartOutlined,
   RiseOutlined,
-  TruckOutlined,
   LogoutOutlined,
   UserOutlined,
   ArrowRightOutlined,
@@ -43,12 +41,6 @@ const allNavItems: NavItem[] = [
   { key: '/dashboard/services', icon: <AppstoreOutlined />, label: '服务入口', roles: ['enterprise'] },
 ]
 
-const serviceNavItems: Record<ServiceKey, NavItem> = {
-  logistics: { key: '/dashboard/logistics', icon: <TruckOutlined />, label: '物流平台' },
-  warehouse: { key: '/dashboard/warehouse', icon: <CloudServerOutlined />, label: '仓储平台' },
-  finance: { key: '/dashboard/finance', icon: <DollarOutlined />, label: '资金服务' },
-}
-
 const accountItems = [
   { key: '/dashboard/identity', icon: <SafetyCertificateOutlined />, label: '实名认证' },
   { key: '/dashboard/enterprise', icon: <BankOutlined />, label: '企业信息' },
@@ -62,17 +54,6 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useUserStore()
-  const [enabledServices, setEnabledServices] = useState<ServiceKey[]>(() => readEnabledServices())
-
-  useEffect(() => {
-    const handleAccessChange = () => setEnabledServices(readEnabledServices())
-    window.addEventListener('storage', handleAccessChange)
-    window.addEventListener(SERVICE_ACCESS_EVENT, handleAccessChange)
-    return () => {
-      window.removeEventListener('storage', handleAccessChange)
-      window.removeEventListener(SERVICE_ACCESS_EVENT, handleAccessChange)
-    }
-  }, [])
 
   useEffect(() => {
     if (!hasEnterpriseAccess(user)) {
@@ -84,7 +65,7 @@ export default function DashboardLayout() {
         setServicePermissions(res.data.permissions)
       }
     }).catch(() => {})
-  }, [user?.role, user?.enterpriseCode])
+  }, [user])
 
   const approvedServices = useMemo(() => {
     return new Set<string>(

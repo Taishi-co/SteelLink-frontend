@@ -19,6 +19,10 @@ export interface ParsedInstruction {
   financing_required: boolean
   keywords: string[]
   confidence: number
+  delivery_address?: string
+  delivery_address_source?: 'manual' | 'buyer_warehouse' | string
+  delivery_warehouse_id?: number
+  delivery_warehouse_name?: string
 }
 
 export interface MatchedProduct {
@@ -41,6 +45,15 @@ export interface MatchedProduct {
   quote_validity?: number
   quality_cert?: string
   description?: string
+  origin_warehouse_name?: string
+  origin_address?: string
+  destination_address?: string
+  logistics_service_id?: number
+  logistics_service_name?: string
+  logistics_route?: string
+  freight_estimate?: number
+  landed_total?: number
+  unit_landed_price?: number
   selected?: boolean
 }
 

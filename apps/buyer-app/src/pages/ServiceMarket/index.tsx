@@ -136,8 +136,8 @@ export default function ServiceMarketPage() {
     queryFn: () => serviceOfferService.listLogistics({ page_size: 12 }),
   })
 
-  const warehouses = warehouseData?.data.list ?? []
-  const logistics = logisticsData?.data.list ?? []
+  const warehouses = useMemo(() => warehouseData?.data.list ?? [], [warehouseData?.data.list])
+  const logistics = useMemo(() => logisticsData?.data.list ?? [], [logisticsData?.data.list])
   const loading = warehouseLoading || logisticsLoading
 
   const serviceResources = useMemo(
