@@ -9,6 +9,7 @@ import {
   LoginOutlined,
   MessageOutlined,
   ShoppingCartOutlined,
+  TruckOutlined,
 } from '@ant-design/icons'
 import { getBuyerToken } from '@/services/auth'
 import { aiProcurementService } from '@/services/aiProcurementService'
@@ -36,14 +37,16 @@ interface ProcurementStep {
 const procurementSteps: ProcurementStep[] = [
   { step: 1, code: 'instruction_parsing', title: '指令解析', description: '确认商品、数量、用途和融资意图' },
   { step: 2, code: 'product_matching', title: '商品匹配', description: '召回候选商品并选择下单商品' },
-  { step: 3, code: 'order_generation', title: '订单生成', description: '填写真实订单信息并锁定库存' },
-  { step: 4, code: 'financing_matching', title: '融资匹配', description: '按需匹配订单融资方案' },
-  { step: 5, code: 'review_submission', title: '审核提交', description: '确认订单和融资后提交审核' },
+  { step: 3, code: 'logistics_warehouse_matching', title: '物流仓储匹配', description: '按发货仓库、收货地址和物流服务估算到手成本' },
+  { step: 4, code: 'order_generation', title: '订单生成', description: '填写真实订单信息并锁定库存' },
+  { step: 5, code: 'financing_matching', title: '融资匹配', description: '按需匹配订单融资方案' },
+  { step: 6, code: 'review_submission', title: '审核提交', description: '确认订单和融资后提交审核' },
 ]
 
 const stageIcons: Record<AIProcurementStageCode, ReactNode> = {
   instruction_parsing: <MessageOutlined />,
   product_matching: <FileSearchOutlined />,
+  logistics_warehouse_matching: <TruckOutlined />,
   order_generation: <ShoppingCartOutlined />,
   financing_matching: <BankOutlined />,
   review_submission: <AuditOutlined />,
@@ -272,7 +275,7 @@ export default function AiProcurementPage() {
     }
   }
 
-  const handleConfirmProduct = () => {
+  const handleConfirmProduct = async () => {
     const selectedQuantity = sumSelectedQuantity(selectedProducts)
     if (selectedProducts.length === 0) {
       message.warning('请选择至少一个商品')
@@ -282,7 +285,23 @@ export default function AiProcurementPage() {
       message.warning(`拼单数量需要等于采购数量：${result?.parsed.quantity || 0}${result?.parsed.unit || ''}`)
       return
     }
-    navigate('/ai-procurement/3')
+    setBusy(true)
+    try {
+      const matched = await aiProcurementService.matchLogisticsWarehouse({
+        parsed: result.parsed,
+        selected_products: selectedProducts,
+      })
+      setSelectedProducts(matched.matched_products)
+      updateResult({
+        stages: matched.stages,
+      })
+      navigate('/ai-procurement/3')
+      message.success('物流仓储方案匹配完成')
+    } catch (error) {
+      message.error('物流仓储匹配失败')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const handleGenerateOrder = async () => {
@@ -305,9 +324,9 @@ export default function AiProcurementPage() {
       setCurrentProcurement(response.procurement)
       setResult(getResultFromProcurement(response.procurement))
       if (response.procurement.financing_required) {
-        navigate('/ai-procurement/4')
-      } else {
         navigate('/ai-procurement/5')
+      } else {
+        navigate('/ai-procurement/6')
       }
       message.success('真实订单已生成')
     } catch (error) {
@@ -327,7 +346,7 @@ export default function AiProcurementPage() {
       const procurement = await aiProcurementService.matchFinance(currentProcurement.id, required)
       setCurrentProcurement(procurement)
       setResult(getResultFromProcurement(procurement))
-      navigate('/ai-procurement/5')
+      navigate('/ai-procurement/6')
       message.success(required ? '融资方案匹配完成' : '已跳过融资匹配')
     } catch (error) {
       message.error('融资匹配失败')
@@ -369,7 +388,7 @@ export default function AiProcurementPage() {
     })
   }
 
-  const openProcurement = (item: AIProcurementInfo, step = 5) => {
+  const openProcurement = (item: AIProcurementInfo, step = 6) => {
     setCurrentProcurement(item)
     setResult(getResultFromProcurement(item))
     setPrompt(item.prompt)
@@ -410,7 +429,7 @@ export default function AiProcurementPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const showWorkflow = !activeStep || activeStep < 5
+  const showWorkflow = !activeStep || activeStep < 6
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -604,7 +623,7 @@ function StepPage({
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
-  onConfirmProduct: () => void
+  onConfirmProduct: () => Promise<void>
   onGenerateOrder: () => Promise<void>
   onMatchFinance: (required: boolean) => Promise<void>
   onSubmitReview: () => void
@@ -666,7 +685,7 @@ function renderStepContent(props: {
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
-  onConfirmProduct: () => void
+  onConfirmProduct: () => Promise<void>
   onGenerateOrder: () => Promise<void>
   onMatchFinance: (required: boolean) => Promise<void>
   onSubmitReview: () => void
@@ -749,14 +768,12 @@ function renderStepContent(props: {
                       <Tag>{item.product_no}</Tag>
                       <Tag>可用 {item.available_qty || item.quantity}</Tag>
                       {item.delivery_days ? <Tag>{item.delivery_days}天交付</Tag> : null}
-                      {item.origin_warehouse_name ? <Tag>{item.origin_warehouse_name}发货</Tag> : null}
-                      {item.logistics_service_name ? <Tag color="blue">{item.logistics_service_name}</Tag> : null}
                     </div>
                   </div>
                   <div>
-                    <Text strong>{formatMoney(item.unit_landed_price || item.unit_price)} / {result.parsed.unit}</Text>
-                    <div className="mt-1 text-sm text-gray-500">商品 {formatMoney(item.total_amount)} · 运费 {formatMoney(item.freight_estimate)}</div>
-                    <div className="mt-1 text-sm text-gray-500">到手 {formatMoney(productLandedTotal(item))}</div>
+                    <Text strong>{formatMoney(item.unit_price)} / {result.parsed.unit}</Text>
+                    <div className="mt-1 text-sm text-gray-500">商品金额 {formatMoney(item.total_amount)}</div>
+                    <div className="mt-1 text-sm text-gray-500">匹配度 {item.score || 0}</div>
                   </div>
                   <Space>
                     <Button onClick={() => showProductDetail(item)}>详情</Button>
@@ -782,10 +799,10 @@ function renderStepContent(props: {
             <div className="rounded border border-gray-100 bg-gray-50 p-4">
               <Text>
                 已选 {selectedProducts.length} 个商品，合计 {sumSelectedQuantity(selectedProducts)} / {result.parsed.quantity} {result.parsed.unit}
-                ，预估到手 {formatMoney(selectedProducts.reduce((sum, item) => sum + productLandedTotal(item), 0))}
+                ，商品金额 {formatMoney(selectedProducts.reduce((sum, item) => sum + item.total_amount, 0))}
               </Text>
             </div>
-            <Button type="primary" onClick={props.onConfirmProduct}>确认商品，填写订单</Button>
+            <Button type="primary" icon={<TruckOutlined />} loading={busy} onClick={() => void props.onConfirmProduct()}>确认商品，匹配物流仓储</Button>
           </Space>
         ) : (
           <Empty description="暂无商品匹配结果，请返回上一步调整参数" />
@@ -796,10 +813,16 @@ function renderStepContent(props: {
 
   if (activeStep === 3) {
     return (
-      <Card title="生成真实订单">
+      <Card title="物流仓储匹配">
         {selectedProducts.length > 0 ? (
-          <>
-            <Space direction="vertical" size="small" className="mb-5 w-full">
+          <Space direction="vertical" size="middle" className="w-full">
+            <div className="rounded border border-gray-100 bg-gray-50 p-4">
+              <Text>
+                预估运费 {formatMoney(selectedProducts.reduce((sum, item) => sum + Number(item.freight_estimate || 0), 0))}
+                ，到手总额 {formatMoney(selectedProducts.reduce((sum, item) => sum + productLandedTotal(item), 0))}
+              </Text>
+            </div>
+            <Space direction="vertical" size="small" className="w-full">
               {selectedProducts.map((item) => (
                 <Descriptions key={item.product_id} bordered size="small" column={{ xs: 1, md: 4 }}>
                   <Descriptions.Item label="商品">{item.product_name}</Descriptions.Item>
@@ -808,11 +831,29 @@ function renderStepContent(props: {
                   <Descriptions.Item label="到手金额">{formatMoney(productLandedTotal(item))}</Descriptions.Item>
                   <Descriptions.Item label="发货仓库">{item.origin_warehouse_name || String(item.warehouse?.warehouse_name || '-')}</Descriptions.Item>
                   <Descriptions.Item label="起运地址">{item.origin_address || String(item.warehouse?.address || '-')}</Descriptions.Item>
+                  <Descriptions.Item label="收货地址">{item.destination_address || result.parsed.delivery_address || '-'}</Descriptions.Item>
                   <Descriptions.Item label="推荐物流">{item.logistics_service_name || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="运输线路">{item.logistics_route || '-'}</Descriptions.Item>
                   <Descriptions.Item label="预估运费">{formatMoney(item.freight_estimate)}</Descriptions.Item>
                 </Descriptions>
               ))}
             </Space>
+            <Link to="/ai-procurement/4">
+              <Button type="primary" icon={<ShoppingCartOutlined />}>确认物流仓储方案，填写订单</Button>
+            </Link>
+          </Space>
+        ) : (
+          <Empty description="请先在商品匹配阶段选择商品" />
+        )}
+      </Card>
+    )
+  }
+
+  if (activeStep === 4) {
+    return (
+      <Card title="生成真实订单">
+        {selectedProducts.length > 0 ? (
+          <>
             <Form form={orderForm} layout="vertical">
               <Row gutter={16}>
                 <Col xs={24} md={8}><Form.Item name="quantity" label="下单数量"><InputNumber className="w-full" disabled addonAfter={result.parsed.unit} /></Form.Item></Col>
@@ -837,7 +878,7 @@ function renderStepContent(props: {
     )
   }
 
-  if (activeStep === 4) {
+  if (activeStep === 5) {
     if (!currentProcurement?.financing_required) {
       return (
         <Card title="融资匹配">
@@ -862,7 +903,7 @@ function renderStepContent(props: {
                 </div>
               </div>
             ))}
-            <Link to="/ai-procurement/5"><Button type="primary">确认融资方案，进入审核</Button></Link>
+            <Link to="/ai-procurement/6"><Button type="primary">确认融资方案，进入审核</Button></Link>
           </Space>
         ) : (
           <Button type="primary" icon={<BankOutlined />} loading={busy} onClick={() => void props.onMatchFinance(true)}>
@@ -944,13 +985,7 @@ function showProductDetail(item: MatchedProduct) {
         <Descriptions.Item label="品类">{item.category || '-'}</Descriptions.Item>
         <Descriptions.Item label="库存">{item.available_qty || item.quantity}</Descriptions.Item>
         <Descriptions.Item label="单价">{formatMoney(item.unit_price)}</Descriptions.Item>
-        <Descriptions.Item label="预估运费">{formatMoney(item.freight_estimate)}</Descriptions.Item>
-        <Descriptions.Item label="到手总价">{formatMoney(productLandedTotal(item))}</Descriptions.Item>
-        <Descriptions.Item label="推荐物流">{item.logistics_service_name || '-'}</Descriptions.Item>
-        <Descriptions.Item label="起运地址">{item.origin_address || '-'}</Descriptions.Item>
-        <Descriptions.Item label="收货地址">{item.destination_address || '-'}</Descriptions.Item>
         <Descriptions.Item label="捆包号">{item.bundle_no || '-'}</Descriptions.Item>
-        <Descriptions.Item label="仓库">{String(item.warehouse?.warehouse_name || '-')}</Descriptions.Item>
         <Descriptions.Item label="描述">{item.description || item.match_reason}</Descriptions.Item>
       </Descriptions>
     ),
