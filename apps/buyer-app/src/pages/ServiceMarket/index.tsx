@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, Card, Col, Divider, Empty, Row, Space, Statistic, Steps, Table, Tag, Typography } from 'antd'
+import { Button, Card, Col, Divider, Empty, Form, Input, InputNumber, Modal, Row, Select, Space, Statistic, Steps, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   BankOutlined,
@@ -14,11 +14,15 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   serviceOfferService,
   type LogisticsServiceItem,
   type WarehouseServiceItem,
 } from '@/services/serviceOfferService'
+import { serviceFulfillmentService } from '@/services/serviceFulfillmentService'
+import type { CreateLogisticsOrderPayload, CreateWarehouseStoragePayload } from '@/services/serviceFulfillmentService'
+import { getBuyerToken } from '@/services/auth'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -37,59 +41,27 @@ interface ServiceResourceRow {
   tags: string[]
 }
 
-const columns: ColumnsType<ServiceResourceRow> = [
-  {
-    title: '服务商',
-    dataIndex: 'provider',
-    key: 'provider',
-    render: (value: string, record) => (
-      <Link to={record.resourceType === 'warehouse' ? `/warehouses/${record.id}` : `/logistics-services/${record.id}`}>
-        {value}
-      </Link>
-    ),
-  },
-  {
-    title: '服务类型',
-    dataIndex: 'type',
-    key: 'type',
-    render: (value: string, record) => (
-      <Tag color={record.resourceType === 'warehouse' ? 'green' : 'blue'}>{value}</Tag>
-    ),
-  },
-  { title: '覆盖区域', dataIndex: 'region', key: 'region' },
-  { title: '能力', dataIndex: 'capability', key: 'capability' },
-  { title: '价格', dataIndex: 'price', key: 'price' },
-  { title: '响应', dataIndex: 'leadTime', key: 'leadTime' },
-  {
-    title: '标签',
-    dataIndex: 'tags',
-    key: 'tags',
-    render: (tags: string[]) => (
-      <Space wrap>
-        {tags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
-      </Space>
-    ),
-  },
-]
-
 const serviceCards = [
   {
-    title: '仓储服务',
+    key: 'storage-rent',
+    title: '已有货物租仓',
     icon: <CloudServerOutlined className="text-2xl text-emerald-600" />,
-    description: '查找仓库、监管仓、装卸、库内加工和仓单资料服务。',
-    actions: ['预约入库', '库存监管', '仓单质押资料'],
+    description: '用户已有一批货，但缺少临时或监管存放场地，可向已审核仓库提交入库托管需求。',
+    actions: ['预约入库', '库存监管', '质押监管'],
   },
   {
-    title: '物流运输',
+    key: 'logistics-hire',
+    title: '已有货物找物流',
     icon: <CarOutlined className="text-2xl text-blue-600" />,
-    description: '按线路、车型、时效和回单要求匹配承运能力。',
-    actions: ['整车运输', '短驳配送', '在途追踪'],
+    description: '用户已有现货或仓内货物，需要委托物流商运输，并可附加履约保障。',
+    actions: ['运输委托', '价格估算', '履约保障'],
   },
   {
-    title: '仓配协同',
+    key: 'provider-listing',
+    title: '服务商上架资源',
     icon: <SwapOutlined className="text-2xl text-indigo-600" />,
-    description: '把仓储、运输、货权过户和签收节点串成一个履约计划。',
-    actions: ['到仓提货', '过户确认', '签收回单'],
+    description: '仓库有闲置库容可上架出租；物流商可上架线路、车型和报价规则。',
+    actions: ['仓库出租', '物流上架', '平台审核'],
   },
 ]
 
@@ -127,6 +99,13 @@ function mapLogisticsResource(item: LogisticsServiceItem): ServiceResourceRow {
 }
 
 export default function ServiceMarketPage() {
+  const [logisticsForm] = Form.useForm<CreateLogisticsOrderPayload & { guarantee_enabled?: boolean; coverage_amount?: number }>()
+  const [storageForm] = Form.useForm<CreateWarehouseStoragePayload>()
+  const [warehouseForm] = Form.useForm<Partial<WarehouseServiceItem>>()
+  const [carrierForm] = Form.useForm<Partial<LogisticsServiceItem>>()
+  const [activeModal, setActiveModal] = useState<'logistics' | 'storage' | 'warehouse-listing' | 'logistics-listing' | null>(null)
+  const queryClient = useQueryClient()
+  const isLoggedIn = Boolean(getBuyerToken())
   const { data: warehouseData, isLoading: warehouseLoading } = useQuery({
     queryKey: ['service-market-warehouses'],
     queryFn: () => serviceOfferService.listWarehouses({ page_size: 12 }),
@@ -150,6 +129,130 @@ export default function ServiceMarketPage() {
 
   const totalWarehouseCapacity = warehouses.reduce((sum, item) => sum + (item.available_capacity || 0), 0)
   const totalLogisticsCapacity = logistics.reduce((sum, item) => sum + (item.load_capacity || 0), 0)
+  const ensureLoggedIn = () => {
+    if (!isLoggedIn) {
+      message.warning('请先登录后再提交服务需求')
+      return false
+    }
+    return true
+  }
+  const openLogisticsRequest = (item?: LogisticsServiceItem) => {
+    if (!ensureLoggedIn()) return
+    logisticsForm.resetFields()
+    logisticsForm.setFieldsValue({
+      logistics_service_id: item?.id,
+      origin: item?.route_start || '',
+      destination: item?.route_end || '',
+      vehicle_type: item?.vehicle_type || '',
+      cargo_name: '钢材',
+      weight: 30,
+      guarantee_type: '平台履约保障',
+      guarantee_enabled: true,
+    })
+    setActiveModal('logistics')
+  }
+  const openStorageRequest = (item?: WarehouseServiceItem) => {
+    if (!ensureLoggedIn()) return
+    storageForm.resetFields()
+    storageForm.setFieldsValue({
+      warehouse_service_id: item?.id,
+      product_name: '钢材现货',
+      quantity: 30,
+      storage_requirement: item?.pledge_supervision ? '需要质押监管和出库凭证管理' : '需要短期存放和出入库作业',
+    })
+    setActiveModal('storage')
+  }
+  const createLogisticsMutation = useMutation({
+    mutationFn: async (values: CreateLogisticsOrderPayload & { guarantee_enabled?: boolean; coverage_amount?: number }) => {
+      const logisticsOrder = await serviceFulfillmentService.createLogisticsOrder(values)
+      if (values.guarantee_enabled && values.guarantee_type) {
+        await serviceFulfillmentService.createGuarantee({
+          logistics_order_id: logisticsOrder.data.id,
+          guarantee_type: values.guarantee_type,
+          coverage_amount: values.coverage_amount,
+          description: `物流委托 ${logisticsOrder.data.logistics_no} 的履约保障`,
+        })
+      }
+      return logisticsOrder
+    },
+    onSuccess: () => {
+      message.success('物流委托已提交，物流商可在工作台接单')
+      setActiveModal(null)
+      logisticsForm.resetFields()
+    },
+  })
+  const storageMutation = useMutation({
+    mutationFn: serviceFulfillmentService.requestWarehouseStorage,
+    onSuccess: () => {
+      message.success('仓储托管需求已提交，仓储方可在作业记录中处理')
+      setActiveModal(null)
+      storageForm.resetFields()
+    },
+  })
+  const warehouseListingMutation = useMutation({
+    mutationFn: serviceOfferService.createWarehouse,
+    onSuccess: () => {
+      message.success('仓库资源已提交审核')
+      setActiveModal(null)
+      warehouseForm.resetFields()
+      void queryClient.invalidateQueries({ queryKey: ['service-market-warehouses'] })
+    },
+  })
+  const logisticsListingMutation = useMutation({
+    mutationFn: serviceOfferService.createLogistics,
+    onSuccess: () => {
+      message.success('物流资源已提交审核')
+      setActiveModal(null)
+      carrierForm.resetFields()
+      void queryClient.invalidateQueries({ queryKey: ['service-market-logistics'] })
+    },
+  })
+  const columns: ColumnsType<ServiceResourceRow> = [
+    {
+      title: '服务商',
+      dataIndex: 'provider',
+      key: 'provider',
+      render: (value: string, record) => (
+        <Link to={record.resourceType === 'warehouse' ? `/warehouses/${record.id}` : `/logistics-services/${record.id}`}>
+          {value}
+        </Link>
+      ),
+    },
+    {
+      title: '服务类型',
+      dataIndex: 'type',
+      key: 'type',
+      render: (value: string, record) => (
+        <Tag color={record.resourceType === 'warehouse' ? 'green' : 'blue'}>{value}</Tag>
+      ),
+    },
+    { title: '覆盖区域', dataIndex: 'region', key: 'region' },
+    { title: '能力', dataIndex: 'capability', key: 'capability' },
+    { title: '价格', dataIndex: 'price', key: 'price' },
+    {
+      title: '标签',
+      dataIndex: 'tags',
+      key: 'tags',
+      render: (tags: string[]) => (
+        <Space wrap>
+          {tags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
+        </Space>
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      fixed: 'right',
+      render: (_, record) => {
+        if (record.resourceType === 'warehouse') {
+          const warehouse = warehouses.find((item) => item.id === record.id)
+          return <Button type="link" onClick={() => openStorageRequest(warehouse)}>租仓存货</Button>
+        }
+        const carrier = logistics.find((item) => item.id === record.id)
+        return <Button type="link" onClick={() => openLogisticsRequest(carrier)}>委托运输</Button>
+      },
+    },
+  ]
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -173,6 +276,8 @@ export default function ServiceMarketPage() {
                 <Link to="/logistics-services">
                   <Button size="large" icon={<EnvironmentOutlined />}>查看物流资源</Button>
                 </Link>
+                <Button size="large" icon={<CarOutlined />} onClick={() => openLogisticsRequest()}>发布运输需求</Button>
+                <Button size="large" icon={<CloudServerOutlined />} onClick={() => openStorageRequest()}>发布租仓需求</Button>
               </Space>
             </Col>
             <Col xs={24} lg={10}>
@@ -202,6 +307,16 @@ export default function ServiceMarketPage() {
                     <Space wrap>
                       {item.actions.map((action) => <Tag key={action}>{action}</Tag>)}
                     </Space>
+                    <div className="mt-4">
+                      {item.key === 'logistics-hire' && <Button type="primary" onClick={() => openLogisticsRequest()}>委托物流商运输</Button>}
+                      {item.key === 'storage-rent' && <Button type="primary" onClick={() => openStorageRequest()}>提交租仓托管</Button>}
+                      {item.key === 'provider-listing' && (
+                        <Space wrap>
+                          <Button onClick={() => { if (ensureLoggedIn()) setActiveModal('warehouse-listing') }}>上架仓库</Button>
+                          <Button onClick={() => { if (ensureLoggedIn()) setActiveModal('logistics-listing') }}>上架物流</Button>
+                        </Space>
+                      )}
+                    </div>
                   </div>
                 </Space>
               </Card>
@@ -257,6 +372,102 @@ export default function ServiceMarketPage() {
           </Col>
         </Row>
       </main>
+      <Modal
+        title="委托物流商运输"
+        open={activeModal === 'logistics'}
+        onCancel={() => setActiveModal(null)}
+        onOk={() => logisticsForm.submit()}
+        confirmLoading={createLogisticsMutation.isPending}
+        width={720}
+      >
+        <Form form={logisticsForm} layout="vertical" onFinish={(values) => createLogisticsMutation.mutate(values)}>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item name="logistics_service_id" label="物流服务商" rules={[{ required: true }]}>
+                <Select options={logistics.map((item) => ({ value: item.id, label: `${item.name} · ${item.route_start || '-'} -> ${item.route_end || '-'}` }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}><Form.Item name="cargo_name" label="货物名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="origin" label="提货地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="destination" label="送达地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="weight" label="重量" rules={[{ required: true }]}><InputNumber className="w-full" min={0.01} addonAfter="吨" /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="vehicle_type" label="车型"><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="coverage_amount" label="保障金额"><InputNumber className="w-full" min={0} addonBefore="¥" /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="guarantee_type" label="履约保障"><Input placeholder="如：平台履约保障、签收回单保障、货损保障" /></Form.Item></Col>
+          </Row>
+        </Form>
+      </Modal>
+      <Modal
+        title="提交仓储托管需求"
+        open={activeModal === 'storage'}
+        onCancel={() => setActiveModal(null)}
+        onOk={() => storageForm.submit()}
+        confirmLoading={storageMutation.isPending}
+        width={720}
+      >
+        <Form form={storageForm} layout="vertical" onFinish={(values) => storageMutation.mutate(values)}>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item name="warehouse_service_id" label="目标仓库" rules={[{ required: true }]}>
+                <Select options={warehouses.map((item) => ({ value: item.id, label: `${item.warehouse_name} · ${[item.province, item.city].filter(Boolean).join(' / ') || item.address || '-'}` }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}><Form.Item name="product_name" label="货物名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="quantity" label="数量" rules={[{ required: true }]}><InputNumber className="w-full" min={0.01} addonAfter="吨" /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="contact_name" label="联系人"><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话"><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="scheduled_at" label="计划入库时间"><Input placeholder="如：2026-05-10 上午" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="bundle_no" label="捆包/批次号"><Input /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="storage_requirement" label="仓储要求"><Input.TextArea rows={2} /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="remark" label="备注"><Input.TextArea rows={2} /></Form.Item></Col>
+          </Row>
+        </Form>
+      </Modal>
+      <Modal
+        title="上架闲置仓库"
+        open={activeModal === 'warehouse-listing'}
+        onCancel={() => setActiveModal(null)}
+        onOk={() => warehouseForm.submit()}
+        confirmLoading={warehouseListingMutation.isPending}
+        width={720}
+      >
+        <Form form={warehouseForm} layout="vertical" onFinish={(values) => warehouseListingMutation.mutate(values)}>
+          <Row gutter={16}>
+            <Col xs={24} md={12}><Form.Item name="warehouse_name" label="仓库名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="address" label="详细地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="province" label="省份"><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="city" label="城市"><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="district" label="区县"><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="capacity" label="总库容"><InputNumber className="w-full" min={0} addonAfter="吨" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="available_capacity" label="可出租库容"><InputNumber className="w-full" min={0} addonAfter="吨" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="price_rule" label="价格规则"><Input placeholder="如：12 元/吨/天" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="service_types" label="服务类型"><Select mode="tags" /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="description" label="资源描述"><Input.TextArea rows={3} /></Form.Item></Col>
+          </Row>
+        </Form>
+      </Modal>
+      <Modal
+        title="上架物流线路"
+        open={activeModal === 'logistics-listing'}
+        onCancel={() => setActiveModal(null)}
+        onOk={() => carrierForm.submit()}
+        confirmLoading={logisticsListingMutation.isPending}
+        width={720}
+      >
+        <Form form={carrierForm} layout="vertical" onFinish={(values) => logisticsListingMutation.mutate(values)}>
+          <Row gutter={16}>
+            <Col xs={24} md={12}><Form.Item name="name" label="服务名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="fleet_name" label="车队名称"><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="route_start" label="起始地" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="route_end" label="目的地" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="vehicle_type" label="车型"><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="load_capacity" label="载重"><InputNumber className="w-full" min={0} addonAfter="吨" /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="price_rule" label="价格规则"><Input placeholder="如：80 元/吨" /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="service_scope" label="服务范围"><Input /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="description" label="资源描述"><Input.TextArea rows={3} /></Form.Item></Col>
+          </Row>
+        </Form>
+      </Modal>
     </div>
   )
 }
