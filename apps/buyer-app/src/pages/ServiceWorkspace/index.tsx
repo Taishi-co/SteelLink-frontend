@@ -21,14 +21,14 @@ type ServiceKey = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance
 const serviceConfig: Record<ServiceKey, {
   title: string
   description: string
-  supplyRole: string
+  enterpriseRole: string
   icon: React.ReactNode
   actions: Array<{ label: string; href: string }>
 }> = {
   sales: {
-    title: '销售服务',
+    title: '销售交易能力',
     description: '发布商品、参与竞价报价、管理销售订单与履约。',
-    supplyRole: '供应商',
+    enterpriseRole: '供应商',
     icon: <ShopOutlined />,
     actions: [
       { label: '进入卖家中心', href: '/seller/dashboard' },
@@ -36,9 +36,9 @@ const serviceConfig: Record<ServiceKey, {
     ],
   },
   procurement: {
-    title: '采购服务',
+    title: '采购交易能力',
     description: '加入购物车、创建订单、发起竞价和使用 AI 采购。',
-    supplyRole: '采购商',
+    enterpriseRole: '采购商',
     icon: <ShoppingCartOutlined />,
     actions: [
       { label: 'AI采购', href: '/ai-procurement' },
@@ -46,33 +46,33 @@ const serviceConfig: Record<ServiceKey, {
     ],
   },
   logistics: {
-    title: '物流服务',
+    title: '物流服务商能力',
     description: '承接运输需求、维护承运资质与物流履约节点。',
-    supplyRole: '物流方',
+    enterpriseRole: '物流方',
     icon: <TruckOutlined />,
     actions: [{ label: '物流资源管理', href: '/dashboard/logistics-resources' }],
   },
   warehouse: {
-    title: '仓储服务',
+    title: '仓储服务商能力',
     description: '维护仓储资源、场地资质和入出库协同能力。',
-    supplyRole: '仓储方',
+    enterpriseRole: '仓储方',
     icon: <HomeOutlined />,
     actions: [{ label: '仓储资源管理', href: '/dashboard/warehouse-resources' }],
   },
   finance: {
-    title: '金融服务',
+    title: '金融服务商能力',
     description: '提供融资服务、凭单融资对接和企业资信材料管理。',
-    supplyRole: '资金方',
+    enterpriseRole: '资金方',
     icon: <BankOutlined />,
-    actions: [{ label: '金融服务台', href: '/dashboard/finance' }],
+    actions: [{ label: '金融产品管理', href: '/dashboard/finance-products' }],
   },
 }
 
 const statusMeta: Record<number, { text: string; color: string; message: string }> = {
   1: { text: '审核中', color: 'processing', message: '申请已提交，请等待平台审核。' },
-  2: { text: '已开通', color: 'success', message: '服务已开通，可以进入对应工作台。' },
+  2: { text: '已开通', color: 'success', message: '能力已开通，可以进入对应工作台。' },
   3: { text: '已驳回', color: 'error', message: '申请被驳回，请按原因补充材料后重新提交。' },
-  4: { text: '已暂停', color: 'warning', message: '服务权限已被平台暂停，请联系运营处理。' },
+  4: { text: '已暂停', color: 'warning', message: '企业能力已被平台暂停，请联系运营处理。' },
 }
 
 function isServiceKey(value: string | undefined): value is ServiceKey {
@@ -103,7 +103,7 @@ export default function ServiceWorkspace() {
   const { mutate: applyService, isPending } = useMutation({
     mutationFn: (payload: EnterpriseServiceApplicationPayload) => certificationService.applyService(payload),
     onSuccess: () => {
-      message.success('服务申请已提交')
+      message.success('能力申请已提交')
       setDocumentUrls({})
       void queryClient.invalidateQueries({ queryKey: ['enterprise-services'] })
     },
@@ -178,8 +178,8 @@ export default function ServiceWorkspace() {
         <Col xs={24} lg={14}>
           <Card title="服务资料">
             <Descriptions column={1} bordered size="small">
-              <Descriptions.Item label="供应链角色">{config.supplyRole}</Descriptions.Item>
-              <Descriptions.Item label="平台服务">{config.title}</Descriptions.Item>
+              <Descriptions.Item label="供应链角色">{config.enterpriseRole}</Descriptions.Item>
+              <Descriptions.Item label="能力类型">{config.title}</Descriptions.Item>
               <Descriptions.Item label="所需材料">
                 {requiredDocuments.length ? (
                   <Space direction="vertical">
@@ -250,7 +250,7 @@ export default function ServiceWorkspace() {
                   disabled={!requiredDocuments.length || uploadedCount < requiredDocuments.length}
                   onClick={handleApply}
                 >
-                  提交服务申请
+                  提交能力申请
                 </Button>
               </Space>
             )}
@@ -269,7 +269,7 @@ export function ServiceOverview() {
   const permissions = data?.data.permissions ?? []
 
   return (
-    <Card title="企业服务入口" loading={isLoading}>
+    <Card title="企业能力入口" loading={isLoading}>
       <Row gutter={[16, 16]}>
         {(Object.keys(serviceConfig) as ServiceKey[]).map((key) => {
           const permission = permissions.find((item) => item.service === key)
@@ -287,7 +287,7 @@ export function ServiceOverview() {
                     <p className="text-gray-500 text-sm mt-2 min-h-[44px]">{serviceConfig[key].description}</p>
                     <Link to={`/dashboard/services/${key}`}>
                       <Button size="small" type={status === 2 ? 'primary' : 'default'}>
-                        {status === 2 ? '进入服务' : '申请/查看'}
+                        {status === 2 ? '进入能力' : '申请/查看'}
                       </Button>
                     </Link>
                   </div>
@@ -297,7 +297,7 @@ export function ServiceOverview() {
           )
         })}
       </Row>
-      {!permissions.length && !isLoading && <Empty className="mt-6" description="暂无已开通服务，可选择服务提交申请" />}
+      {!permissions.length && !isLoading && <Empty className="mt-6" description="暂无已开通能力，可选择能力提交申请" />}
     </Card>
   )
 }

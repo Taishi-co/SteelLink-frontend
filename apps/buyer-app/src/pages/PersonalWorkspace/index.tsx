@@ -28,11 +28,11 @@ const serviceCards: Array<{
   desc: string
   icon: React.ReactNode
 }> = [
-  { key: 'sales', title: '销售服务', role: '供应商', desc: '商品发布、竞价报价、销售订单。', icon: <ShopOutlined /> },
-  { key: 'procurement', title: '采购服务', role: '采购商', desc: '采购下单、AI采购、竞价定标。', icon: <ShoppingCartOutlined /> },
-  { key: 'logistics', title: '物流服务', role: '物流方', desc: '运输承接、物流履约、节点协同。', icon: <TruckOutlined /> },
-  { key: 'warehouse', title: '仓储服务', role: '仓储方', desc: '仓储资源、入出库协同。', icon: <HomeOutlined /> },
-  { key: 'finance', title: '金融服务', role: '资金方', desc: '融资服务、资信材料、凭单融资。', icon: <BankOutlined /> },
+  { key: 'sales', title: '销售交易能力', role: '供应商', desc: '商品发布、竞价报价、销售订单。', icon: <ShopOutlined /> },
+  { key: 'procurement', title: '采购交易能力', role: '采购商', desc: '采购下单、AI采购、竞价定标。', icon: <ShoppingCartOutlined /> },
+  { key: 'logistics', title: '物流服务商能力', role: '物流方', desc: '运输承接、物流履约、节点协同。', icon: <TruckOutlined /> },
+  { key: 'warehouse', title: '仓储服务商能力', role: '仓储方', desc: '仓储资源、入出库协同。', icon: <HomeOutlined /> },
+  { key: 'finance', title: '金融服务商能力', role: '资金方', desc: '融资服务、资信材料、凭单融资。', icon: <BankOutlined /> },
 ]
 
 const permissionStatus: Record<number, { label: string; color: string }> = {
@@ -113,7 +113,7 @@ export default function PersonalWorkspace() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <Title level={4} className="!mb-1">个人工作台</Title>
-            <Text type="secondary">先完成个人实名认证和企业认证，企业审核通过后可申请并使用平台服务。</Text>
+            <Text type="secondary">先完成个人实名认证和企业认证，企业审核通过后可使用交易能力，服务商身份可提供对应平台服务。</Text>
           </div>
           <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
             <UserOutlined className="text-blue-500" />
@@ -137,8 +137,8 @@ export default function PersonalWorkspace() {
               icon: enterpriseApproved ? <CheckCircleOutlined /> : <BankOutlined />,
             },
             {
-              title: '服务权限',
-              description: enterpriseApproved ? '可申请最多 5 项服务' : '企业通过后开放',
+              title: '企业能力',
+              description: enterpriseApproved ? '交易能力与服务商能力' : '企业通过后开放',
               icon: <ClockCircleOutlined />,
             },
           ]}
@@ -160,7 +160,7 @@ export default function PersonalWorkspace() {
           <Col xs={24} lg={12}>
             <Card title="企业认证" extra={<Tag color={enterpriseStatusColor(enterprise?.status)}>{enterpriseStatusText(enterprise?.status)}</Tag>}>
               <Paragraph type="secondary">
-                企业认证通过后，平台会展示销售、采购、物流、仓储、金融服务权限入口。
+                企业认证通过后，平台会展示销售/采购交易能力，以及仓储、物流、金融服务商能力入口。
               </Paragraph>
               <Space>
                 <Button type={enterpriseApproved ? 'default' : 'primary'} icon={<BankOutlined />} onClick={() => navigate('/dashboard/enterprise')}>
@@ -177,11 +177,11 @@ export default function PersonalWorkspace() {
             className="mt-4"
             type="info"
             showIcon
-            message="企业审核通过后开放服务权限"
-            description="当前阶段请优先完成个人实名认证和企业认证。企业通过后，本页会展示最多 5 个平台服务入口。"
+            message="企业审核通过后开放企业能力"
+            description="当前阶段请优先完成个人实名认证和企业认证。企业通过后，本页会展示交易能力与服务商能力入口。"
           />
         ) : (
-          <Card className="mt-4" title="企业服务权限">
+          <Card className="mt-4" title="企业能力">
             <Row gutter={[16, 16]}>
               {serviceCards.slice(0, 5).map((service) => {
                 const permission = permissionMap[service.key]
@@ -202,7 +202,7 @@ export default function PersonalWorkspace() {
                           <p className="text-sm text-gray-500 mt-2 min-h-[40px]">{service.desc}</p>
                           <Link to={`/dashboard/services/${service.key}`}>
                             <Button size="small" type={status === 2 ? 'primary' : 'default'}>
-                              {status === 2 ? '进入服务' : '申请/查看'} <RightOutlined />
+                              {status === 2 ? '进入能力' : '申请/查看'} <RightOutlined />
                             </Button>
                           </Link>
                         </div>

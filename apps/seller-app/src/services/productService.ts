@@ -16,6 +16,7 @@ type ProductStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'off
 export interface SellerProductRecord {
   id: number
   sku_id: string
+  goods_type: 'spot' | 'futures'
   seller_id: number
   seller_uid: string
   seller_name: string
@@ -27,6 +28,8 @@ export interface SellerProductRecord {
   material: string
   warehouse_name: string
   warehouse_code: string
+  warehouse_service_id?: number
+  warehouse_enterprise_id?: number
   province: string
   city: string
   district: string
@@ -72,6 +75,7 @@ interface BackendProductInfo {
   id: number
   product_no: string
   name: string
+  goods_type?: 'spot' | 'futures'
   category: string
   sub_category: string
   steel_mill: string
@@ -80,7 +84,8 @@ interface BackendProductInfo {
     spec: string
   }
   warehouse_info: {
-    warehouse_id?: number
+    warehouse_service_id?: number
+    warehouse_enterprise_id?: number
     warehouse_name: string
     warehouse_code: string
     province: string
@@ -88,6 +93,8 @@ interface BackendProductInfo {
     district: string
     address: string
   }
+  warehouse_service_id?: number
+  warehouse_enterprise_id?: number
   bundle_no: string
   quantity: number
   available_qty: number
@@ -115,6 +122,7 @@ interface BackendProductListResponse {
 
 export interface UpsertProductPayload {
   name: string
+  goods_type?: 'spot' | 'futures'
   category: string
   sub_category: string
   steel_mill: string
@@ -122,8 +130,9 @@ export interface UpsertProductPayload {
     material: string
     spec: string
   }
+  warehouse_service_id?: number
   warehouse_info: {
-    warehouse_id?: number
+    warehouse_service_id?: number
     warehouse_name: string
     warehouse_code: string
     province: string
@@ -172,6 +181,7 @@ function toSellerProductRecord(product: BackendProductInfo): SellerProductRecord
   return {
     id: product.id,
     sku_id: product.product_no,
+    goods_type: product.goods_type || 'spot',
     seller_id: product.enterprise_id,
     seller_uid: String(product.enterprise_id),
     seller_name: `企业 ${product.enterprise_id}`,
@@ -183,6 +193,8 @@ function toSellerProductRecord(product: BackendProductInfo): SellerProductRecord
     material: product.spec?.material || '',
     warehouse_name: product.warehouse_info?.warehouse_name || '',
     warehouse_code: product.warehouse_info?.warehouse_code || '',
+    warehouse_service_id: product.warehouse_service_id || product.warehouse_info?.warehouse_service_id,
+    warehouse_enterprise_id: product.warehouse_enterprise_id || product.warehouse_info?.warehouse_enterprise_id,
     province: product.warehouse_info?.province || '',
     city: product.warehouse_info?.city || '',
     district: product.warehouse_info?.district || '',

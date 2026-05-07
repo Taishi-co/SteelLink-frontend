@@ -91,6 +91,18 @@ export interface SellerOrderTimelineItem {
   description?: string
 }
 
+export interface SellerOrderEventInfo {
+  id: number
+  event_type: string
+  actor_user_id: number
+  actor_enterprise_id: number
+  actor_service: string
+  from_status: number
+  to_status: number
+  payload?: Record<string, unknown>
+  created_at: string
+}
+
 export const sellerOrderService = {
   async list() {
     const response = await api.get<unknown, ApiResponse<{ list: SellerOrderInfo[] }>>('/orders?role=seller')
@@ -108,6 +120,10 @@ export const sellerOrderService = {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/confirm`)
     return response.data
   },
+  async sellerConfirm(id: number, payload?: { terms_note?: string }) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/seller-confirm`, payload || {})
+    return response.data
+  },
   async signContract(id: number) {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/sign-contract`)
     return response.data
@@ -115,5 +131,25 @@ export const sellerOrderService = {
   async confirmOutbound(id: number, payload: { pickup_code: string }) {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/confirm-outbound`, payload)
     return response.data
+  },
+  async createLogisticsBidding(id: number, payload?: { pickup_address?: string; destination_address?: string; requirement?: string }) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/logistics-biddings`, payload || {})
+    return response.data
+  },
+  async confirmLogisticsQuote(id: number, payload: { quote_id: number }) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/logistics-confirm`, payload)
+    return response.data
+  },
+  async reconcile(id: number) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/reconcile`)
+    return response.data
+  },
+  async archive(id: number) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/archive`)
+    return response.data
+  },
+  async listEvents(id: number) {
+    const response = await api.get<unknown, ApiResponse<{ list: SellerOrderEventInfo[] }>>(`/orders/${id}/events`)
+    return response.data.list
   },
 }

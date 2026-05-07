@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { clearSellerSession, getSellerToken } from './auth'
+import { clearSellerSession, getSellerToken, saveSellerToken } from './auth'
 
 const defaultBaseURL = import.meta.env.DEV ? 'http://localhost:8080/api/v1' : '/api/v1'
 
@@ -23,7 +23,13 @@ api.interceptors.request.use(
 )
 
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const refreshedToken = response.headers['x-token-refreshed']
+    if (refreshedToken) {
+      saveSellerToken(refreshedToken)
+    }
+    return response.data
+  },
   (error) => {
     if (error.response?.status === 401) {
       clearSellerSession()

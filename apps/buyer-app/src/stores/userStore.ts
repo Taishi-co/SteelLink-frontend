@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { User } from '@/types'
-import { clearBuyerSession, getBuyerToken, getBuyerUser } from '@/services/auth'
+import { BUYER_TOKEN_REFRESH_EVENT, clearBuyerSession, getBuyerToken, getBuyerUser } from '@/services/auth'
 
 const initialUser = getBuyerUser()
 const initialToken = getBuyerToken()
@@ -29,3 +29,11 @@ export const useUserStore = create<UserState>((set) => ({
     set({ user: null, token: null, isLoggedIn: false })
   },
 }))
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(BUYER_TOKEN_REFRESH_EVENT, () => {
+    const user = getBuyerUser()
+    const token = getBuyerToken()
+    useUserStore.setState({ user, token, isLoggedIn: Boolean(user && token) })
+  })
+}

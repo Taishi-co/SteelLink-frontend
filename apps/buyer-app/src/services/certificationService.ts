@@ -50,6 +50,10 @@ export interface CreateEnterprisePayload {
   contact_phone: string
   contact_email?: string
   registered_address: string
+  documents: Array<{
+    document_type: string
+    file_url: string
+  }>
 }
 
 export interface JoinEnterprisePayload {
@@ -61,7 +65,8 @@ export interface EnterpriseServicePermission {
   enterprise_id: number
   enterprise_code: string
   service: 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
-  supply_role: 'supplier' | 'buyer' | 'logistics' | 'warehouse' | 'fund'
+  capability_kind?: 'trade' | 'provider'
+  enterprise_role: 'buyer' | 'seller' | 'logistics' | 'warehouse' | 'fund'
   status: number
   audit_reason: string
   approved_at?: string
@@ -142,6 +147,7 @@ export const certificationService = {
       contact_name: payload.legal_person,
       contact_phone: payload.contact_phone,
       address: payload.registered_address,
+      documents: payload.documents,
     })
     return {
       ...verifyRes,
@@ -157,6 +163,7 @@ export const certificationService = {
       contact_name: payload.legal_person,
       contact_phone: payload.contact_phone,
       address: payload.registered_address,
+      documents: payload.documents,
     })
 
     if (createRes.code === 0 && createRes.data?.id) {

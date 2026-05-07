@@ -1,4 +1,6 @@
-import { Button, Card, Col, Divider, Row, Space, Statistic, Steps, Table, Tag, Typography } from 'antd'
+import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
+import { Button, Card, Col, Divider, Empty, Row, Space, Statistic, Steps, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   BankOutlined,
@@ -11,12 +13,22 @@ import {
   SwapOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons'
+import { useQuery } from '@tanstack/react-query'
+import {
+  serviceOfferService,
+  type LogisticsServiceItem,
+  type WarehouseServiceItem,
+} from '@/services/serviceOfferService'
 
 const { Title, Paragraph, Text } = Typography
 
-interface ServiceProduct {
+type ResourceType = 'warehouse' | 'logistics'
+
+interface ServiceResourceRow {
   key: string
+  id: number
   provider: string
+  resourceType: ResourceType
   type: string
   region: string
   capability: string
@@ -25,46 +37,24 @@ interface ServiceProduct {
   tags: string[]
 }
 
-const serviceProducts: ServiceProduct[] = [
+const columns: ColumnsType<ServiceResourceRow> = [
   {
-    key: '1',
-    provider: '华东智慧仓',
-    type: '仓储监管',
-    region: '上海宝山 / 太仓',
-    capability: '板卷、型材、仓单监管',
-    price: '6.8 元/吨/天起',
-    leadTime: '2 小时确认',
-    tags: ['监管仓', '可质押'],
+    title: '服务商',
+    dataIndex: 'provider',
+    key: 'provider',
+    render: (value: string, record) => (
+      <Link to={record.resourceType === 'warehouse' ? `/warehouses/${record.id}` : `/logistics-services/${record.id}`}>
+        {value}
+      </Link>
+    ),
   },
-  {
-    key: '2',
-    provider: '苏沪钢运',
-    type: '整车运输',
-    region: '长三角短驳',
-    capability: '13 米平板、卷钢专车',
-    price: '按线路报价',
-    leadTime: '4 小时派车',
-    tags: ['在途轨迹', '回单结算'],
-  },
-  {
-    key: '3',
-    provider: '港口联储',
-    type: '港口仓配',
-    region: '宁波北仑 / 上海外高桥',
-    capability: '入港、短驳、装卸',
-    price: '组合计费',
-    leadTime: '当日排期',
-    tags: ['港口', '装卸'],
-  },
-]
-
-const columns: ColumnsType<ServiceProduct> = [
-  { title: '服务商', dataIndex: 'provider', key: 'provider' },
   {
     title: '服务类型',
     dataIndex: 'type',
     key: 'type',
-    render: (value: string) => <Tag color={value.includes('仓') ? 'green' : 'blue'}>{value}</Tag>,
+    render: (value: string, record) => (
+      <Tag color={record.resourceType === 'warehouse' ? 'green' : 'blue'}>{value}</Tag>
+    ),
   },
   { title: '覆盖区域', dataIndex: 'region', key: 'region' },
   { title: '能力', dataIndex: 'capability', key: 'capability' },
@@ -103,7 +93,64 @@ const serviceCards = [
   },
 ]
 
+function mapWarehouseResource(item: WarehouseServiceItem): ServiceResourceRow {
+  const region = [item.province, item.city, item.district].filter(Boolean).join(' / ') || item.address || '-'
+  const tags = item.service_types?.length ? item.service_types : ['仓储资源']
+  return {
+    key: `warehouse-${item.id}`,
+    id: item.id,
+    provider: item.warehouse_name,
+    resourceType: 'warehouse',
+    type: '仓储服务',
+    region,
+    capability: `总库容 ${item.capacity || 0} / 可用 ${item.available_capacity || 0}`,
+    price: item.price_rule || '按仓储规则报价',
+    leadTime: '平台审核通过',
+    tags,
+  }
+}
+
+function mapLogisticsResource(item: LogisticsServiceItem): ServiceResourceRow {
+  const tags = [item.vehicle_type, item.service_scope].filter(Boolean) as string[]
+  return {
+    key: `logistics-${item.id}`,
+    id: item.id,
+    provider: item.name,
+    resourceType: 'logistics',
+    type: '物流运输',
+    region: `${item.route_start || '-'} -> ${item.route_end || '-'}`,
+    capability: `${item.vehicle_type || '车型待确认'} / 载重 ${item.load_capacity || 0}`,
+    price: item.price_rule || '按线路报价',
+    leadTime: '平台审核通过',
+    tags: tags.length ? tags : ['物流资源'],
+  }
+}
+
 export default function ServiceMarketPage() {
+  const { data: warehouseData, isLoading: warehouseLoading } = useQuery({
+    queryKey: ['service-market-warehouses'],
+    queryFn: () => serviceOfferService.listWarehouses({ page_size: 12 }),
+  })
+  const { data: logisticsData, isLoading: logisticsLoading } = useQuery({
+    queryKey: ['service-market-logistics'],
+    queryFn: () => serviceOfferService.listLogistics({ page_size: 12 }),
+  })
+
+  const warehouses = warehouseData?.data.list ?? []
+  const logistics = logisticsData?.data.list ?? []
+  const loading = warehouseLoading || logisticsLoading
+
+  const serviceResources = useMemo(
+    () => [
+      ...warehouses.map(mapWarehouseResource),
+      ...logistics.map(mapLogisticsResource),
+    ],
+    [logistics, warehouses],
+  )
+
+  const totalWarehouseCapacity = warehouses.reduce((sum, item) => sum + (item.available_capacity || 0), 0)
+  const totalLogisticsCapacity = logistics.reduce((sum, item) => sum + (item.load_capacity || 0), 0)
+
   return (
     <div className="min-h-screen bg-slate-50">
       <section className="border-b bg-white">
@@ -117,20 +164,24 @@ export default function ServiceMarketPage() {
               </Space>
               <Title className="!mb-3">物流仓储服务市场</Title>
               <Paragraph className="!mb-6 !max-w-3xl !text-base !text-slate-500">
-                买家在交易后可以统一选择仓库、承运线路、监管仓和仓配组合服务；服务商在独立后台承接订单、反馈节点并完成结算。
+                买家在交易前后可以统一查看已审核仓库、承运线路、监管仓和仓配组合服务；服务商在工作台上架资源，平台审核通过后进入这里展示。
               </Paragraph>
               <Space wrap>
-                <Button type="primary" size="large" icon={<FileSearchOutlined />}>发布服务需求</Button>
-                <Button size="large" icon={<EnvironmentOutlined />}>按交付地找服务</Button>
+                <Link to="/warehouses">
+                  <Button type="primary" size="large" icon={<FileSearchOutlined />}>查看仓储资源</Button>
+                </Link>
+                <Link to="/logistics-services">
+                  <Button size="large" icon={<EnvironmentOutlined />}>查看物流资源</Button>
+                </Link>
               </Space>
             </Col>
             <Col xs={24} lg={10}>
               <Card className="rounded-lg border-slate-200">
                 <Row gutter={[16, 16]}>
-                  <Col span={12}><Statistic title="合作仓库" value={128} suffix="个" prefix={<BankOutlined />} /></Col>
-                  <Col span={12}><Statistic title="承运线路" value={560} suffix="条" prefix={<CarOutlined />} /></Col>
-                  <Col span={12}><Statistic title="平均响应" value={3.2} suffix="小时" prefix={<ThunderboltOutlined />} /></Col>
-                  <Col span={12}><Statistic title="监管库存" value={42.6} suffix="万吨" prefix={<SafetyCertificateOutlined />} /></Col>
+                  <Col span={12}><Statistic title="已审核仓库" value={warehouses.length} suffix="个" prefix={<BankOutlined />} /></Col>
+                  <Col span={12}><Statistic title="已审核线路" value={logistics.length} suffix="条" prefix={<CarOutlined />} /></Col>
+                  <Col span={12}><Statistic title="可用库容" value={totalWarehouseCapacity} precision={0} prefix={<SafetyCertificateOutlined />} /></Col>
+                  <Col span={12}><Statistic title="承运载重" value={totalLogisticsCapacity} precision={0} prefix={<ThunderboltOutlined />} /></Col>
                 </Row>
               </Card>
             </Col>
@@ -158,8 +209,24 @@ export default function ServiceMarketPage() {
           ))}
         </Row>
 
-        <Card className="mt-6 rounded-lg border-slate-200" title="推荐服务商" extra={<Button type="link">查看全部</Button>}>
-          <Table columns={columns} dataSource={serviceProducts} pagination={false} scroll={{ x: 900 }} />
+        <Card
+          className="mt-6 rounded-lg border-slate-200"
+          title="已审核服务资源"
+          extra={
+            <Space>
+              <Link to="/warehouses"><Button type="link">仓储全部</Button></Link>
+              <Link to="/logistics-services"><Button type="link">物流全部</Button></Link>
+            </Space>
+          }
+        >
+          <Table
+            columns={columns}
+            dataSource={serviceResources}
+            loading={loading}
+            locale={{ emptyText: <Empty description="暂无已审核仓储或物流资源" /> }}
+            pagination={{ pageSize: 8, showSizeChanger: false }}
+            scroll={{ x: 900 }}
+          />
         </Card>
 
         <Row gutter={[16, 16]} className="mt-6">

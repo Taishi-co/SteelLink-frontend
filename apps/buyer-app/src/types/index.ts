@@ -26,6 +26,8 @@ export interface ProductSpec {
 
 export interface WarehouseInfo {
   warehouse_id: number
+  warehouse_service_id?: number
+  warehouse_enterprise_id?: number
   warehouse_name: string
   warehouse_code: string
   address: string
@@ -38,10 +40,13 @@ export interface Product {
   id: number
   productNo: string
   name: string
+  goodsType: 'spot' | 'futures'
   category: string
   subCategory: string
   steelMill: string
   spec: ProductSpec
+  warehouseServiceId?: number
+  warehouseEnterpriseId?: number
   warehouseInfo: WarehouseInfo
   bundleNo: string
   quantity: number
