@@ -7,6 +7,7 @@ export interface WarehouseMovementInfo {
   movement_no: string
   warehouse_service_id: number
   warehouse_enterprise_id: number
+  request_enterprise_id?: number
   product_id: number
   product_name: string
   bundle_no: string
@@ -100,6 +101,42 @@ export interface LogisticsEstimateResult {
   price_rule: string
 }
 
+export interface CreateLogisticsOrderPayload {
+  order_id?: number
+  order_no?: string
+  logistics_service_id: number
+  warehouse_service_id?: number
+  origin: string
+  destination: string
+  cargo_name?: string
+  weight: number
+  vehicle_type?: string
+  guarantee_type?: string
+}
+
+export interface CreateWarehouseStoragePayload {
+  warehouse_service_id: number
+  product_id?: number
+  product_name: string
+  bundle_no?: string
+  order_id?: number
+  order_no?: string
+  quantity: number
+  scheduled_at?: string
+  contact_name?: string
+  contact_phone?: string
+  storage_requirement?: string
+  remark?: string
+}
+
+export interface CreateGuaranteePayload {
+  order_id?: number
+  logistics_order_id?: number
+  guarantee_type: string
+  coverage_amount?: number
+  description?: string
+}
+
 export interface WarehouseProductInfo {
   id: number
   product_no: string
@@ -128,6 +165,12 @@ export const serviceFulfillmentService = {
     api.get<unknown, ApiResponse<PageResponse<LogisticsOrderInfo>>>('/logistics/orders', { params }),
   estimateLogistics: (payload: LogisticsEstimatePayload) =>
     api.post<unknown, ApiResponse<LogisticsEstimateResult>>('/logistics/estimate', payload),
+  createLogisticsOrder: (payload: CreateLogisticsOrderPayload) =>
+    api.post<unknown, ApiResponse<LogisticsOrderInfo>>('/logistics/orders', payload),
+  requestWarehouseStorage: (payload: CreateWarehouseStoragePayload) =>
+    api.post<unknown, ApiResponse<WarehouseMovementInfo>>('/warehouse-storage-requests', payload),
+  createGuarantee: (payload: CreateGuaranteePayload) =>
+    api.post<unknown, ApiResponse<GuaranteeInfo>>('/fulfillment-guarantees', payload),
   getOrderFulfillment: (orderId: number) =>
     api.get<unknown, ApiResponse<FulfillmentSummary>>(`/orders/${orderId}/service-fulfillment`),
 }
