@@ -4,6 +4,7 @@ import type { ApiResponse } from '@/types'
 export type AIProcurementStageCode =
   | 'instruction_parsing'
   | 'product_matching'
+  | 'logistics_warehouse_matching'
   | 'order_generation'
   | 'financing_matching'
   | 'review_submission'
@@ -173,6 +174,11 @@ interface MatchProductsResponse {
   stages: StageInfo[]
 }
 
+interface MatchLogisticsWarehouseResponse {
+  matched_products: MatchedProduct[]
+  stages: StageInfo[]
+}
+
 interface GenerateOrderResponse {
   procurement: AIProcurementInfo
   order_draft: OrderDraft
@@ -191,6 +197,11 @@ export const aiProcurementService = {
 
   matchProducts: async (parsed: ParsedInstruction) => {
     const response = await api.post<ApiResponse<MatchProductsResponse>, ApiResponse<MatchProductsResponse>>('/ai-procurements/match-products', { parsed })
+    return response.data
+  },
+
+  matchLogisticsWarehouse: async (payload: { parsed: ParsedInstruction; selected_products: MatchedProduct[] }) => {
+    const response = await api.post<ApiResponse<MatchLogisticsWarehouseResponse>, ApiResponse<MatchLogisticsWarehouseResponse>>('/ai-procurements/match-logistics-warehouse', payload)
     return response.data
   },
 
