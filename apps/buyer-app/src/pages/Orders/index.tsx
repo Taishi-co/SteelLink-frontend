@@ -11,7 +11,7 @@ const statusMap: Record<number, { label: string; color: string }> = {
   1: { label: '待确认', color: 'orange' },
   2: { label: '待签合同', color: 'gold' },
   3: { label: '待支付', color: 'orange' },
-  4: { label: '待卖家确认收款', color: 'blue' },
+  4: { label: '已支付', color: 'blue' },
   5: { label: '待提货', color: 'cyan' },
   6: { label: '配送中', color: 'blue' },
   7: { label: '已送达', color: 'green' },
@@ -19,27 +19,35 @@ const statusMap: Record<number, { label: string; color: string }> = {
   9: { label: '已取消', color: 'red' },
   10: { label: '已冻结', color: 'volcano' },
   11: { label: '异常', color: 'magenta' },
+  12: { label: '待仓库确认', color: 'purple' },
+  13: { label: '待卖方确认', color: 'orange' },
+  14: { label: '待买方确认', color: 'blue' },
+  15: { label: '物流竞价中', color: 'cyan' },
+  16: { label: '待确认物流', color: 'gold' },
+  17: { label: '运输中', color: 'processing' },
+  18: { label: '已收货', color: 'green' },
+  19: { label: '已对账', color: 'success' },
+  20: { label: '已归档', color: 'default' },
+  21: { label: '融资审批中', color: 'purple' },
+  22: { label: '待签署融资合同', color: 'gold' },
 }
 
 function getStatusAction(order: { status: number; payment_info?: { voucher_url?: string }; delivery_info?: { pickup_code?: string } }) {
-  if (order.status === 3) {
-    return '待买家上传支付凭证'
-  }
-  if (order.status === 4) {
-    return '待卖家确认收款'
-  }
-  if (order.status === 5) {
-    return order.delivery_info?.pickup_code ? '待卖家确认出库' : '待买家录入提货信息'
-  }
-  if (order.status === 6) {
-    return '待买家确认收货'
-  }
-  if (order.status === 8) {
-    return '已完成'
-  }
-  if (order.status === 9) {
-    return '已取消'
-  }
+  if (order.status === 12) return '等待仓储方确认仓库条件'
+  if (order.status === 13) return '等待卖方确认条款'
+  if (order.status === 14) return '等待买方确认订单'
+  if (order.status === 3) return '待买家上传支付凭证或申请融资'
+  if (order.status === 21) return '资金方风控审批中'
+  if (order.status === 22) return '请签署融资合同'
+  if (order.status === 4) return '支付完成，等待物流'
+  if (order.status === 15) return '物流竞价中'
+  if (order.status === 16) return '请确认物流资源'
+  if (order.status === 5) return '待提货/运输'
+  if (order.status === 17) return '运输中'
+  if (order.status === 7 || order.status === 6) return '待买家确认收货'
+  if (order.status === 18) return '已收货，等待对账'
+  if (order.status === 8 || order.status === 19 || order.status === 20) return '已完成'
+  if (order.status === 9) return '已取消'
   return `状态${order.status}`
 }
 

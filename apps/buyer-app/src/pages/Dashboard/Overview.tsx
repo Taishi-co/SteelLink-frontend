@@ -60,10 +60,11 @@ interface DashboardRaw {
 }
 
 const ORDER_STATUS_MAP: Record<number, { label: string; color: string }> = {
+  0: { label: '草稿', color: 'default' },
   1: { label: '待确认', color: 'default' },
   2: { label: '待签合同', color: 'default' },
   3: { label: '待支付', color: 'warning' },
-  4: { label: '待收款确认', color: 'processing' },
+  4: { label: '已支付', color: 'processing' },
   5: { label: '待提货', color: 'blue' },
   6: { label: '配送中', color: 'processing' },
   7: { label: '已送达', color: 'cyan' },
@@ -71,6 +72,17 @@ const ORDER_STATUS_MAP: Record<number, { label: string; color: string }> = {
   9: { label: '已取消', color: 'error' },
   10: { label: '冻结', color: 'red' },
   11: { label: '异常', color: 'red' },
+  12: { label: '待仓库确认', color: 'purple' },
+  13: { label: '待卖方确认', color: 'default' },
+  14: { label: '待买方确认', color: 'blue' },
+  15: { label: '物流竞价中', color: 'cyan' },
+  16: { label: '待确认物流', color: 'default' },
+  17: { label: '运输中', color: 'processing' },
+  18: { label: '已收货', color: 'success' },
+  19: { label: '已对账', color: 'success' },
+  20: { label: '已归档', color: 'default' },
+  21: { label: '融资审批中', color: 'purple' },
+  22: { label: '待签署融资合同', color: 'default' },
 }
 
 function formatAmount(amount: number) {

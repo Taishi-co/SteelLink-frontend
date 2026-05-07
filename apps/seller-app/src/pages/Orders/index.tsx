@@ -15,7 +15,7 @@ const statusMeta: Record<number, { color: string; text: string }> = {
   1: { color: 'orange', text: '待确认' },
   2: { color: 'gold', text: '待签合同' },
   3: { color: 'orange', text: '待支付' },
-  4: { color: 'blue', text: '待确认收款' },
+  4: { color: 'blue', text: '已支付' },
   5: { color: 'cyan', text: '待提货' },
   6: { color: 'processing', text: '配送中' },
   7: { color: 'green', text: '已送达' },
@@ -23,6 +23,17 @@ const statusMeta: Record<number, { color: string; text: string }> = {
   9: { color: 'red', text: '已取消' },
   10: { color: 'volcano', text: '已冻结' },
   11: { color: 'magenta', text: '异常' },
+  12: { color: 'purple', text: '待仓库确认' },
+  13: { color: 'orange', text: '待卖方确认' },
+  14: { color: 'blue', text: '待买方确认' },
+  15: { color: 'cyan', text: '物流竞价中' },
+  16: { color: 'gold', text: '待确认物流' },
+  17: { color: 'processing', text: '运输中' },
+  18: { color: 'green', text: '已收货' },
+  19: { color: 'success', text: '已对账' },
+  20: { color: 'default', text: '已归档' },
+  21: { color: 'purple', text: '融资审批中' },
+  22: { color: 'gold', text: '待签署融资合同' },
 }
 
 const statusOptions = [
@@ -39,7 +50,7 @@ const statusOptions = [
   { label: '已取消', value: 9 },
 ]
 
-const activeOrderStatuses = [1, 2, 3, 4, 5, 6, 7]
+const activeOrderStatuses = [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 17, 21, 22]
 
 const summaryStatusItems = [
   { key: 'active', label: '进行中', statuses: activeOrderStatuses },
@@ -322,20 +333,53 @@ export default function OrdersPage() {
               确认订单
             </Button>
           )}
+          {record.status === 13 && (
+            <Button type="link" size="small" onClick={async () => {
+              setActionLoading(true)
+              try {
+                const detail = await sellerOrderService.sellerConfirm(record.id)
+                message.success('已确认条款')
+                setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+              } catch (error: unknown) { message.error(getErrorMessage(error, '确认失败')) }
+              finally { setActionLoading(false) }
+            }}>确认条款</Button>
+          )}
           {record.status === 2 && !record.contract_info?.seller_signed && (
             <Button type="link" size="small" onClick={() => void handleSignContract(record)}>
               签署合同
             </Button>
           )}
-          {record.status === 4 && record.payment_info?.voucher_url && (
+          {record.status === 4 && (
             <Button type="link" size="small" onClick={() => void handleConfirmPayment(record)}>
               确认收款
             </Button>
+          )}
+          {record.status === 4 && (
+            <Button type="link" size="small" onClick={async () => {
+              setActionLoading(true)
+              try {
+                const detail = await sellerOrderService.createLogisticsBidding(record.id)
+                message.success('已发起物流竞价')
+                setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+              } catch (error: unknown) { message.error(getErrorMessage(error, '发起竞价失败')) }
+              finally { setActionLoading(false) }
+            }}>发起物流竞价</Button>
           )}
           {record.status === 5 && record.delivery_info?.pickup_code && (
             <Button type="link" size="small" onClick={() => void handleConfirmOutbound(record)}>
               确认出库
             </Button>
+          )}
+          {record.status === 18 && (
+            <Button type="link" size="small" onClick={async () => {
+              setActionLoading(true)
+              try {
+                const detail = await sellerOrderService.reconcile(record.id)
+                message.success('已对账确认')
+                setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+              } catch (error: unknown) { message.error(getErrorMessage(error, '对账失败')) }
+              finally { setActionLoading(false) }
+            }}>对账确认</Button>
           )}
         </Space>
       ),

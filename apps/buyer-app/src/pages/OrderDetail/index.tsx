@@ -17,7 +17,7 @@ const statusMap: Record<number, { label: string; color: string }> = {
   1: { label: '待确认', color: 'orange' },
   2: { label: '待签合同', color: 'gold' },
   3: { label: '待支付', color: 'orange' },
-  4: { label: '待卖家确认收款', color: 'blue' },
+  4: { label: '已支付', color: 'blue' },
   5: { label: '待提货', color: 'cyan' },
   6: { label: '配送中', color: 'processing' },
   7: { label: '已送达', color: 'green' },
@@ -25,16 +25,30 @@ const statusMap: Record<number, { label: string; color: string }> = {
   9: { label: '已取消', color: 'red' },
   10: { label: '已冻结', color: 'volcano' },
   11: { label: '异常', color: 'magenta' },
+  12: { label: '待仓库确认', color: 'purple' },
+  13: { label: '待卖方确认', color: 'orange' },
+  14: { label: '待买方确认', color: 'blue' },
+  15: { label: '物流竞价中', color: 'cyan' },
+  16: { label: '待确认物流', color: 'gold' },
+  17: { label: '运输中', color: 'processing' },
+  18: { label: '已收货', color: 'green' },
+  19: { label: '已对账', color: 'success' },
+  20: { label: '已归档', color: 'default' },
+  21: { label: '融资审批中', color: 'purple' },
+  22: { label: '待签署融资合同', color: 'gold' },
 }
 
 const orderSteps = [
   { title: '订单创建' },
-  { title: '卖家确认' },
+  { title: '仓库确认' },
+  { title: '卖方确认' },
+  { title: '买方确认' },
   { title: '签署合同' },
-  { title: '支付凭证' },
-  { title: '待提货' },
-  { title: '配送中' },
-  { title: '已完成' },
+  { title: '支付/融资' },
+  { title: '物流竞价' },
+  { title: '运输交付' },
+  { title: '签收对账' },
+  { title: '归档' },
 ]
 
 const logisticsStatusText: Record<string, string> = {
@@ -53,68 +67,79 @@ const movementStatusText: Record<string, string> = {
 }
 
 function getCurrentStep(status: number) {
-  if (status <= 1) return 0
-  if (status === 2) return 2
-  if (status === 3) return 3
-  if (status === 4 || status === 5) return 4
-  if (status === 6 || status === 7) return 5
-  if (status >= 8) return 6
+  if (status === 0 || status === 1) return 0
+  if (status === 12) return 1
+  if (status === 13) return 2
+  if (status === 14) return 3
+  if (status === 2) return 4
+  if (status === 3 || status === 21 || status === 22) return 5
+  if (status === 4) return 5
+  if (status === 15 || status === 16) return 6
+  if (status === 5 || status === 6 || status === 17 || status === 7) return 7
+  if (status === 18 || status === 19) return 8
+  if (status === 8 || status === 20) return 9
   return 0
 }
 
-function getStatusNotice(status: number, hasPaymentVoucher: boolean, hasDeliveryInfo: boolean, contractInfo?: { buyer_signed: boolean; seller_signed: boolean }) {
+function getStatusNotice(status: number, _hasPaymentVoucher: boolean, _hasDeliveryInfo: boolean, contractInfo?: { buyer_signed: boolean; seller_signed: boolean }) {
   if (status === 1) {
-    return {
-      type: 'warning' as const,
-      message: '订单已提交，等待卖家确认。',
-    }
+    return { type: 'warning' as const, message: '订单已提交，等待卖家确认。' }
+  }
+  if (status === 12) {
+    return { type: 'warning' as const, message: '订单已提交，等待仓储方确认仓库条件。' }
+  }
+  if (status === 13) {
+    return { type: 'warning' as const, message: '仓储方已确认仓库条件，等待卖方确认条款。' }
+  }
+  if (status === 14) {
+    return { type: 'warning' as const, message: '卖方已确认条款，请确认订单最终版本。' }
   }
   if (status === 2) {
     if (contractInfo?.buyer_signed) {
-      return {
-        type: 'info' as const,
-        message: '您已签署合同，等待卖家签署后进入支付阶段。',
-      }
+      return { type: 'info' as const, message: '您已签署合同，等待卖家签署后进入支付阶段。' }
     }
-    return {
-      type: 'warning' as const,
-      message: '卖家已确认订单，请签署合同。',
-    }
+    return { type: 'warning' as const, message: '请签署交易合同。' }
   }
   if (status === 3) {
-    return {
-      type: hasPaymentVoucher ? 'info' as const : 'warning' as const,
-      message: hasPaymentVoucher ? '支付凭证已上传，等待卖家确认收款。' : '当前待支付，请先上传支付凭证。',
-    }
+    return { type: 'warning' as const, message: '当前待支付，请上传支付凭证或申请托盘融资。' }
+  }
+  if (status === 21) {
+    return { type: 'info' as const, message: '托盘融资申请已提交，资金方正在进行风控审批。' }
+  }
+  if (status === 22) {
+    return { type: 'warning' as const, message: '融资已审批通过，请签署债务合同并支付手续费。' }
   }
   if (status === 4) {
-    return {
-      type: 'info' as const,
-      message: '买家已上传支付凭证，等待卖家确认收款。',
-    }
+    return { type: 'success' as const, message: '支付已完成，等待卖方发起物流竞价。' }
   }
-  if (status === 5) {
-    return {
-      type: hasDeliveryInfo ? 'info' as const : 'warning' as const,
-      message: hasDeliveryInfo ? '提货信息已录入，等待卖家确认出库。' : '当前待提货，请先录入提货信息。',
-    }
+  if (status === 15) {
+    return { type: 'info' as const, message: '卖方已发起物流竞价，等待物流方报价。' }
+  }
+  if (status === 16) {
+    return { type: 'warning' as const, message: '物流方已报价，请确认物流资源。' }
+  }
+  if (status === 5 || status === 17) {
+    return { type: 'info' as const, message: '物流资源已确认，运输任务已下发。' }
   }
   if (status === 6 || status === 7) {
-    return {
-      type: 'info' as const,
-      message: '订单已进入配送阶段，确认签收后订单会完成归档。',
-    }
+    return { type: 'info' as const, message: '订单已进入配送阶段，确认签收后订单会完成归档。' }
   }
-  if (status === 8) {
-    return {
-      type: 'success' as const,
-      message: '订单已完成，支付、提货和签收信息已归档。',
-    }
+  if (status === 18) {
+    return { type: 'success' as const, message: '已确认收货，等待卖方对账确认。' }
   }
-  return {
-    type: 'info' as const,
-    message: '订单状态已更新。',
+  if (status === 19) {
+    return { type: 'success' as const, message: '卖方已完成对账确认，等待归档。' }
   }
+  if (status === 8 || status === 20) {
+    return { type: 'success' as const, message: '订单已完成归档。' }
+  }
+  if (status === 9) {
+    return { type: 'error' as const, message: '订单已取消。' }
+  }
+  if (status === 11) {
+    return { type: 'error' as const, message: '订单进入异常状态，等待平台运营介入。' }
+  }
+  return { type: 'info' as const, message: '订单状态已更新。' }
 }
 
 function isValidHttpUrl(value?: string) {
@@ -570,41 +595,64 @@ export default function OrderDetailPage() {
             )}
 
             <Card className="mt-6">
-              <Title level={5}>下一步</Title>
-              <Paragraph className="!mb-0">
-                当前已支持订单创建、支付凭证上传、提货信息录入、出库确认。买家确认收货并上传签收凭证后，订单会进入已完成状态。
-              </Paragraph>
-              {order.status === 2 && !order.contract_info?.buyer_signed && (
-                <Button className="mt-4" type="primary" loading={signing} onClick={handleSignContract}>
-                  签署合同
-                </Button>
-              )}
-              {order.status === 3 && (
-                <Button className="mt-4" type="primary" icon={<UploadOutlined />} onClick={() => setOpen(true)}>
-                  上传支付凭证
-                </Button>
-              )}
-              {canCancelOrder && (
-                <Button className="mt-4 ml-3" danger loading={cancelling} onClick={handleCancelOrder}>
-                  取消订单
-                </Button>
-              )}
-              {order.status === 5 && (
-                <Button className="mt-4 ml-3" type="primary" icon={<CarOutlined />} onClick={openDeliveryModal}>
-                  {order.delivery_info?.pickup_code ? '修改提货信息' : '录入提货信息'}
-                </Button>
-              )}
-              {order.status === 6 && (
-                <Button className="mt-4 ml-3" type="primary" icon={<CheckCircleOutlined />} onClick={() => setReceiptOpen(true)}>
-                  确认收货
-                </Button>
-              )}
-              {order.status === 8 && (
-                <div className="mt-4 text-green-600">
-                  <CheckCircleOutlined className="mr-1" />
-                  订单已完成，签收信息已归档
-                </div>
-              )}
+              <Title level={5}>订单操作</Title>
+              <Space wrap>
+                {order.status === 14 && (
+                  <Button type="primary" onClick={async () => {
+                    try {
+                      await orderService.buyerConfirm(Number(id), { confirm_note: '买方确认订单' })
+                      message.success('已确认订单')
+                      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+                    } catch (error: unknown) { message.error(getErrorMessage(error, '确认失败')) }
+                  }}>确认订单</Button>
+                )}
+                {order.status === 2 && !order.contract_info?.buyer_signed && (
+                  <Button type="primary" loading={signing} onClick={handleSignContract}>
+                    签署合同
+                  </Button>
+                )}
+                {order.status === 3 && (
+                  <Button type="primary" icon={<UploadOutlined />} onClick={() => setOpen(true)}>
+                    上传支付凭证
+                  </Button>
+                )}
+                {order.status === 3 && (
+                  <Button type="default" onClick={() => message.info('请选择金融服务产品后申请托盘融资')}>
+                    申请托盘融资
+                  </Button>
+                )}
+                {order.status === 22 && (
+                  <Button type="primary" onClick={() => message.info('请上传手续费支付凭证以完成融资合同签署')}>
+                    签署融资合同并支付手续费
+                  </Button>
+                )}
+                {order.status === 16 && (
+                  <Button type="primary" onClick={() => message.info('请选择并确认物流报价')}>
+                    确认物流资源
+                  </Button>
+                )}
+                {canCancelOrder && (
+                  <Button danger loading={cancelling} onClick={handleCancelOrder}>
+                    取消订单
+                  </Button>
+                )}
+                {order.status === 5 && (
+                  <Button type="primary" icon={<CarOutlined />} onClick={openDeliveryModal}>
+                    {order.delivery_info?.pickup_code ? '修改提货信息' : '录入提货信息'}
+                  </Button>
+                )}
+                {(order.status === 6 || order.status === 7 || order.status === 17) && (
+                  <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setReceiptOpen(true)}>
+                    确认收货
+                  </Button>
+                )}
+                {(order.status === 8 || order.status === 18 || order.status === 19 || order.status === 20) && (
+                  <span className="text-green-600">
+                    <CheckCircleOutlined className="mr-1" />
+                    订单已完成归档
+                  </span>
+                )}
+              </Space>
             </Card>
 
             <Modal

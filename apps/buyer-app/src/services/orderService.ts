@@ -98,6 +98,18 @@ export interface OrderTimelineItem {
   description?: string
 }
 
+export interface OrderEventInfo {
+  id: number
+  event_type: string
+  actor_user_id: number
+  actor_enterprise_id: number
+  actor_service: string
+  from_status: number
+  to_status: number
+  payload?: Record<string, unknown>
+  created_at: string
+}
+
 export const orderService = {
   create: async (payload: CreateOrderPayload) => {
     const response = await api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>('/orders', payload)
@@ -115,6 +127,8 @@ export const orderService = {
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/cancel`).then((response) => response.data),
   signContract: (id: number) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/sign-contract`).then((response) => response.data),
+  attachContract: (id: number, payload: { contract_no?: string; contract_url: string; contract_hash?: string }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/contract`, payload).then((response) => response.data),
   uploadPaymentVoucher: (
     id: number,
     payload: {
@@ -127,6 +141,20 @@ export const orderService = {
       gps_longitude?: number
     },
   ) => api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`orders/${id}/payment-voucher`, payload).then((response) => response.data),
+  directPayment: (
+    id: number,
+    payload: {
+      voucher_url: string
+      transaction_no?: string
+      payer_account?: string
+      payee_account?: string
+      captured_at?: string
+      gps_latitude?: number
+      gps_longitude?: number
+    },
+  ) => api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/payments/direct`, payload).then((response) => response.data),
+  buyerConfirm: (id: number, payload?: { confirm_note?: string }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/buyer-confirm`, payload || {}).then((response) => response.data),
   setDeliveryInfo: (
     id: number,
     payload: {
@@ -142,5 +170,17 @@ export const orderService = {
     },
   ) => api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/delivery-info`, payload).then((response) => response.data),
   confirmReceipt: (id: number, payload: { receipt_voucher: string; captured_at?: string; gps_latitude?: number; gps_longitude?: number }) =>
-    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/confirm-receipt`, payload).then((response) => response.data),
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/receipts/confirm`, payload).then((response) => response.data),
+  createFinancingRequest: (id: number, payload: { finance_service_id: number; requested_amount?: number }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/financing-requests`, payload).then((response) => response.data),
+  buyerConfirmFinancing: (id: number, payload: { confirmed: boolean; remark?: string }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/financing-requests/buyer-confirm`, payload).then((response) => response.data),
+  buyerSignDebtAndPayFee: (id: number, payload: { fee_voucher_url: string; remark?: string }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/financing-requests/debt-sign`, payload).then((response) => response.data),
+  confirmLogisticsQuote: (id: number, payload: { quote_id: number }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/logistics-confirm`, payload).then((response) => response.data),
+  listEvents: async (id: number) => {
+    const response = await api.get<ApiResponse<{ list: OrderEventInfo[] }>, ApiResponse<{ list: OrderEventInfo[] }>>(`/orders/${id}/events`)
+    return response.data
+  },
 }
