@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
+import { AutoComplete, Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
 import {
   AuditOutlined,
   BankOutlined,
@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons'
 import { getBuyerToken } from '@/services/auth'
 import { aiProcurementService } from '@/services/aiProcurementService'
+import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
 import { serviceOfferService } from '@/services/serviceOfferService'
 import { supplyDemandService } from '@/services/supplyDemandService'
 import type {
@@ -177,6 +178,7 @@ export default function AiProcurementPage() {
   const [selectedProducts, setSelectedProducts] = useState<MatchedProduct[]>([])
   const [mine, setMine] = useState<AIProcurementInfo[]>([])
   const [warehouses, setWarehouses] = useState<WarehouseServiceItem[]>([])
+  const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
   const isLoggedIn = Boolean(getBuyerToken())
 
   const loadMine = useCallback(async () => {
@@ -206,6 +208,12 @@ export default function AiProcurementPage() {
   }, [])
 
   useEffect(() => {
+    categoryService.list()
+      .then((response) => setCategories(response.data.length > 0 ? response.data : fallbackProductCategories))
+      .catch(() => setCategories(fallbackProductCategories))
+  }, [])
+
+  useEffect(() => {
     if (result?.parsed) {
       instructionForm.setFieldsValue(result.parsed)
     }
@@ -224,6 +232,14 @@ export default function AiProcurementPage() {
   }, [orderForm, result?.parsed.delivery_address, selectedProducts])
 
   const currentStep = activeStep ? activeStep - 1 : 0
+  const categoryOptions = useMemo(
+    () =>
+      categories.map((category) => ({
+        label: category.display_name || category.name,
+        value: category.name,
+      })),
+    [categories],
+  )
 
   const updateResult = (patch: Partial<AIProcurementParseResult>) => {
     setResult((prev) => ({
@@ -581,6 +597,7 @@ export default function AiProcurementPage() {
             instructionForm={instructionForm}
             orderForm={orderForm}
             warehouses={warehouses}
+            categoryOptions={categoryOptions}
             onConfirmInstruction={handleConfirmInstruction}
             onToggleProduct={handleToggleProduct}
             onProductQuantityChange={handleProductQuantityChange}
@@ -686,6 +703,7 @@ function StepPage({
   instructionForm,
   orderForm,
   warehouses,
+  categoryOptions,
   onConfirmInstruction,
   onToggleProduct,
   onProductQuantityChange,
@@ -706,6 +724,7 @@ function StepPage({
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
   warehouses: WarehouseServiceItem[]
+  categoryOptions: Array<{ label: string; value: string }>
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
@@ -748,6 +767,7 @@ function StepPage({
           instructionForm,
           orderForm,
           warehouses,
+          categoryOptions,
           onConfirmInstruction,
           onToggleProduct,
           onProductQuantityChange,
@@ -774,6 +794,7 @@ function renderStepContent(props: {
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
   warehouses: WarehouseServiceItem[]
+  categoryOptions: Array<{ label: string; value: string }>
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
@@ -785,7 +806,7 @@ function renderStepContent(props: {
   onMatchFinance: (required: boolean) => Promise<void>
   onSubmitReview: () => void
 }) {
-  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm, warehouses } = props
+  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm, warehouses, categoryOptions } = props
 
   if (activeStep === 1) {
     return (
@@ -793,7 +814,18 @@ function renderStepContent(props: {
         <Form form={instructionForm} layout="vertical">
           <Row gutter={16}>
             <Col xs={24} md={12}><Form.Item name="product_name" label="采购物品" rules={[{ required: true }]}><Input /></Form.Item></Col>
-            <Col xs={24} md={12}><Form.Item name="category" label="品类" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择或输入品类' }]}>
+                <AutoComplete
+                  options={categoryOptions}
+                  placeholder="请选择品类，不存在时可直接输入"
+                  filterOption={(inputValue, option) =>
+                    String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
+                    String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
+                  }
+                />
+              </Form.Item>
+            </Col>
             <Col xs={24} md={8}><Form.Item name="quantity" label="采购数量" rules={[{ required: true }]}><InputNumber className="w-full" min={0.01} /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="unit" label="单位" rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="financing_required" label="是否需要融资" valuePropName="checked"><Switch /></Form.Item></Col>
