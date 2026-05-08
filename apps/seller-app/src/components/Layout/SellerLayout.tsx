@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Avatar, Button, Dropdown, Layout, Menu, Space, Typography } from 'antd'
 import {
+  BankOutlined,
   DashboardOutlined,
   HomeOutlined,
   LogoutOutlined,
@@ -66,6 +67,7 @@ export default function SellerLayout() {
 
     items.push({ key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' })
     items.push({ key: '/products', icon: <ShopOutlined />, label: '商品管理' })
+    items.push({ key: '/warehouses', icon: <BankOutlined />, label: '仓库管理' })
     items.push({ key: '/bidding', icon: <RiseOutlined />, label: '参与竞价' })
     items.push({ key: '/orders', icon: <ShoppingCartOutlined />, label: '订单管理' })
     items.push({ key: '/fulfillment', icon: <TruckOutlined />, label: '履约核销' })

@@ -9,6 +9,7 @@ const IdentityPage = lazy(() => import('@/pages/Identity'))
 const LoginPage = lazy(() => import('@/pages/Login'))
 const OrdersPage = lazy(() => import('@/pages/Orders'))
 const ProductsPage = lazy(() => import('@/pages/Products'))
+const WarehousesPage = lazy(() => import('@/pages/Warehouses'))
 const BiddingPage = lazy(() => import('@/pages/Bidding'))
 const SettingsPage = lazy(() => import('@/pages/Settings'))
 const FulfillmentPage = lazy(() => import('@/pages/Fulfillment'))
@@ -57,6 +58,7 @@ export function AppRouter() {
               <Route element={<RequireEnterprise />}>
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="products" element={<ProductsPage />} />
+                <Route path="warehouses" element={<WarehousesPage />} />
                 <Route path="bidding" element={<BiddingPage />} />
                 <Route path="orders" element={<OrdersPage />} />
                 <Route path="fulfillment" element={<FulfillmentPage />} />
