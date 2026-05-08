@@ -13,7 +13,8 @@
 - [x] 新增服务商应用 build 已通过
 - [x] 已确认环境变量、CI 或跨仓依赖: 继续使用 `API_UPSTREAM`
 - [x] 已确认 smoke test 范围: `/logistics`、`/warehouse`、`/finance`、`/seller`、`/api`
-- [ ] GitHub PR 创建后，已执行 `./harness/lark-pr-doc.sh docs/features/SL-FE-WEB-APPS-NGINX --pr-url <github-pr-url> --pr-title "<pr-title>"` 并写入共享飞书 PR 记录
+- [x] GitHub PR 创建后，已执行 `./harness/lark-pr-doc.sh docs/features/SL-FE-WEB-APPS-NGINX --pr-url <github-pr-url> --pr-title "<pr-title>"` 并写入共享飞书 PR 记录
+- 飞书 PRD/PR 记录: https://www.feishu.cn/wiki/T5KXwtsWaibxjmk8mDbcGEfjnJh
 
 ## 回滚信息
 
