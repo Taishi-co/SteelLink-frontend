@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Alert,
+  AutoComplete,
   Button,
   Card,
   Descriptions,
@@ -35,6 +36,7 @@ import { getErrorMessage } from '@steellink/shared/utils'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { useNavigate } from 'react-router-dom'
+import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
 import { sellerProductService, type SellerProductRecord } from '@/services/productService'
 import { uploadService, type UploadPurpose } from '@/services/uploadService'
 import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
@@ -78,8 +80,6 @@ interface ProductDisplayFormValues {
   imageFiles: UploadFile[]
   qualificationFiles: UploadFile[]
 }
-
-const categoryOptions = ['全部', '热轧板卷', '冷轧板卷', '中厚板', '型材', '管材', '建材']
 
 const goodsTypeMeta: Record<'spot' | 'futures', { color: string; text: string }> = {
   spot: { color: 'blue', text: '现货' },
@@ -220,6 +220,7 @@ function toDisplayPayload(values: ProductDisplayFormValues, imageURLs: string[],
 export default function ProductsPage() {
   const navigate = useNavigate()
   const [products, setProducts] = useState<SellerProductRecord[]>([])
+  const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
   const [platformWarehouses, setPlatformWarehouses] = useState<WarehouseServiceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [warehouseLoading, setWarehouseLoading] = useState(false)
@@ -259,8 +260,18 @@ export default function ProductsPage() {
     }
   }
 
+  const loadCategories = async () => {
+    try {
+      const response = await categoryService.list()
+      setCategories(response.data.length > 0 ? response.data : fallbackProductCategories)
+    } catch {
+      setCategories(fallbackProductCategories)
+    }
+  }
+
   useEffect(() => {
     void loadProducts()
+    void loadCategories()
     void loadPlatformWarehouses()
   }, [])
 
@@ -275,6 +286,34 @@ export default function ProductsPage() {
         return matchesSearch && matchesCategory && matchesStatus
       }),
     [categoryFilter, products, searchText, statusFilter],
+  )
+
+  const categorySelectOptions = useMemo(() => {
+    const categoryNames = new Set(categories.map((category) => category.name))
+    products.forEach((product) => {
+      if (product.category) {
+        categoryNames.add(product.category)
+      }
+    })
+    return [
+      { label: '全部品类', value: '全部' },
+      ...Array.from(categoryNames).map((name) => {
+        const category = categories.find((item) => item.name === name)
+        return {
+          label: category?.display_name || name,
+          value: name,
+        }
+      }),
+    ]
+  }, [categories, products])
+
+  const categoryInputOptions = useMemo(
+    () =>
+      categories.map((category) => ({
+        label: category.display_name || category.name,
+        value: category.name,
+      })),
+    [categories],
   )
 
   const productSummary = useMemo(
@@ -575,7 +614,7 @@ export default function ProductsPage() {
               className="w-full xl:w-40"
               value={categoryFilter}
               onChange={setCategoryFilter}
-              options={categoryOptions.map((category) => ({ label: category, value: category }))}
+              options={categorySelectOptions}
             />
             <Select
               className="w-full xl:w-40"
@@ -633,12 +672,14 @@ export default function ProductsPage() {
               ]}
             />
           </Form.Item>
-          <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择品类' }]}>
-            <Select
-              placeholder="请选择品类"
-              options={categoryOptions
-                .filter((category) => category !== '全部')
-                .map((category) => ({ label: category, value: category }))}
+          <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择或输入品类' }]}>
+            <AutoComplete
+              options={categoryInputOptions}
+              placeholder="请选择品类，不存在时可直接输入新业务品类"
+              filterOption={(inputValue, option) =>
+                String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
+                String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
+              }
             />
           </Form.Item>
           <Space className="w-full" size="large" wrap>
