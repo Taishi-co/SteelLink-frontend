@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
+import { AutoComplete, Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
 import {
   AuditOutlined,
   BankOutlined,
@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons'
 import { getBuyerToken } from '@/services/auth'
 import { aiProcurementService } from '@/services/aiProcurementService'
+import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
 import { serviceOfferService } from '@/services/serviceOfferService'
 import { supplyDemandService } from '@/services/supplyDemandService'
 import type {
@@ -165,6 +166,27 @@ function hasPendingLogisticsResolution(items: MatchedProduct[]) {
   return items.some((item) => item.logistics_match_status === 'no_match' || item.logistics_match_status === 'destination_missing')
 }
 
+function mergeParsedInstruction(base: ParsedInstruction, values: Partial<ParsedInstruction>): ParsedInstruction {
+  const quantity = Number(values.quantity ?? base.quantity)
+  const confidence = Number(values.confidence ?? base.confidence)
+  return {
+    ...base,
+    ...values,
+    product_name: String(values.product_name ?? base.product_name ?? '').trim(),
+    category: String(values.category ?? base.category ?? '').trim(),
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : base.quantity,
+    unit: String(values.unit ?? base.unit ?? '').trim(),
+    usage: String(values.usage ?? base.usage ?? '').trim(),
+    financing_required: Boolean(values.financing_required ?? base.financing_required),
+    keywords: values.keywords && values.keywords.length > 0 ? values.keywords : base.keywords,
+    confidence: Number.isFinite(confidence) && confidence >= 0 ? confidence : base.confidence,
+    delivery_address: String(values.delivery_address ?? base.delivery_address ?? '').trim(),
+    delivery_address_source: values.delivery_address_source ?? base.delivery_address_source,
+    delivery_warehouse_id: values.delivery_warehouse_id ?? base.delivery_warehouse_id,
+    delivery_warehouse_name: String(values.delivery_warehouse_name ?? base.delivery_warehouse_name ?? '').trim(),
+  }
+}
+
 async function copyText(value: string) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(value)
@@ -205,6 +227,7 @@ export default function AiProcurementPage() {
   const [selectedProducts, setSelectedProducts] = useState<MatchedProduct[]>([])
   const [mine, setMine] = useState<AIProcurementInfo[]>([])
   const [warehouses, setWarehouses] = useState<WarehouseServiceItem[]>([])
+  const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
   const isLoggedIn = Boolean(getBuyerToken())
 
   const loadMine = useCallback(async () => {
@@ -234,6 +257,12 @@ export default function AiProcurementPage() {
   }, [])
 
   useEffect(() => {
+    categoryService.list()
+      .then((response) => setCategories(response.data.length > 0 ? response.data : fallbackProductCategories))
+      .catch(() => setCategories(fallbackProductCategories))
+  }, [])
+
+  useEffect(() => {
     if (result?.parsed) {
       instructionForm.setFieldsValue(result.parsed)
     }
@@ -252,6 +281,14 @@ export default function AiProcurementPage() {
   }, [orderForm, result?.parsed.delivery_address, selectedProducts])
 
   const currentStep = activeStep ? activeStep - 1 : 0
+  const categoryOptions = useMemo(
+    () =>
+      categories.map((category) => ({
+        label: category.display_name || category.name,
+        value: category.name,
+      })),
+    [categories],
+  )
 
   const updateResult = (patch: Partial<AIProcurementParseResult>) => {
     setResult((prev) => ({
@@ -271,6 +308,13 @@ export default function AiProcurementPage() {
       stages: patch.stages || prev?.stages || [],
     }))
   }
+
+  const getLatestParsedInstruction = useCallback(() => {
+    if (!result) {
+      return null
+    }
+    return mergeParsedInstruction(result.parsed, instructionForm.getFieldsValue())
+  }, [instructionForm, result])
 
   const handleParse = async () => {
     const value = prompt.trim()
@@ -305,7 +349,9 @@ export default function AiProcurementPage() {
     setBusy(true)
     try {
       const values = await instructionForm.validateFields()
-      const confirmed = await aiProcurementService.confirmInstruction(prompt, values)
+      const parsedForRequest = mergeParsedInstruction(result.parsed, values)
+      const confirmed = await aiProcurementService.confirmInstruction(prompt, parsedForRequest)
+      instructionForm.setFieldsValue(confirmed.parsed)
       const matched = await aiProcurementService.matchProducts(confirmed.parsed)
       updateResult({
         parsed: confirmed.parsed,
@@ -328,18 +374,20 @@ export default function AiProcurementPage() {
       message.warning('请选择至少一个商品')
       return
     }
-    if (!result || !nearlyEqual(selectedQuantity, result.parsed.quantity)) {
-      message.warning(`拼单数量需要等于采购数量：${result?.parsed.quantity || 0}${result?.parsed.unit || ''}`)
+    const parsedForRequest = getLatestParsedInstruction()
+    if (!parsedForRequest || !nearlyEqual(selectedQuantity, parsedForRequest.quantity)) {
+      message.warning(`拼单数量需要等于采购数量：${parsedForRequest?.quantity || 0}${parsedForRequest?.unit || ''}`)
       return
     }
     setBusy(true)
     try {
       const matched = await aiProcurementService.matchLogisticsWarehouse({
-        parsed: result.parsed,
+        parsed: parsedForRequest,
         selected_products: selectedProducts,
       })
       setSelectedProducts(matched.matched_products)
       updateResult({
+        parsed: parsedForRequest,
         stages: matched.stages,
       })
       navigate('/ai-procurement/3')
@@ -359,9 +407,14 @@ export default function AiProcurementPage() {
     setBusy(true)
     try {
       const values = await orderForm.validateFields()
+      const parsedForRequest = getLatestParsedInstruction()
+      if (!parsedForRequest) {
+        message.warning('请先确认参数')
+        return
+      }
       const response = await aiProcurementService.generateOrder({
         prompt,
-        parsed: result.parsed,
+        parsed: parsedForRequest,
         selected_products: selectedProducts,
         order_form: {
           ...toOrderFormPayload(values),
@@ -630,6 +683,7 @@ export default function AiProcurementPage() {
             instructionForm={instructionForm}
             orderForm={orderForm}
             warehouses={warehouses}
+            categoryOptions={categoryOptions}
             onConfirmInstruction={handleConfirmInstruction}
             onToggleProduct={handleToggleProduct}
             onProductQuantityChange={handleProductQuantityChange}
@@ -752,6 +806,7 @@ function StepPage({
   instructionForm,
   orderForm,
   warehouses,
+  categoryOptions,
   onConfirmInstruction,
   onToggleProduct,
   onProductQuantityChange,
@@ -772,6 +827,7 @@ function StepPage({
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
   warehouses: WarehouseServiceItem[]
+  categoryOptions: Array<{ label: string; value: string }>
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
@@ -814,6 +870,7 @@ function StepPage({
           instructionForm,
           orderForm,
           warehouses,
+          categoryOptions,
           onConfirmInstruction,
           onToggleProduct,
           onProductQuantityChange,
@@ -840,6 +897,7 @@ function renderStepContent(props: {
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
   warehouses: WarehouseServiceItem[]
+  categoryOptions: Array<{ label: string; value: string }>
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
@@ -851,7 +909,7 @@ function renderStepContent(props: {
   onMatchFinance: (required: boolean) => Promise<void>
   onSubmitReview: () => void
 }) {
-  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm, warehouses } = props
+  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm, warehouses, categoryOptions } = props
 
   if (activeStep === 1) {
     return (
@@ -859,7 +917,18 @@ function renderStepContent(props: {
         <Form form={instructionForm} layout="vertical">
           <Row gutter={16}>
             <Col xs={24} md={12}><Form.Item name="product_name" label="采购物品" rules={[{ required: true }]}><Input /></Form.Item></Col>
-            <Col xs={24} md={12}><Form.Item name="category" label="品类" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择或输入品类' }]}>
+                <AutoComplete
+                  options={categoryOptions}
+                  placeholder="请选择品类，不存在时可直接输入"
+                  filterOption={(inputValue, option) =>
+                    String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
+                    String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
+                  }
+                />
+              </Form.Item>
+            </Col>
             <Col xs={24} md={8}><Form.Item name="quantity" label="采购数量" rules={[{ required: true }]}><InputNumber className="w-full" min={0.01} /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="unit" label="单位" rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="financing_required" label="是否需要融资" valuePropName="checked"><Switch /></Form.Item></Col>
