@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Row, Col, Card, Input, Select, Pagination, Typography, Space, Tag, Empty, Spin, InputNumber, Button, Switch } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
 import { Link, useSearchParams } from 'react-router-dom'
+import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
 import { productService } from '@/services/productService'
 import type { Product } from '@/types'
 
 const { Title, Paragraph, Text } = Typography
 const { Search } = Input
 
-const productCategories = ['全部', '热轧板卷', '冷轧板卷', '中厚板', '型材', '管材', '建材']
 const sortOptions = [
   { label: '默认排序', value: 'newest' },
   { label: '价格从低到高', value: 'price_asc' },
@@ -28,9 +28,8 @@ export default function ProductsPage() {
   const initialQuickOrderOnly = searchParams.get('quick_order') === '1'
 
   const [searchText, setSearchText] = useState(initialKeyword)
-  const [selectedCategory, setSelectedCategory] = useState(
-    productCategories.includes(initialCategory) ? initialCategory : '全部',
-  )
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory)
+  const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
   const [currentPage, setCurrentPage] = useState(initialPage > 0 ? initialPage : 1)
   const [sortBy, setSortBy] = useState(initialSortBy)
   const [steelMill, setSteelMill] = useState(initialSteelMill)
@@ -55,6 +54,19 @@ export default function ProductsPage() {
       maxPrice ||
       minAvailable,
   )
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await categoryService.list()
+        setCategories(response.data.length > 0 ? response.data : fallbackProductCategories)
+      } catch {
+        setCategories(fallbackProductCategories)
+      }
+    }
+
+    void loadCategories()
+  }, [])
 
   useEffect(() => {
     const nextParams = new URLSearchParams()
@@ -123,6 +135,20 @@ export default function ProductsPage() {
   const displayedProducts = quickOrderOnly
     ? products.filter((product) => product.minOrderQty > 0 && product.availableQty >= product.minOrderQty)
     : products
+
+  const categoryOptions = useMemo(() => {
+    const options = [
+      { label: '全部', value: '全部' },
+      ...categories.map((category) => ({
+        label: category.display_name || category.name,
+        value: category.name,
+      })),
+    ]
+    if (selectedCategory !== '全部' && !options.some((option) => option.value === selectedCategory)) {
+      options.push({ label: selectedCategory, value: selectedCategory })
+    }
+    return options
+  }, [categories, selectedCategory])
 
   return (
     <div className="min-h-screen bg-gray-50 py-6">
@@ -195,7 +221,7 @@ export default function ProductsPage() {
                       setCurrentPage(1)
                     }}
                     style={{ width: 150 }}
-                    options={productCategories.map((category) => ({ label: category, value: category }))}
+                    options={categoryOptions}
                   />
                 </div>
                 <div>

@@ -1,114 +1,89 @@
-import { Button, Card, Col, List, Row, Statistic, Steps, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Col, Row, Space, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import {
-  AuditOutlined,
-  BankOutlined,
-  CheckCircleOutlined,
-  DollarCircleOutlined,
-  FileSearchOutlined,
-  FundProjectionScreenOutlined,
-  InsuranceOutlined,
-  SafetyCertificateOutlined,
-} from '@ant-design/icons'
-import ServicePanelGate from './ServicePanelGate'
+import { BankOutlined, FileSearchOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { FinanceServiceItem, serviceOfferService } from '@/services/serviceOfferService'
 
-const { Title, Paragraph, Text } = Typography
+const { Paragraph, Text, Title } = Typography
 
-interface FinanceCase {
-  key: string
-  no: string
-  company: string
-  product: string
-  amount: string
-  collateral: string
-  status: string
-  risk: string
-}
-
-const financeCases: FinanceCase[] = [
-  { key: '1', no: 'JR20260506001', company: '昆山制造集团', product: '订单融资', amount: '320 万', collateral: '待收货订单', status: '风控初审', risk: '低' },
-  { key: '2', no: 'JR20260506002', company: '华东金属贸易', product: '仓单质押', amount: '580 万', collateral: '监管仓库存', status: '待放款', risk: '中' },
-  { key: '3', no: 'JR20260506003', company: '宁波终端厂', product: '账期额度', amount: '200 万', collateral: '历史交易', status: '贷后跟踪', risk: '低' },
-]
-
-const columns: ColumnsType<FinanceCase> = [
-  { title: '申请编号', dataIndex: 'no', key: 'no' },
-  { title: '企业', dataIndex: 'company', key: 'company' },
-  { title: '产品', dataIndex: 'product', key: 'product' },
-  { title: '申请金额', dataIndex: 'amount', key: 'amount' },
-  { title: '融资依据', dataIndex: 'collateral', key: 'collateral' },
+const columns: ColumnsType<FinanceServiceItem> = [
+  { title: '资金产品', dataIndex: 'name', key: 'name', width: 180 },
+  { title: '类型', dataIndex: 'finance_type', key: 'finance_type', width: 120, render: (v?: string) => v || '-' },
   {
-    title: '状态',
-    dataIndex: 'status',
-    key: 'status',
-    render: (value: string) => <Tag color={value === '待放款' ? 'green' : value === '风控初审' ? 'blue' : 'purple'}>{value}</Tag>,
+    title: '额度范围',
+    key: 'amount',
+    width: 170,
+    render: (_, row) => `${(row.min_amount || 0).toLocaleString()} - ${(row.max_amount || 0).toLocaleString()} 元`,
   },
   {
-    title: '风险',
-    dataIndex: 'risk',
-    key: 'risk',
-    render: (value: string) => <Tag color={value === '中' ? 'gold' : 'success'}>{value}</Tag>,
+    title: '账期/费率',
+    key: 'term_rate',
+    width: 140,
+    render: (_, row) => `${row.term_days || 0} 天 / ${row.annual_rate || 0}%`,
+  },
+  { title: '手续费规则', dataIndex: 'fee_rule', key: 'fee_rule', width: 180, render: (v?: string) => v || '-' },
+  {
+    title: '适用场景',
+    dataIndex: 'supported_scenarios',
+    key: 'supported_scenarios',
+    width: 180,
+    render: (items?: string[]) => items?.length ? <Space wrap>{items.map((item) => <Tag key={item}>{item}</Tag>)}</Space> : '-',
   },
 ]
 
 export default function FinancePage() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['approved-finance-services'],
+    queryFn: () => serviceOfferService.listFinance({ status: 2, page_size: 100 }),
+  })
+  const rows = data?.data?.list ?? []
+
   return (
-    <ServicePanelGate serviceKey="finance">
-      <div className="min-w-0">
-        <Card className="mb-6 rounded-lg">
-          <Title level={4} className="!mb-1">资金服务平台</Title>
-          <Paragraph className="!mb-0 !text-gray-500">
-            将融资申请、授信、风控、放款和贷后预警放在买家工作台内，后续可接订单、仓单、物流签收和企业认证数据。
-          </Paragraph>
-        </Card>
+    <div className="min-w-0 space-y-4">
+      <Card className="rounded-lg">
+        <Space align="start">
+          <BankOutlined className="text-xl text-violet-600 mt-1" />
+          <div>
+            <Title level={4} className="!mb-1">可申请资金服务</Title>
+            <Paragraph className="!mb-0 !text-gray-500">
+              这里面向买方/卖方展示平台已审核的资金产品。真正的融资申请在订单支付节点发起，资金方会在独立工作台处理审批、合同、分佣放款和货权质押。
+            </Paragraph>
+          </div>
+        </Space>
+      </Card>
 
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="待审申请" value={12} suffix="笔" prefix={<FileSearchOutlined />} /></Card></Col>
-          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="授信余额" value={2860} suffix="万" prefix={<BankOutlined />} /></Card></Col>
-          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="今日放款" value={760} suffix="万" prefix={<CheckCircleOutlined />} /></Card></Col>
-          <Col xs={24} sm={12} lg={6}><Card className="rounded-lg"><Statistic title="预警案件" value={3} suffix="笔" prefix={<SafetyCertificateOutlined />} /></Card></Col>
-        </Row>
-
-        <Row gutter={[16, 16]} className="mt-4">
-          <Col xs={24} xl={16}>
-            <Card className="rounded-lg" title="融资申请池" extra={<Button type="primary" icon={<AuditOutlined />}>进入风控</Button>}>
-              <Table columns={columns} dataSource={financeCases} pagination={false} scroll={{ x: 820 }} />
-            </Card>
-          </Col>
-          <Col xs={24} xl={8}>
-            <Card className="rounded-lg" title="标准审核流">
-              <Steps
-                direction="vertical"
-                current={1}
-                items={[
-                  { title: '资料校验', description: '企业认证、合同、订单、仓单' },
-                  { title: '风控评估', description: '交易真实性、库存监管、授信占用' },
-                  { title: '放款确认', description: '合同签署、资金划拨、费用确认' },
-                  { title: '贷后监控', description: '回款、库存、履约状态预警' },
-                ]}
-              />
-            </Card>
-            <Card className="mt-4 rounded-lg" title="产品线">
-              <List
-                dataSource={[
-                  { title: '订单融资', description: '基于采购订单与付款节点', icon: <FundProjectionScreenOutlined /> },
-                  { title: '仓单质押', description: '基于监管仓库存和货权控制', icon: <InsuranceOutlined /> },
-                ]}
-                renderItem={(item) => (
-                  <List.Item>
-                    <List.Item.Meta avatar={item.icon} title={item.title} description={item.description} />
-                  </List.Item>
-                )}
-              />
-            </Card>
-          </Col>
-        </Row>
-
-        <Card className="mt-4 rounded-lg">
-          <Title level={5}><DollarCircleOutlined /> 业务逻辑待确认</Title>
-          <Text type="secondary">资金服务可先作为买家工作台服务能力，后续如果资金方也要独立运营账号，再扩展资金方后台角色与菜单。</Text>
-        </Card>
-      </div>
-    </ServicePanelGate>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={8}>
+          <Card className="rounded-lg" title="使用口径">
+            <Space direction="vertical">
+              <Text><FileSearchOutlined /> 买卖方只查看和申请资金服务。</Text>
+              <Text><SafetyCertificateOutlined /> 资金方工作台只给已开通金融服务商能力的企业使用。</Text>
+              <Text type="secondary">订单进入待支付后，可选择资金产品发起托盘垫资。</Text>
+            </Space>
+          </Card>
+        </Col>
+        <Col xs={24} lg={16}>
+          <Alert
+            className="mb-4"
+            type="info"
+            showIcon
+            message="资金方入口"
+            description="如果你的企业是资金方，请先在个人工作台申请并通过“金融服务商能力”，审核通过后侧边栏会出现“进入资金方工作台”。"
+          />
+          <Card className="rounded-lg" title="平台资金产品池" extra={<Link to="/dashboard/orders"><Button type="primary">从订单申请</Button></Link>}>
+            <Table
+              rowKey="id"
+              loading={isLoading}
+              columns={columns}
+              dataSource={rows}
+              pagination={{ pageSize: 10 }}
+              scroll={{ x: 920 }}
+              locale={{ emptyText: '暂无已审核资金产品' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+    </div>
   )
 }

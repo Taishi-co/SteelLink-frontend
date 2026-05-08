@@ -36,6 +36,8 @@ const statusMap: Record<number, { label: string; color: string }> = {
   20: { label: '已归档', color: 'default' },
   21: { label: '融资审批中', color: 'purple' },
   22: { label: '待签署融资合同', color: 'gold' },
+  23: { label: '待重新选仓', color: 'volcano' },
+  24: { label: '待重新发起物流', color: 'volcano' },
 }
 
 const orderSteps = [
@@ -68,13 +70,13 @@ const movementStatusText: Record<string, string> = {
 
 function getCurrentStep(status: number) {
   if (status === 0 || status === 1) return 0
-  if (status === 12) return 1
+  if (status === 12 || status === 23) return 1
   if (status === 13) return 2
   if (status === 14) return 3
   if (status === 2) return 4
   if (status === 3 || status === 21 || status === 22) return 5
   if (status === 4) return 5
-  if (status === 15 || status === 16) return 6
+  if (status === 15 || status === 16 || status === 24) return 6
   if (status === 5 || status === 6 || status === 17 || status === 7) return 7
   if (status === 18 || status === 19) return 8
   if (status === 8 || status === 20) return 9
@@ -83,63 +85,69 @@ function getCurrentStep(status: number) {
 
 function getStatusNotice(status: number, _hasPaymentVoucher: boolean, _hasDeliveryInfo: boolean, contractInfo?: { buyer_signed: boolean; seller_signed: boolean }) {
   if (status === 1) {
-    return { type: 'warning' as const, message: '订单已提交，等待卖家确认。' }
+    return { type: 'warning' as const, title: '当前状态：订单已提交', message: '下一步：等待卖家确认。' }
   }
   if (status === 12) {
-    return { type: 'warning' as const, message: '订单已提交，等待仓储方确认仓库条件。' }
+    return { type: 'warning' as const, title: '当前状态：待仓库确认', message: '下一步：等待仓储方确认仓库条件。' }
+  }
+  if (status === 23) {
+    return { type: 'warning' as const, title: '当前状态：待重新选仓', message: '下一步：请重新选择仓储方，平台管理端已收到异常反馈。' }
   }
   if (status === 13) {
-    return { type: 'warning' as const, message: '仓储方已确认仓库条件，等待卖方确认条款。' }
+    return { type: 'warning' as const, title: '当前状态：仓储确认已完成', message: '下一步：等待卖方确认条款。' }
   }
   if (status === 14) {
-    return { type: 'warning' as const, message: '卖方已确认条款，请确认订单最终版本。' }
+    return { type: 'warning' as const, title: '当前状态：卖方确认已完成', message: '下一步：请确认订单最终版本。' }
   }
   if (status === 2) {
     if (contractInfo?.buyer_signed) {
-      return { type: 'info' as const, message: '您已签署合同，等待卖家签署后进入支付阶段。' }
+      return { type: 'info' as const, title: '当前状态：买方签署已完成', message: '下一步：等待卖家签署后进入支付阶段。' }
     }
-    return { type: 'warning' as const, message: '请签署交易合同。' }
+    return { type: 'warning' as const, title: '当前状态：待签合同', message: '下一步：请签署交易合同。' }
   }
   if (status === 3) {
-    return { type: 'warning' as const, message: '当前待支付，请上传支付凭证或申请托盘融资。' }
+    return { type: 'warning' as const, title: '当前状态：待支付/融资', message: '下一步：请上传支付与货权监管凭证，或申请托盘融资。' }
   }
   if (status === 21) {
-    return { type: 'info' as const, message: '托盘融资申请已提交，资金方正在进行风控审批。' }
+    return { type: 'info' as const, title: '当前状态：融资申请已完成', message: '下一步：等待资金方进行风控审批。' }
   }
   if (status === 22) {
-    return { type: 'warning' as const, message: '融资已审批通过，请签署债务合同并支付手续费。' }
+    return { type: 'warning' as const, title: '当前状态：风控审批已完成', message: '下一步：请签署债务合同并支付手续费。' }
   }
   if (status === 4) {
-    return { type: 'success' as const, message: '支付已完成，等待卖方发起物流竞价。' }
+    return { type: 'success' as const, title: '当前状态：支付/监管已完成', message: '下一步：等待卖方发起物流竞价。' }
   }
   if (status === 15) {
-    return { type: 'info' as const, message: '卖方已发起物流竞价，等待物流方报价。' }
+    return { type: 'info' as const, title: '当前状态：物流竞价已发起', message: '下一步：等待物流方报价。' }
   }
   if (status === 16) {
-    return { type: 'warning' as const, message: '物流方已报价，请确认物流资源。' }
+    return { type: 'warning' as const, title: '当前状态：物流报价已完成', message: '下一步：请按合同约定确认物流资源。' }
+  }
+  if (status === 24) {
+    return { type: 'warning' as const, title: '当前状态：待重新发起物流', message: '下一步：等待卖方重新发起物流，平台管理端已收到异常反馈。' }
   }
   if (status === 5 || status === 17) {
-    return { type: 'info' as const, message: '物流资源已确认，运输任务已下发。' }
+    return { type: 'info' as const, title: '当前状态：物流确认已完成', message: '下一步：等待物流方运输履约。' }
   }
   if (status === 6 || status === 7) {
-    return { type: 'info' as const, message: '订单已进入配送阶段，确认签收后订单会完成归档。' }
+    return { type: 'info' as const, title: '当前状态：运输履约中', message: '下一步：收到货物后确认签收。' }
   }
   if (status === 18) {
-    return { type: 'success' as const, message: '已确认收货，等待卖方对账确认。' }
+    return { type: 'success' as const, title: '当前状态：收货确认已完成', message: '下一步：等待卖方对账确认。' }
   }
   if (status === 19) {
-    return { type: 'success' as const, message: '卖方已完成对账确认，等待归档。' }
+    return { type: 'success' as const, title: '当前状态：对账已完成', message: '下一步：等待归档。' }
   }
   if (status === 8 || status === 20) {
-    return { type: 'success' as const, message: '订单已完成归档。' }
+    return { type: 'success' as const, title: '当前状态：交易闭环已完成', message: '订单已完成归档，可回工作台查看订单记录。' }
   }
   if (status === 9) {
-    return { type: 'error' as const, message: '订单已取消。' }
+    return { type: 'error' as const, title: '当前状态：订单已取消', message: '订单已取消，可回工作台查看记录。' }
   }
   if (status === 11) {
-    return { type: 'error' as const, message: '订单进入异常状态，等待平台运营介入。' }
+    return { type: 'error' as const, title: '当前状态：订单异常', message: '下一步：等待平台运营介入。' }
   }
-  return { type: 'info' as const, message: '订单状态已更新。' }
+  return { type: 'info' as const, title: '当前状态：订单状态已更新', message: '请回工作台查看订单进度。' }
 }
 
 function isValidHttpUrl(value?: string) {
@@ -179,9 +187,12 @@ export default function OrderDetailPage() {
   const [confirmingReceipt, setConfirmingReceipt] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [signing, setSigning] = useState(false)
+  const [warehouseOpen, setWarehouseOpen] = useState(false)
+  const [savingWarehouse, setSavingWarehouse] = useState(false)
   const [form] = Form.useForm()
   const [deliveryForm] = Form.useForm()
   const [receiptForm] = Form.useForm()
+  const [warehouseForm] = Form.useForm()
 
   const { data, isLoading } = useQuery({
     queryKey: ['order-detail', id],
@@ -221,18 +232,36 @@ export default function OrderDetailPage() {
     .join(' ')
   const canCancelOrder = (order?.status === 1 || order?.status === 2 || order?.status === 3) && !order.payment_info?.voucher_url
 
+  const showCompleted = (title: string, next: string) => {
+    Modal.success({
+      title,
+      content: (
+        <Space direction="vertical" size={8}>
+          <Text>已完成：{title.replace('已完成', '')}</Text>
+          <Text type="secondary">下一步：{next}</Text>
+          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+        </Space>
+      ),
+      okText: '回工作台看订单',
+      onOk: () => navigate('/orders'),
+    })
+  }
+
   const handleUploadVoucher = async () => {
     try {
       const values = await form.validateFields()
       setUploading(true)
       const uploaded = await uploadService.upload(getUploadFile(values.voucher_file), 'payment_voucher')
-      await orderService.uploadPaymentVoucher(Number(id), {
+      const titleUploaded = await uploadService.upload(getUploadFile(values.title_voucher_file), 'title_voucher')
+      await orderService.directPayment(Number(id), {
         voucher_url: uploaded.url,
         transaction_no: values.transaction_no,
         payer_account: values.payer_account,
         payee_account: values.payee_account,
+        title_voucher_url: titleUploaded.url,
+        title_remark: values.title_remark,
       })
-      message.success('支付凭证已上传')
+      showCompleted('支付与货权监管凭证已完成', '等待卖方发起物流竞价。')
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       form.resetFields()
@@ -242,6 +271,27 @@ export default function OrderDetailPage() {
       message.error(getErrorMessage(error, '上传失败'))
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleReselectWarehouse = async () => {
+    try {
+      const values = await warehouseForm.validateFields()
+      setSavingWarehouse(true)
+      await orderService.reselectWarehouse(Number(id), {
+        warehouse_service_id: Number(values.warehouse_service_id),
+        confirm_note: values.confirm_note,
+      })
+      showCompleted('重新选仓已完成', '等待新仓储方确认仓库条件。')
+      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+      warehouseForm.resetFields()
+      setWarehouseOpen(false)
+    } catch (error: unknown) {
+      if (hasFormErrorFields(error)) return
+      message.error(getErrorMessage(error, '重新选仓失败'))
+    } finally {
+      setSavingWarehouse(false)
     }
   }
 
@@ -255,7 +305,7 @@ export default function OrderDetailPage() {
         warehouse_service_id: pickupWarehouseServiceId,
         warehouse_name: pickupWarehouseName,
       })
-      message.success('提货信息已保存，提货码已生成')
+      showCompleted('提货信息已完成', '卖方可使用提货码核销出库。')
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       deliveryForm.resetFields()
@@ -288,7 +338,7 @@ export default function OrderDetailPage() {
       await orderService.confirmReceipt(Number(id), {
         receipt_voucher: uploaded.url,
       })
-      message.success('已确认收货，订单已完成')
+      showCompleted('收货确认已完成', '等待卖方对账确认。')
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       receiptForm.resetFields()
@@ -305,7 +355,7 @@ export default function OrderDetailPage() {
     try {
       setSigning(true)
       await orderService.signContract(Number(id))
-      message.success('合同签署成功')
+      showCompleted('合同签署已完成', '等待对方签署；双方签署后进入支付节点。')
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
     } catch (error: unknown) {
@@ -326,7 +376,7 @@ export default function OrderDetailPage() {
         try {
           setCancelling(true)
           await orderService.cancel(Number(id))
-          message.success('订单已取消')
+          showCompleted('订单取消已完成', '订单已回到工作台记录，库存已释放。')
           await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
           await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
         } catch (error: unknown) {
@@ -394,7 +444,7 @@ export default function OrderDetailPage() {
               type={statusNotice.type}
               showIcon
               className="mt-6"
-              message="订单状态提示"
+              message={statusNotice.title}
               description={statusNotice.message}
             />
 
@@ -601,7 +651,7 @@ export default function OrderDetailPage() {
                   <Button type="primary" onClick={async () => {
                     try {
                       await orderService.buyerConfirm(Number(id), { confirm_note: '买方确认订单' })
-                      message.success('已确认订单')
+                      showCompleted('买方确认已完成', '进入合同签署节点，请签署交易合同。')
                       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
                     } catch (error: unknown) { message.error(getErrorMessage(error, '确认失败')) }
                   }}>确认订单</Button>
@@ -613,7 +663,12 @@ export default function OrderDetailPage() {
                 )}
                 {order.status === 3 && (
                   <Button type="primary" icon={<UploadOutlined />} onClick={() => setOpen(true)}>
-                    上传支付凭证
+                    上传支付/货权凭证
+                  </Button>
+                )}
+                {order.status === 23 && (
+                  <Button type="primary" icon={<EnvironmentOutlined />} onClick={() => setWarehouseOpen(true)}>
+                    重新选择仓储方
                   </Button>
                 )}
                 {order.status === 3 && (
@@ -656,7 +711,7 @@ export default function OrderDetailPage() {
             </Card>
 
             <Modal
-              title="上传支付凭证"
+              title="上传支付与货权监管凭证"
               open={open}
               onCancel={() => setOpen(false)}
               onOk={handleUploadVoucher}
@@ -674,6 +729,17 @@ export default function OrderDetailPage() {
                     <Button icon={<UploadOutlined />}>选择文件</Button>
                   </Upload>
                 </Form.Item>
+                <Form.Item
+                  name="title_voucher_file"
+                  label="货权/仓单监管凭证"
+                  valuePropName="fileList"
+                  getValueFromEvent={(event) => event?.fileList ?? []}
+                  rules={[{ required: true, message: '请上传货权/仓单监管凭证' }]}
+                >
+                  <Upload beforeUpload={() => false} maxCount={1}>
+                    <Button icon={<UploadOutlined />}>选择文件</Button>
+                  </Upload>
+                </Form.Item>
                 <Form.Item name="transaction_no" label="交易流水号">
                   <Input />
                 </Form.Item>
@@ -681,6 +747,32 @@ export default function OrderDetailPage() {
                   <Input />
                 </Form.Item>
                 <Form.Item name="payee_account" label="收款账户">
+                  <Input />
+                </Form.Item>
+                <Form.Item name="title_remark" label="货权监管备注">
+                  <Input />
+                </Form.Item>
+              </Form>
+            </Modal>
+
+            <Modal
+              title="重新选择仓储方"
+              open={warehouseOpen}
+              onCancel={() => setWarehouseOpen(false)}
+              onOk={handleReselectWarehouse}
+              confirmLoading={savingWarehouse}
+            >
+              <Form form={warehouseForm} layout="vertical">
+                <Alert
+                  showIcon
+                  type="info"
+                  className="mb-4"
+                  message="仓储方拒绝承接后，订单会回退到重新选仓。请填写新的已审核仓储资源 ID。"
+                />
+                <Form.Item name="warehouse_service_id" label="仓储资源 ID" rules={[{ required: true, message: '请输入仓储资源 ID' }]}>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="confirm_note" label="备注">
                   <Input />
                 </Form.Item>
               </Form>

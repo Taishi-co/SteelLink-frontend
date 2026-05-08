@@ -154,11 +154,12 @@ export default function EnterprisePage() {
         ? await certificationService.verifyEnterprise(resubmitEnterpriseId, payload)
         : await certificationService.createEnterprise(payload)
       if (res.code === 0) {
-        message.success(resubmitEnterpriseId ? '企业认证已重新提交，请等待审核' : '企业创建成功，请等待审核')
+        message.success(resubmitEnterpriseId ? '企业认证已重新提交，请等待审核' : '企业认证提交成功，请等待审核')
         setHasEnterprise(true)
         setEnterpriseInfo(res.data)
         setResubmitEnterpriseId(null)
         await refreshUserAndEnterprise()
+        navigate('/dashboard', { replace: true })
       } else {
         message.error(res.message || '创建失败')
       }
@@ -333,7 +334,7 @@ export default function EnterprisePage() {
                   <Upload
                     beforeUpload={handleUploadLicense}
                     maxCount={1}
-                    accept="image/*"
+                    accept="image/*,.pdf"
                     showUploadList={!!licenseUrl}
                   >
                     <Button icon={<UploadOutlined />}>{licenseUrl ? '已上传营业执照（点击更换）' : '上传营业执照'}</Button>

@@ -17,6 +17,7 @@
 
 - 卖家端商品发布上传商品主图与审核资料。
 - 买家端订单详情上传支付凭证和签收凭证。
+- 买家端企业认证上传营业执照和平台服务资质资料。
 - 买家端商城首页展示商品主图。
 - 增加 buyer/seller 两端上传 service。
 
@@ -31,6 +32,7 @@
 - 受影响页面:
   - `apps/seller-app/src/pages/Products/index.tsx`
   - `apps/buyer-app/src/pages/OrderDetail/index.tsx`
+  - `apps/buyer-app/src/pages/Enterprise/index.tsx`
   - `apps/buyer-app/src/pages/Mall/index.tsx`
 - 新增页面: 无
 - 路由变化: 无
@@ -40,6 +42,8 @@
 
 - 受影响 API:
   - `POST /api/v1/uploads`
+  - `POST /api/v1/enterprises`
+  - `POST /api/v1/enterprises/:id/verify`
   - `POST /api/v1/products`
   - `POST /api/v1/orders/:id/payment-voucher`
   - `POST /api/v1/orders/:id/confirm-receipt`
@@ -59,3 +63,4 @@
 2. 买家上传支付凭证时不再手填 URL。
 3. 买家确认收货时不再手填签收凭证 URL。
 4. 商城首页热门商品优先显示真实商品主图。
+5. 创建物流商企业时，营业执照、运输许可证、承运资质均可上传图片或 PDF，并将返回 URL 写入企业认证资料。

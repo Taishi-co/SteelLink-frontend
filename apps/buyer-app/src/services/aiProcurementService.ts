@@ -52,10 +52,30 @@ export interface MatchedProduct {
   logistics_service_id?: number
   logistics_service_name?: string
   logistics_route?: string
+  logistics_options?: LogisticsOption[]
+  logistics_match_status?: 'matched' | 'no_match' | 'destination_missing' | string
   freight_estimate?: number
   landed_total?: number
   unit_landed_price?: number
   selected?: boolean
+}
+
+export interface LogisticsOption {
+  service_id: number
+  service_name: string
+  route: string
+  route_start?: string
+  route_end?: string
+  service_scope?: string
+  vehicle_type?: string
+  load_capacity?: number
+  price_rule?: string
+  freight_estimate: number
+  unit_freight_estimate: number
+  landed_total: number
+  unit_landed_price: number
+  score: number
+  match_reason: string
 }
 
 export interface OrderFormPayload {

@@ -78,7 +78,7 @@ export const warehouseOrderService = {
     return response.data
   },
 
-  async warehouseConfirm(id: number, payload?: { condition_ok: boolean; remark?: string }) {
+  async warehouseConfirm(id: number, payload?: { confirmed: boolean; condition_note?: string }) {
     const response = await api.post<unknown, ApiResponse<OrderInfo>>(`/orders/${id}/warehouse-confirm`, payload || {})
     return response.data
   },

@@ -29,34 +29,63 @@ export interface OrderInfo {
   created_at: string
   financing_info?: {
     id: number
+    order_id: number
+    order_no: string
+    buyer_enterprise_id: number
+    seller_enterprise_id: number
     finance_service_id: number
+    funding_enterprise_id: number
     requested_amount: number
     approved_amount?: number
+    term_days?: number
+    annual_rate?: number
+    service_fee?: number
     risk_result?: string
-    risk_score?: number
     risk_remark?: string
+    buyer_confirmed_at?: string
+    debt_contract_no?: string
     debt_contract_url?: string
+    debt_contract_hash?: string
+    buyer_signed_at?: string
     fee_voucher_url?: string
-    disbursed_amount?: number
+    fee_paid_at?: string
+    funding_commission?: number
+    commission_voucher?: string
+    commission_paid_at?: string
+    disbursement_voucher?: string
     disbursed_at?: string
+    pledge_voucher_url?: string
+    release_condition?: string
     status: string
   }
 }
 
+export type FinancingRequestInfo = NonNullable<OrderInfo['financing_info']>
+
+const withOrderDetails = async (requests: FinancingRequestInfo[]) => {
+  const orders = await Promise.all(
+    requests.map(async (financing) => {
+      const order = await financeOrderService.getById(financing.order_id)
+      return { ...order, financing_info: financing }
+    })
+  )
+  return orders
+}
+
 export const financeOrderService = {
   async listFinancing() {
-    const response = await api.get<unknown, ApiResponse<{ list: OrderInfo[] }>>('/orders?status=21&role=finance')
-    return response.data.list
+    const list = await this.listAll()
+    return list.filter((item) => item.financing_info?.status === 'submitted')
   },
 
   async listPendingDebt() {
-    const response = await api.get<unknown, ApiResponse<{ list: OrderInfo[] }>>('/orders?status=22&role=finance')
-    return response.data.list
+    const list = await this.listAll()
+    return list.filter((item) => ['buyer_confirmed', 'contract_generated', 'buyer_signed_fee_paid'].includes(item.financing_info?.status || ''))
   },
 
   async listAll() {
-    const response = await api.get<unknown, ApiResponse<{ list: OrderInfo[] }>>('/orders?role=finance')
-    return response.data.list
+    const response = await api.get<unknown, ApiResponse<{ list: FinancingRequestInfo[] }>>('/orders/financing-requests/mine')
+    return withOrderDetails(response.data.list || [])
   },
 
   async getById(id: number) {
@@ -64,28 +93,28 @@ export const financeOrderService = {
     return response.data
   },
 
-  async submitRiskResult(orderId: number, payload: { approved: boolean; approved_amount?: number; risk_score?: number; risk_remark?: string }) {
-    const response = await api.post<unknown, ApiResponse<OrderInfo>>(`/orders/${orderId}/financing-requests/risk-result`, payload)
+  async submitRiskResult(orderId: number, payload: { approved: boolean; approved_amount?: number; term_days?: number; annual_rate?: number; service_fee?: number; risk_remark?: string }) {
+    const response = await api.post<unknown, ApiResponse<OrderInfo['financing_info']>>(`/orders/${orderId}/financing-requests/risk-result`, payload)
     return response.data
   },
 
-  async generateDebtContract(orderId: number, payload?: { contract_url?: string }) {
-    const response = await api.post<unknown, ApiResponse<OrderInfo>>(`/orders/${orderId}/financing-requests/debt-contract`, payload || {})
+  async generateDebtContract(orderId: number, payload: { debt_contract_no?: string; debt_contract_url: string; debt_contract_hash?: string }) {
+    const response = await api.post<unknown, ApiResponse<OrderInfo['financing_info']>>(`/orders/${orderId}/financing-requests/debt-contract`, payload)
     return response.data
   },
 
-  async disburse(orderId: number, payload?: { disbursed_amount?: number; transaction_no?: string }) {
-    const response = await api.post<unknown, ApiResponse<OrderInfo>>(`/orders/${orderId}/financing-requests/disburse`, payload || {})
+  async disburse(orderId: number, payload: { disbursement_voucher: string; funding_commission?: number; commission_voucher: string; remark?: string }) {
+    const response = await api.post<unknown, ApiResponse<OrderInfo['financing_info']>>(`/orders/${orderId}/financing-requests/disburse`, payload)
     return response.data
   },
 
-  async recordPledge(orderId: number, payload: { pledge_type: string; collateral_description: string; estimated_value?: number }) {
-    const response = await api.post<unknown, ApiResponse<OrderInfo>>(`/orders/${orderId}/pledges`, payload)
+  async recordPledge(orderId: number, payload: { pledge_voucher_url: string; release_condition: string; pledge_remark?: string }) {
+    const response = await api.post<unknown, ApiResponse<OrderInfo['financing_info']>>(`/orders/${orderId}/pledges`, payload)
     return response.data
   },
 
-  async releasePledge(orderId: number, payload?: { release_remark?: string }) {
-    const response = await api.post<unknown, ApiResponse<OrderInfo>>(`/orders/${orderId}/pledges/release`, payload || {})
+  async releasePledge(orderId: number, payload: { reason: string; voucher_url?: string }) {
+    const response = await api.post<unknown, ApiResponse<OrderInfo['financing_info']>>(`/orders/${orderId}/pledges/release`, payload)
     return response.data
   },
 }

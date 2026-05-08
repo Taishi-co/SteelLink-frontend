@@ -40,6 +40,8 @@ const statusMap: Record<number, { label: string; color: string }> = {
   20: { label: '已归档', color: 'default' },
   21: { label: '融资审批中', color: 'purple' },
   22: { label: '待签署融资合同', color: 'magenta' },
+  23: { label: '待重新选仓', color: 'volcano' },
+  24: { label: '待重新发起物流', color: 'volcano' },
 }
 
 type TabKey = 'pending' | 'movements' | 'all'
@@ -53,6 +55,21 @@ function App() {
   const [confirmModal, setConfirmModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [confirmRemark, setConfirmRemark] = useState('')
   const [confirmOk, setConfirmOk] = useState(true)
+
+  const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
+    Modal.success({
+      title,
+      content: (
+        <Space direction="vertical" size={8}>
+          <Text>已完成：{title.replace('已完成', '')}</Text>
+          <Text type="secondary">下一步：{next}</Text>
+          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+        </Space>
+      ),
+      okText: '回工作台看订单',
+      onOk: () => setActiveTab(targetTab),
+    })
+  }
 
   const fetchPending = async () => {
     setLoading(true)
@@ -100,10 +117,14 @@ function App() {
     if (!confirmModal.orderId) return
     try {
       await warehouseOrderService.warehouseConfirm(confirmModal.orderId, {
-        condition_ok: confirmOk,
-        remark: confirmRemark || undefined,
+        confirmed: confirmOk,
+        condition_note: confirmRemark || undefined,
       })
-      message.success(confirmOk ? '仓库条件已确认' : '仓库条件已打回')
+      showCompleted(
+        confirmOk ? '仓库条件确认已完成' : '仓储拒绝反馈已完成',
+        confirmOk ? '订单流转到卖方工作台，等待卖方确认条款。' : '平台管理端已收到反馈，买方需重新选择仓储方。',
+        'all',
+      )
       setConfirmModal({ visible: false, orderId: null })
       setConfirmRemark('')
       fetchPending()
@@ -115,7 +136,7 @@ function App() {
   const handleMovementStatus = async (id: number, status: string) => {
     try {
       await warehouseMovementService.updateStatus(id, { status })
-      message.success('状态已更新')
+      showCompleted('仓库作业状态更新已完成', status === 'completed' ? '等待后续物流或签收节点。' : '继续处理仓库作业，完成后更新为已完成。', 'movements')
       fetchMovements()
     } catch {
       message.error('操作失败')
@@ -330,7 +351,7 @@ function App() {
             <Paragraph>
               {confirmOk
                 ? '确认仓库条件满足，订单将进入"待卖方确认"状态。'
-                : '仓库条件不满足，订单将被打回，需重新安排仓库。'}
+                : '仓库条件不满足时，订单会反馈平台管理端，并回退给买方重新选择仓储方。'}
             </Paragraph>
             <TextArea
               rows={3}
