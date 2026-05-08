@@ -3,7 +3,7 @@
 ## 项目定位
 
 当前仓库是 SteelLink 主服务前端应用仓，同时沉淀 AI 入口文档、feature 设计模板、权限矩阵和标准化 `harness/` 工作流。
-业务代码位于 `apps/buyer-app`、`apps/seller-app` 与 `packages/shared`，治理产物位于 `docs/` 与 `harness/`。
+业务代码位于 `apps/buyer-app`、`apps/seller-app`、`apps/logistics-app`、`apps/warehouse-app`、`apps/finance-app` 与 `packages/shared`，治理产物位于 `docs/` 与 `harness/`。
 
 ## 目录地图
 
@@ -13,7 +13,10 @@ SteelLink-frontend/
 ├── CLAUDE.md           # Claude 的轻量入口
 ├── apps/
 │   ├── buyer-app/      # 买家端 React/Vite 应用
-│   └── seller-app/     # 卖家端 React/Vite 应用
+│   ├── seller-app/     # 卖家端 React/Vite 应用
+│   ├── logistics-app/  # 物流服务商 React/Vite 应用
+│   ├── warehouse-app/  # 仓储服务商 React/Vite 应用
+│   └── finance-app/    # 资金服务商 React/Vite 应用
 ├── packages/
 │   └── shared/         # 前端共享类型与工具
 ├── docs/
