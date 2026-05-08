@@ -9,6 +9,7 @@
 
 - 代码文件:
   - `apps/buyer-app/src/services/uploadService.ts`
+  - `apps/buyer-app/src/pages/Enterprise/index.tsx`
   - `apps/buyer-app/src/pages/OrderDetail/index.tsx`
   - `apps/buyer-app/src/pages/Mall/index.tsx`
   - `apps/seller-app/src/services/uploadService.ts`
@@ -26,6 +27,7 @@
 3. 改造买家订单详情，支付凭证和签收凭证改为文件选择并上传。
 4. 改造商城首页热门商品卡片，优先展示商品主图。
 5. 合并最新主干订单时间线改动，确保上传改造不覆盖状态展示。
+6. 企业认证页营业执照允许选择图片或 PDF，服务资质继续使用 `enterprise_service_document` 上传。
 
 ## 验证计划
 
@@ -36,6 +38,7 @@
 - `./harness/review.sh docs/features/SL-STORAGE-COS-UPLOAD`
 - `./harness/release.sh docs/features/SL-STORAGE-COS-UPLOAD`
 - 人工验证: 使用真实 COS 配置进行上传 smoke test。
+- 人工验证补充: 创建物流商企业时上传营业执照、运输许可证、承运资质。
 
 ## 风险与回滚关注点
 

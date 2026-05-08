@@ -333,7 +333,7 @@ export default function EnterprisePage() {
                   <Upload
                     beforeUpload={handleUploadLicense}
                     maxCount={1}
-                    accept="image/*"
+                    accept="image/*,.pdf"
                     showUploadList={!!licenseUrl}
                   >
                     <Button icon={<UploadOutlined />}>{licenseUrl ? '已上传营业执照（点击更换）' : '上传营业执照'}</Button>
