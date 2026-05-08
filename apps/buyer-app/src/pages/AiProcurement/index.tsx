@@ -5,9 +5,12 @@ import { Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal
 import {
   AuditOutlined,
   BankOutlined,
+  CopyOutlined,
+  EyeOutlined,
   FileSearchOutlined,
   LoginOutlined,
   MessageOutlined,
+  ReloadOutlined,
   ShoppingCartOutlined,
   TruckOutlined,
 } from '@ant-design/icons'
@@ -160,6 +163,31 @@ function applyLogisticsOption(product: MatchedProduct, option: LogisticsOption):
 
 function hasPendingLogisticsResolution(items: MatchedProduct[]) {
   return items.some((item) => item.logistics_match_status === 'no_match' || item.logistics_match_status === 'destination_missing')
+}
+
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value)
+    return
+  }
+
+  const textArea = document.createElement('textarea')
+  textArea.value = value
+  textArea.style.position = 'fixed'
+  textArea.style.left = '-9999px'
+  textArea.style.top = '0'
+  document.body.appendChild(textArea)
+  textArea.focus()
+  textArea.select()
+
+  try {
+    const copied = document.execCommand('copy')
+    if (!copied) {
+      throw new Error('copy failed')
+    }
+  } finally {
+    document.body.removeChild(textArea)
+  }
 }
 
 export default function AiProcurementPage() {
@@ -415,6 +443,27 @@ export default function AiProcurementPage() {
     navigate(`/ai-procurement/${step}`)
   }
 
+  const handleRepeatProcurement = (item: AIProcurementInfo) => {
+    setPrompt(item.prompt)
+    setResult(null)
+    setCurrentProcurement(null)
+    setSelectedProducts([])
+    instructionForm.resetFields()
+    orderForm.resetFields()
+    navigate('/ai-procurement')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    message.success('已填入采购对话，可重新解析')
+  }
+
+  const handleCopyProcurementPrompt = async (item: AIProcurementInfo) => {
+    try {
+      await copyText(item.prompt)
+      message.success('采购对话已复制')
+    } catch {
+      message.error('复制失败，请手动复制采购对话')
+    }
+  }
+
   const handleToggleProduct = (product: MatchedProduct) => {
     setSelectedProducts((prev) => {
       const exists = prev.some((item) => item.product_id === product.product_id)
@@ -599,6 +648,8 @@ export default function AiProcurementPage() {
             loadingMine={loadingMine}
             onRefreshMine={loadMine}
             onOpenProcurement={openProcurement}
+            onRepeatProcurement={handleRepeatProcurement}
+            onCopyProcurementPrompt={handleCopyProcurementPrompt}
             onSetExamplePrompt={setExamplePrompt}
           />
         )}
@@ -613,6 +664,8 @@ function HomeSections({
   loadingMine,
   onRefreshMine,
   onOpenProcurement,
+  onRepeatProcurement,
+  onCopyProcurementPrompt,
   onSetExamplePrompt,
 }: {
   isLoggedIn: boolean
@@ -620,6 +673,8 @@ function HomeSections({
   loadingMine: boolean
   onRefreshMine: () => Promise<void>
   onOpenProcurement: (item: AIProcurementInfo, step?: number) => void
+  onRepeatProcurement: (item: AIProcurementInfo) => void
+  onCopyProcurementPrompt: (item: AIProcurementInfo) => Promise<void>
   onSetExamplePrompt: (value: string) => void
 }) {
   return (
@@ -634,20 +689,31 @@ function HomeSections({
             {mine.length > 0 ? (
               <Space direction="vertical" size="middle" className="w-full">
                 {mine.map((item) => (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
-                    className="w-full rounded border border-gray-100 bg-white p-4 text-left transition hover:border-primary-300 hover:bg-primary-50"
-                    onClick={() => onOpenProcurement(item)}
+                    className="w-full rounded border border-gray-100 bg-white p-4 transition hover:border-primary-300"
                   >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
+                    <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+                      <div className="min-w-0">
                         <Text strong>{item.procurement_no}</Text>
-                        <div className="mt-1 text-sm text-gray-500">{item.prompt}</div>
+                        <div className="mt-1 break-words text-sm text-gray-500">{item.prompt}</div>
                       </div>
-                      <Tag color={item.status === 'review_submitted' ? 'green' : 'blue'}>{item.status}</Tag>
+                      <div className="flex flex-col gap-3 lg:items-end">
+                        <Tag color={item.status === 'review_submitted' ? 'green' : 'blue'}>{item.status}</Tag>
+                        <Space wrap>
+                          <Button icon={<ReloadOutlined />} onClick={() => onRepeatProcurement(item)}>
+                            再买一次
+                          </Button>
+                          <Button icon={<EyeOutlined />} onClick={() => onOpenProcurement(item)}>
+                            查看详情
+                          </Button>
+                          <Button icon={<CopyOutlined />} onClick={() => void onCopyProcurementPrompt(item)}>
+                            复制
+                          </Button>
+                        </Space>
+                      </div>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </Space>
             ) : (
