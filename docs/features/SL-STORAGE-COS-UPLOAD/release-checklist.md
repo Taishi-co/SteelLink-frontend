@@ -14,6 +14,7 @@
 - [ ] `pnpm --filter @steellink/seller-app build` 已通过
 - [ ] 已确认后端 `POST /api/v1/uploads` 已部署
 - [ ] 已确认后端 COS 密钥、桶名、地域配置完整
+- [ ] 已确认后端支持 `enterprise_license` 与 `enterprise_service_document`
 - [ ] 已确认 smoke test 范围
 
 ## 回滚信息
@@ -28,3 +29,4 @@
 - [ ] 买家端支付凭证可上传
 - [ ] 买家端签收凭证可上传
 - [ ] 商城首页商品主图正常显示
+- [ ] 创建物流商企业时营业执照、运输许可证和承运资质可上传
