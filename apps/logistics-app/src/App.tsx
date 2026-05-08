@@ -35,6 +35,7 @@ const statusMap: Record<number, { label: string; color: string }> = {
   8: { label: '已完成', color: 'success' },
   19: { label: '已对账', color: 'success' },
   20: { label: '已归档', color: 'default' },
+  24: { label: '待重新发起物流', color: 'volcano' },
 }
 
 type TabKey = 'bidding' | 'logistics-orders' | 'all'
@@ -49,6 +50,21 @@ function App() {
   const [quotePrice, setQuotePrice] = useState<number>(0)
   const [quoteDays, setQuoteDays] = useState<number>(3)
   const [quoteRemark, setQuoteRemark] = useState('')
+
+  const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
+    Modal.success({
+      title,
+      content: (
+        <Space direction="vertical" size={8}>
+          <Text>已完成：{title.replace('已完成', '')}</Text>
+          <Text type="secondary">下一步：{next}</Text>
+          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+        </Space>
+      ),
+      okText: '回工作台看订单',
+      onOk: () => setActiveTab(targetTab),
+    })
+  }
 
   const fetchBidding = async () => {
     setLoading(true)
@@ -100,11 +116,13 @@ function App() {
     }
     try {
       await logisticsOrderService.createQuote(quoteModal.orderId, {
-        price: quotePrice,
-        estimated_days: quoteDays,
+        vehicle_info: '平台认证车辆',
+        driver_info: '平台认证司机',
+        amount: quotePrice,
+        estimated_delivery_at: `${quoteDays}天`,
         remark: quoteRemark || undefined,
       })
-      message.success('报价已提交')
+      showCompleted('物流报价已完成', '等待合同约定的运费承担方选择报价。', 'bidding')
       setQuoteModal({ visible: false, orderId: null })
       setQuotePrice(0)
       setQuoteDays(3)
@@ -118,7 +136,7 @@ function App() {
   const handleAcceptOrder = async (id: number) => {
     try {
       await logisticsFulfillmentService.acceptOrder(id)
-      message.success('已接单')
+      showCompleted('物流接单已完成', '下一步发车并更新运输状态。', 'logistics-orders')
       fetchLogisticsOrders()
     } catch {
       message.error('接单失败')
@@ -128,7 +146,7 @@ function App() {
   const handleUpdateOrderStatus = async (id: number, status: string) => {
     try {
       await logisticsFulfillmentService.updateOrderStatus(id, { status })
-      message.success('状态已更新')
+      showCompleted('物流状态更新已完成', status === 'delivered' ? '等待买方确认收货。' : '继续推进运输履约。', 'logistics-orders')
       fetchLogisticsOrders()
     } catch {
       message.error('操作失败')
@@ -138,7 +156,7 @@ function App() {
   const handleShipmentProgress = async (orderId: number, action: string) => {
     try {
       await logisticsOrderService.shipmentProgress(orderId, action)
-      message.success('运输状态已更新')
+      showCompleted('运输状态更新已完成', action === 'delivered' ? '等待买方确认收货。' : '继续推进运输履约。', 'all')
       fetchAll()
     } catch {
       message.error('操作失败')

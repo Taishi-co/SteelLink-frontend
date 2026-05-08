@@ -3,6 +3,7 @@ import type { ApiResponse } from '@/types'
 
 export type UploadPurpose =
   | 'payment_voucher'
+  | 'title_voucher'
   | 'receipt_voucher'
   | 'product_image'
   | 'product_qualification'

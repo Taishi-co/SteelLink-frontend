@@ -34,6 +34,8 @@ const statusMeta: Record<number, { color: string; text: string }> = {
   20: { color: 'default', text: '已归档' },
   21: { color: 'purple', text: '融资审批中' },
   22: { color: 'gold', text: '待签署融资合同' },
+  23: { color: 'volcano', text: '待重新选仓' },
+  24: { color: 'volcano', text: '待重新发起物流' },
 }
 
 const statusOptions = [
@@ -77,6 +79,19 @@ function formatDate(value?: string) {
 
 function getPrimaryProduct(order: SellerOrderInfo) {
   return order.items[0]
+}
+
+function getSellerGuidance(order?: SellerOrderInfo | null) {
+  if (!order) return { type: 'info' as const, title: '当前状态：订单详情', next: '请查看订单信息。' }
+  if (order.status === 13) return { type: 'warning' as const, title: '当前状态：待卖方确认', next: '核对条款后确认订单，随后等待买方确认。' }
+  if (order.status === 2) return { type: 'info' as const, title: order.contract_info?.seller_signed ? '当前状态：卖方签署已完成' : '当前状态：待签合同', next: order.contract_info?.seller_signed ? '等待买方签署后进入支付节点。' : '请签署合同；双方签署后进入支付节点。' }
+  if (order.status === 4) return { type: 'warning' as const, title: '当前状态：买方支付已完成', next: '请确认收款；之后发起物流竞价。' }
+  if (order.status === 15) return { type: 'info' as const, title: '当前状态：物流竞价已发起', next: '等待物流方报价，也可在无运力时反馈平台。' }
+  if (order.status === 16) return { type: 'warning' as const, title: '当前状态：物流报价已完成', next: '如合同约定卖方承担运费，请确认物流报价。' }
+  if (order.status === 24) return { type: 'warning' as const, title: '当前状态：待重新发起物流', next: '平台已收到无运力反馈，请重新发起物流竞价。' }
+  if (order.status === 18) return { type: 'success' as const, title: '当前状态：买方收货已完成', next: '请完成对账确认。' }
+  if (order.status === 19) return { type: 'success' as const, title: '当前状态：对账已完成', next: '等待归档或回工作台查看订单。' }
+  return { type: 'info' as const, title: `当前状态：${formatStatus(order.status).text}`, next: '请按订单详情中的可用操作继续处理。' }
 }
 
 export default function OrdersPage() {
@@ -155,6 +170,26 @@ export default function OrdersPage() {
     setStatusFilter(item.key)
   }
 
+  const showCompleted = (title: string, next: string, detail?: SellerOrderInfo) => {
+    Modal.success({
+      title,
+      content: (
+        <Space direction="vertical" size={8}>
+          <Text>已完成：{title.replace('已完成', '')}</Text>
+          <Text type="secondary">下一步：{next}</Text>
+          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+        </Space>
+      ),
+      okText: '回订单工作台',
+      onOk: () => {
+        if (detail) {
+          setSelectedOrder(detail)
+          setIsModalOpen(true)
+        }
+      },
+    })
+  }
+
   async function openOrderDetail(order: SellerOrderInfo) {
     setActionLoading(true)
     try {
@@ -172,7 +207,7 @@ export default function OrdersPage() {
     setActionLoading(true)
     try {
       const detail = await sellerOrderService.confirmOrder(order.id)
-      message.success('订单已确认，等待双方签署合同')
+      showCompleted('订单确认已完成', '等待买卖双方签署合同。', detail)
       setSelectedOrder(detail)
       setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
       setIsModalOpen(true)
@@ -188,9 +223,9 @@ export default function OrdersPage() {
     try {
       const detail = await sellerOrderService.signContract(order.id)
       if (detail.contract_info?.buyer_signed && detail.contract_info?.seller_signed) {
-        message.success('双方已签署合同，订单进入待支付阶段')
+        showCompleted('合同签署已完成', '双方已签署，等待买方支付或申请托盘垫资。', detail)
       } else {
-        message.success('合同已签署，等待对方签署')
+        showCompleted('合同签署已完成', '等待买方签署；双方签署后进入支付节点。', detail)
       }
       setSelectedOrder(detail)
       setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
@@ -228,13 +263,13 @@ export default function OrdersPage() {
     try {
       if (type === 'payment') {
         const detail = await sellerOrderService.confirmPayment(order.id)
-        message.success('已确认收款，订单进入待提货')
+        showCompleted('收款确认已完成', '可发起物流竞价或等待提货履约。', detail)
         setSelectedOrder(detail)
         setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
         setIsModalOpen(true)
       } else {
         const detail = await sellerOrderService.confirmOutbound(order.id, { pickup_code: confirmInput.trim() })
-        message.success('已确认出库，订单进入配送中')
+        showCompleted('出库确认已完成', '等待物流运输并由买方确认收货。', detail)
         setSelectedOrder(detail)
         setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
         setIsModalOpen(true)
@@ -338,7 +373,7 @@ export default function OrdersPage() {
               setActionLoading(true)
               try {
                 const detail = await sellerOrderService.sellerConfirm(record.id)
-                message.success('已确认条款')
+                showCompleted('卖方条款确认已完成', '等待买方确认订单最终版本。', detail)
                 setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
               } catch (error: unknown) { message.error(getErrorMessage(error, '确认失败')) }
               finally { setActionLoading(false) }
@@ -354,16 +389,27 @@ export default function OrdersPage() {
               确认收款
             </Button>
           )}
-          {record.status === 4 && (
+          {(record.status === 4 || record.status === 24) && (
             <Button type="link" size="small" onClick={async () => {
               setActionLoading(true)
               try {
-                const detail = await sellerOrderService.createLogisticsBidding(record.id)
-                message.success('已发起物流竞价')
+                const detail = await sellerOrderService.createLogisticsBidding(record.id, { freight_payer: 'buyer' })
+                showCompleted('物流竞价发起已完成', '等待物流方报价；订单详情和管理端会记录本次发起事件。', detail)
                 setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
               } catch (error: unknown) { message.error(getErrorMessage(error, '发起竞价失败')) }
               finally { setActionLoading(false) }
             }}>发起物流竞价</Button>
+          )}
+          {(record.status === 15 || record.status === 16) && (
+            <Button type="link" size="small" danger onClick={async () => {
+              setActionLoading(true)
+              try {
+                const detail = await sellerOrderService.reportLogisticsNoCapacity(record.id, { no_capacity_reason: '暂无合规运力承接' })
+                showCompleted('无运力反馈已完成', '平台管理端已收到反馈，订单回退为待重新发起物流。', detail)
+                setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+              } catch (error: unknown) { message.error(getErrorMessage(error, '反馈失败')) }
+              finally { setActionLoading(false) }
+            }}>无运力反馈</Button>
           )}
           {record.status === 5 && record.delivery_info?.pickup_code && (
             <Button type="link" size="small" onClick={() => void handleConfirmOutbound(record)}>
@@ -375,7 +421,7 @@ export default function OrdersPage() {
               setActionLoading(true)
               try {
                 const detail = await sellerOrderService.reconcile(record.id)
-                message.success('已对账确认')
+                showCompleted('对账确认已完成', '等待归档，交易闭环即将完成。', detail)
                 setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
               } catch (error: unknown) { message.error(getErrorMessage(error, '对账失败')) }
               finally { setActionLoading(false) }
@@ -388,6 +434,7 @@ export default function OrdersPage() {
 
   const selectedPrimaryProduct = selectedOrder ? getPrimaryProduct(selectedOrder) : null
   const selectedStatus = selectedOrder ? formatStatus(selectedOrder.status) : null
+  const selectedGuidance = getSellerGuidance(selectedOrder)
 
   return (
     <div className="min-w-0">
@@ -516,19 +563,10 @@ export default function OrdersPage() {
 
             <div style={{ marginTop: 16 }}>
               <Alert
-                type={selectedOrder.status === 1 ? 'warning' : selectedOrder.status === 2 ? 'info' : selectedOrder.payment_info?.voucher_url ? 'info' : 'warning'}
+                type={selectedGuidance.type}
                 showIcon
-                message={
-                  selectedOrder.status === 1
-                    ? '新订单待确认，请核实商品和价格后确认订单。'
-                    : selectedOrder.status === 2
-                      ? selectedOrder.contract_info?.buyer_signed
-                        ? '买家已签署合同，等待您签署后订单进入支付阶段。'
-                        : '订单已确认，等待买卖双方签署合同。'
-                      : selectedOrder.payment_info?.voucher_url
-                        ? '买家已上传支付凭证，可确认收款。'
-                        : '买家尚未上传支付凭证。'
-                }
+                message={selectedGuidance.title}
+                description={`下一步：${selectedGuidance.next}`}
               />
             </div>
 
