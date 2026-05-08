@@ -1,7 +1,7 @@
 # Frontend AI Entrypoint
 
 本目录是 SteelLink 主服务前端应用仓给 AI agent 的统一上手入口，目标是让新 agent 在 5 分钟内获得足够上下文，并进入同一套开发工作流。
-当前工作区包含 `apps/buyer-app`、`apps/seller-app`、`packages/shared`、治理文档与 `harness/` 脚本。
+当前工作区包含 `apps/buyer-app`、`apps/seller-app`、`apps/logistics-app`、`apps/warehouse-app`、`apps/finance-app`、`packages/shared`、治理文档与 `harness/` 脚本。
 
 ## 阅读顺序
 
