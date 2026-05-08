@@ -351,10 +351,11 @@ export default function AiProcurementPage() {
       const values = await instructionForm.validateFields()
       const parsedForRequest = mergeParsedInstruction(result.parsed, values)
       const confirmed = await aiProcurementService.confirmInstruction(prompt, parsedForRequest)
-      instructionForm.setFieldsValue(confirmed.parsed)
-      const matched = await aiProcurementService.matchProducts(confirmed.parsed)
+      const confirmedParsed = mergeParsedInstruction(confirmed.parsed, parsedForRequest)
+      instructionForm.setFieldsValue(confirmedParsed)
+      const matched = await aiProcurementService.matchProducts(confirmedParsed)
       updateResult({
-        parsed: confirmed.parsed,
+        parsed: confirmedParsed,
         matched_products: matched.matched_products,
         stages: matched.stages,
       })
