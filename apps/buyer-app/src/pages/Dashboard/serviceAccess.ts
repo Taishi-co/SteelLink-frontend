@@ -39,13 +39,13 @@ export const serviceDefinitions: ServiceDefinition[] = [
   },
   {
     key: 'finance',
-    title: '资金服务平台',
+    title: '资金服务',
     shortTitle: '资金',
-    description: '处理订单融资、仓单质押、授信审批、放款和贷后监控。',
+    description: '查看平台已审核资金产品，在订单支付节点申请托盘垫资、订单融资或账期服务。',
     route: '/dashboard/finance',
     iconType: 'finance',
     color: '#7c3aed',
-    capabilities: ['订单融资', '仓单质押', '授信审批', '贷后预警'],
+    capabilities: ['托盘垫资', '订单融资', '账期服务', '仓单质押'],
   },
 ]
 

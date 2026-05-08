@@ -53,6 +53,10 @@ function getCookie(name: string) {
   return decodeURIComponent(match.slice(prefix.length))
 }
 
+function getSharedToken() {
+  return localStorage.getItem('token') || sessionStorage.getItem('token') || getCookie('token')
+}
+
 function removeCookie(name: string) {
   document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`
 }
@@ -91,7 +95,7 @@ export function saveFinanceSession(token: string, profile: FinanceProfile) {
 }
 
 export function getFinanceToken() {
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || getCookie(TOKEN_KEY)
+  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || getCookie(TOKEN_KEY) || getSharedToken()
 }
 
 export function getFinanceUser(): FinanceProfile | null {
