@@ -61,10 +61,10 @@ const serviceConfig: Record<ServiceKey, {
   },
   finance: {
     title: '金融服务商能力',
-    description: '提供融资服务、凭单融资对接和企业资信材料管理。',
+    description: '资金方发布金融产品，并处理融资风控、债务合同、分佣放款和货权质押。',
     enterpriseRole: '资金方',
     icon: <BankOutlined />,
-    actions: [{ label: '金融产品管理', href: '/dashboard/finance-products' }],
+    actions: [{ label: '进入资金方工作台', href: import.meta.env.DEV ? 'http://127.0.0.1:5177/finance/' : '/finance/' }],
   },
 }
 

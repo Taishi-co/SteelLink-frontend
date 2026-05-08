@@ -36,7 +36,7 @@ const allNavItems: NavItem[] = [
   { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
   { key: '/dashboard/bidding', icon: <RiseOutlined />, label: '竞价管理', services: ['procurement'] },
   { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单', services: ['procurement', 'sales'] },
-  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资', services: ['finance'] },
+  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '资金服务', services: ['procurement', 'sales'] },
   { key: '/dashboard/logistics', icon: <ShopOutlined />, label: '仓储物流', services: ['logistics', 'warehouse'] },
   { key: '/dashboard/services', icon: <AppstoreOutlined />, label: '服务入口', roles: ['enterprise'] },
 ]
@@ -47,6 +47,7 @@ const accountItems = [
 ]
 
 const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
+const financeWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5177/finance/' : '/finance/'
 
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
@@ -199,6 +200,22 @@ export default function DashboardLayout() {
                     <>
                       <span className="text-xs text-emerald-400 font-semibold flex-1">进入卖家中心</span>
                       <ArrowRightOutlined className="text-emerald-400 text-[10px]" />
+                    </>
+                  )}
+                </div>
+              </a>
+            )}
+            {approvedServices.has('finance') && (
+              <a href={financeWorkbenchHref}>
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
+                  style={{ background: 'rgba(124,58,237,.14)', border: '1px solid rgba(124,58,237,.25)' }}
+                >
+                  <BankOutlined className="text-violet-400 text-sm" />
+                  {!collapsed && (
+                    <>
+                      <span className="text-xs text-violet-300 font-semibold flex-1">进入资金方工作台</span>
+                      <ArrowRightOutlined className="text-violet-300 text-[10px]" />
                     </>
                   )}
                 </div>

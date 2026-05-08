@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Col, Input, InputNumber, Layout, List, Modal, Row, Space, Spin, Steps, Table, Tag, Typography, message } from 'antd'
+import { Badge, Button, Card, Col, Form, Input, InputNumber, Layout, List, Modal, Row, Space, Spin, Steps, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   AuditOutlined,
@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import { financeOrderService } from '@/services/orderService'
 import type { OrderInfo } from '@/services/orderService'
+import { financeService, type FinanceServiceItem } from '@/services/financeService'
 import { hasFinanceCapability } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
@@ -36,12 +37,24 @@ const statusMap: Record<number, { label: string; color: string }> = {
   8: { label: '已完成', color: 'success' },
   19: { label: '已对账', color: 'success' },
   20: { label: '已归档', color: 'default' },
+  9: { label: '已终止', color: 'red' },
+  11: { label: '异常', color: 'red' },
 }
 
-type TabKey = 'risk-review' | 'debt-contract' | 'all'
+type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'all'
+const productStatusMap: Record<number, { label: string; color: string }> = {
+  1: { label: '待审核', color: 'processing' },
+  2: { label: '已通过', color: 'success' },
+  3: { label: '已驳回', color: 'error' },
+  4: { label: '已下线', color: 'default' },
+}
 
 function App() {
-  const [activeTab, setActiveTab] = useState<TabKey>('risk-review')
+  const [activeTab, setActiveTab] = useState<TabKey>('products')
+  const [productForm] = Form.useForm()
+  const [financeProducts, setFinanceProducts] = useState<FinanceServiceItem[]>([])
+  const [productLoading, setProductLoading] = useState(false)
+  const [creatingProduct, setCreatingProduct] = useState(false)
   const [riskOrders, setRiskOrders] = useState<OrderInfo[]>([])
   const [debtOrders, setDebtOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
@@ -50,12 +63,30 @@ function App() {
   const [riskModal, setRiskModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [riskApproved, setRiskApproved] = useState(true)
   const [riskAmount, setRiskAmount] = useState<number>(0)
-  const [riskScore, setRiskScore] = useState<number>(0)
+  const [riskTermDays, setRiskTermDays] = useState<number>(30)
+  const [riskAnnualRate, setRiskAnnualRate] = useState<number>(0)
+  const [riskServiceFee, setRiskServiceFee] = useState<number>(0)
   const [riskRemark, setRiskRemark] = useState('')
 
+  const [debtModal, setDebtModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
+  const [debtContractNo, setDebtContractNo] = useState('')
+  const [debtContractURL, setDebtContractURL] = useState('')
+  const [debtContractHash, setDebtContractHash] = useState('')
+
   const [disburseModal, setDisburseModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
-  const [disburseAmount, setDisburseAmount] = useState<number>(0)
-  const [disburseTxNo, setDisburseTxNo] = useState('')
+  const [disbursementVoucher, setDisbursementVoucher] = useState('')
+  const [fundingCommission, setFundingCommission] = useState<number>(0)
+  const [commissionVoucher, setCommissionVoucher] = useState('')
+  const [disburseRemark, setDisburseRemark] = useState('')
+
+  const [pledgeModal, setPledgeModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
+  const [pledgeVoucherURL, setPledgeVoucherURL] = useState('')
+  const [releaseCondition, setReleaseCondition] = useState('')
+  const [pledgeRemark, setPledgeRemark] = useState('')
+
+  const [releaseModal, setReleaseModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
+  const [releaseReason, setReleaseReason] = useState('')
+  const [releaseVoucherURL, setReleaseVoucherURL] = useState('')
 
   const fetchRiskOrders = async () => {
     setLoading(true)
@@ -66,6 +97,18 @@ function App() {
       message.error('获取融资审批订单失败')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchProducts = async () => {
+    setProductLoading(true)
+    try {
+      const list = await financeService.listMine()
+      setFinanceProducts(list || [])
+    } catch {
+      message.error('获取金融产品失败')
+    } finally {
+      setProductLoading(false)
     }
   }
 
@@ -94,10 +137,25 @@ function App() {
   }
 
   useEffect(() => {
-    if (activeTab === 'risk-review') fetchRiskOrders()
+    if (activeTab === 'products') fetchProducts()
+    else if (activeTab === 'risk-review') fetchRiskOrders()
     else if (activeTab === 'debt-contract') fetchDebtOrders()
     else if (activeTab === 'all') fetchAll()
   }, [activeTab])
+
+  const handleCreateProduct = async (values: Partial<FinanceServiceItem>) => {
+    setCreatingProduct(true)
+    try {
+      await financeService.create(values)
+      message.success('金融产品已提交平台审核')
+      productForm.resetFields()
+      fetchProducts()
+    } catch {
+      message.error('提交金融产品失败')
+    } finally {
+      setCreatingProduct(false)
+    }
+  }
 
   const handleSubmitRisk = async () => {
     if (!riskModal.orderId) return
@@ -105,13 +163,17 @@ function App() {
       await financeOrderService.submitRiskResult(riskModal.orderId, {
         approved: riskApproved,
         approved_amount: riskApproved ? riskAmount : undefined,
-        risk_score: riskScore || undefined,
+        term_days: riskApproved ? riskTermDays : undefined,
+        annual_rate: riskApproved ? riskAnnualRate : undefined,
+        service_fee: riskApproved ? riskServiceFee : undefined,
         risk_remark: riskRemark || undefined,
       })
       message.success(riskApproved ? '风控审批通过' : '风控审批拒绝')
       setRiskModal({ visible: false, orderId: null })
       setRiskAmount(0)
-      setRiskScore(0)
+      setRiskTermDays(30)
+      setRiskAnnualRate(0)
+      setRiskServiceFee(0)
       setRiskRemark('')
       fetchRiskOrders()
     } catch {
@@ -119,10 +181,19 @@ function App() {
     }
   }
 
-  const handleGenerateDebt = async (orderId: number) => {
+  const handleGenerateDebt = async () => {
+    if (!debtModal.orderId) return
     try {
-      await financeOrderService.generateDebtContract(orderId)
+      await financeOrderService.generateDebtContract(debtModal.orderId, {
+        debt_contract_no: debtContractNo || undefined,
+        debt_contract_url: debtContractURL,
+        debt_contract_hash: debtContractHash || undefined,
+      })
       message.success('债务合同已生成')
+      setDebtModal({ visible: false, orderId: null })
+      setDebtContractNo('')
+      setDebtContractURL('')
+      setDebtContractHash('')
       fetchDebtOrders()
     } catch {
       message.error('生成债务合同失败')
@@ -133,16 +204,56 @@ function App() {
     if (!disburseModal.orderId) return
     try {
       await financeOrderService.disburse(disburseModal.orderId, {
-        disbursed_amount: disburseAmount || undefined,
-        transaction_no: disburseTxNo || undefined,
+        disbursement_voucher: disbursementVoucher,
+        funding_commission: fundingCommission,
+        commission_voucher: commissionVoucher,
+        remark: disburseRemark || undefined,
       })
       message.success('放款成功')
       setDisburseModal({ visible: false, orderId: null })
-      setDisburseAmount(0)
-      setDisburseTxNo('')
+      setDisbursementVoucher('')
+      setFundingCommission(0)
+      setCommissionVoucher('')
+      setDisburseRemark('')
       fetchDebtOrders()
     } catch {
       message.error('放款失败')
+    }
+  }
+
+  const handleRecordPledge = async () => {
+    if (!pledgeModal.orderId) return
+    try {
+      await financeOrderService.recordPledge(pledgeModal.orderId, {
+        pledge_voucher_url: pledgeVoucherURL,
+        release_condition: releaseCondition,
+        pledge_remark: pledgeRemark || undefined,
+      })
+      message.success('货权质押已记录')
+      setPledgeModal({ visible: false, orderId: null })
+      setPledgeVoucherURL('')
+      setReleaseCondition('')
+      setPledgeRemark('')
+      fetchAll()
+    } catch {
+      message.error('记录货权质押失败')
+    }
+  }
+
+  const handleReleasePledge = async () => {
+    if (!releaseModal.orderId) return
+    try {
+      await financeOrderService.releasePledge(releaseModal.orderId, {
+        reason: releaseReason,
+        voucher_url: releaseVoucherURL || undefined,
+      })
+      message.success('货权质押已释放')
+      setReleaseModal({ visible: false, orderId: null })
+      setReleaseReason('')
+      setReleaseVoucherURL('')
+      fetchAll()
+    } catch {
+      message.error('释放货权质押失败')
     }
   }
 
@@ -191,6 +302,8 @@ function App() {
           onClick={() => {
             setRiskApproved(true)
             setRiskAmount(record.financing_info?.requested_amount || 0)
+            setRiskTermDays(record.financing_info?.term_days || 30)
+            setRiskAnnualRate(record.financing_info?.annual_rate || 0)
             setRiskModal({ visible: true, orderId: record.id })
           }}
         >
@@ -228,11 +341,10 @@ function App() {
       width: 200,
       render: (_: unknown, record: OrderInfo) => (
         <Space>
-          <Button size="small" icon={<FileSearchOutlined />} onClick={() => handleGenerateDebt(record.id)}>
+          <Button size="small" icon={<FileSearchOutlined />} onClick={() => setDebtModal({ visible: true, orderId: record.id })}>
             生成债务合同
           </Button>
           <Button type="primary" size="small" icon={<DollarCircleOutlined />} onClick={() => {
-            setDisburseAmount(record.financing_info?.approved_amount || 0)
             setDisburseModal({ visible: true, orderId: record.id })
           }}>
             放款
@@ -274,14 +386,59 @@ function App() {
           <Space direction="vertical" size={0}>
             <Text style={{ fontSize: 12 }}>申请: ¥{fin.requested_amount?.toLocaleString()}</Text>
             {fin.approved_amount && <Text style={{ fontSize: 12 }}>审批: ¥{fin.approved_amount?.toLocaleString()}</Text>}
-            {fin.disbursed_amount && <Text style={{ fontSize: 12, color: '#52c41a' }}>已放款: ¥{fin.disbursed_amount?.toLocaleString()}</Text>}
+            {fin.disbursed_at && <Text style={{ fontSize: 12, color: '#52c41a' }}>已放款</Text>}
           </Space>
         )
       },
     },
+    {
+      title: '资金方操作',
+      key: 'action',
+      width: 180,
+      render: (_: unknown, record: OrderInfo) => {
+        const status = record.financing_info?.status
+        if (status === 'disbursed') {
+          return <Button size="small" onClick={() => setPledgeModal({ visible: true, orderId: record.id })}>记录质押</Button>
+        }
+        if (status === 'pledged') {
+          return <Button size="small" onClick={() => setReleaseModal({ visible: true, orderId: record.id })}>释放质押</Button>
+        }
+        return <Text type="secondary">--</Text>
+      },
+    },
+  ]
+
+  const productColumns: ColumnsType<FinanceServiceItem> = [
+    { title: '产品名称', dataIndex: 'name', key: 'name', width: 180 },
+    { title: '类型', dataIndex: 'finance_type', key: 'finance_type', width: 120, render: (v?: string) => v || '-' },
+    {
+      title: '额度范围',
+      key: 'amount',
+      width: 170,
+      render: (_, row) => `${(row.min_amount || 0).toLocaleString()} - ${(row.max_amount || 0).toLocaleString()} 元`,
+    },
+    {
+      title: '账期/费率',
+      key: 'term_rate',
+      width: 140,
+      render: (_, row) => `${row.term_days || 0} 天 / ${row.annual_rate || 0}%`,
+    },
+    { title: '手续费规则', dataIndex: 'fee_rule', key: 'fee_rule', width: 180, render: (v?: string) => v || '-' },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (v: number) => {
+        const meta = productStatusMap[v] || { label: '未知', color: 'default' }
+        return <Tag color={meta.color}>{meta.label}</Tag>
+      },
+    },
+    { title: '审核备注', dataIndex: 'audit_remark', key: 'audit_remark', width: 180, render: (v?: string) => v || '-' },
   ]
 
   const menuItems = [
+    { key: 'products' as TabKey, label: '金融产品', icon: <BankOutlined /> },
     { key: 'risk-review' as TabKey, label: '风控审批', icon: <AuditOutlined /> },
     { key: 'debt-contract' as TabKey, label: '合同与放款', icon: <BankOutlined /> },
     { key: 'all' as TabKey, label: '全部订单', icon: <FileSearchOutlined /> },
@@ -335,13 +492,84 @@ function App() {
         <Header style={{ background: '#fff', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text strong>资金服务方工作台</Text>
           <Space>
-            <Button icon={<AuditOutlined />} onClick={() => { if (activeTab === 'risk-review') fetchRiskOrders(); else if (activeTab === 'debt-contract') fetchDebtOrders(); else fetchAll(); }}>
+            <Button icon={<AuditOutlined />} onClick={() => { if (activeTab === 'products') fetchProducts(); else if (activeTab === 'risk-review') fetchRiskOrders(); else if (activeTab === 'debt-contract') fetchDebtOrders(); else fetchAll(); }}>
               刷新
             </Button>
             <Button icon={<HomeOutlined />} href="/">买家首页</Button>
           </Space>
         </Header>
         <Content className="service-content" style={{ padding: 24 }}>
+          {activeTab === 'products' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">已提交产品</Typography.Text><br /><Title level={3}>{financeProducts.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">已审核通过</Typography.Text><br /><Title level={3}>{financeProducts.filter((item) => item.status === 2).length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">待平台审核</Typography.Text><br /><Title level={3}>{financeProducts.filter((item) => item.status === 1).length}</Title></Card>
+                </Col>
+              </Row>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} xl={9}>
+                  <Card title="上架金融产品">
+                    <Form form={productForm} layout="vertical" onFinish={handleCreateProduct}>
+                      <Form.Item label="产品名称" name="name" rules={[{ required: true, message: '请输入产品名称' }]}>
+                        <Input placeholder="例如托盘垫资-30天账期" />
+                      </Form.Item>
+                      <Form.Item label="服务类型" name="finance_type">
+                        <Input placeholder="托盘垫资 / 订单融资 / 保理" />
+                      </Form.Item>
+                      <Row gutter={12}>
+                        <Col span={12}>
+                          <Form.Item label="最低额度" name="min_amount">
+                            <InputNumber style={{ width: '100%' }} min={0} />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item label="最高额度" name="max_amount">
+                            <InputNumber style={{ width: '100%' }} min={0} />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      <Row gutter={12}>
+                        <Col span={12}>
+                          <Form.Item label="账期天数" name="term_days">
+                            <InputNumber style={{ width: '100%' }} min={1} precision={0} />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item label="年化费率(%)" name="annual_rate">
+                            <InputNumber style={{ width: '100%' }} min={0} precision={4} />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      <Form.Item label="手续费规则" name="fee_rule">
+                        <Input placeholder="例如按授信金额 0.3%" />
+                      </Form.Item>
+                      <Form.Item label="风控要求" name="risk_control_rule">
+                        <Input.TextArea rows={3} />
+                      </Form.Item>
+                      <Form.Item label="服务描述" name="description">
+                        <Input.TextArea rows={3} />
+                      </Form.Item>
+                      <Button type="primary" htmlType="submit" loading={creatingProduct} block>提交平台审核</Button>
+                    </Form>
+                  </Card>
+                </Col>
+                <Col xs={24} xl={15}>
+                  <Card title="我的金融产品">
+                    <Spin spinning={productLoading}>
+                      <Table columns={productColumns} dataSource={financeProducts} rowKey="id" pagination={{ pageSize: 8 }} scroll={{ x: 940 }} locale={{ emptyText: '暂无金融产品' }} />
+                    </Spin>
+                  </Card>
+                </Col>
+              </Row>
+            </>
+          )}
+
           {activeTab === 'risk-review' && (
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -397,7 +625,14 @@ function App() {
             title="风控审核"
             open={riskModal.visible}
             onOk={handleSubmitRisk}
-            onCancel={() => { setRiskModal({ visible: false, orderId: null }); setRiskAmount(0); setRiskScore(0); setRiskRemark('') }}
+            onCancel={() => {
+              setRiskModal({ visible: false, orderId: null })
+              setRiskAmount(0)
+              setRiskTermDays(30)
+              setRiskAnnualRate(0)
+              setRiskServiceFee(0)
+              setRiskRemark('')
+            }}
             okText="提交审核"
           >
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -409,15 +644,25 @@ function App() {
                 </Space>
               </div>
               {riskApproved && (
-                <div>
-                  <Text>审批金额 (元)：</Text>
-                  <InputNumber style={{ width: '100%' }} min={0} value={riskAmount} onChange={(v) => setRiskAmount(v || 0)} />
-                </div>
+                <>
+                  <div>
+                    <Text>审批金额 (元)：</Text>
+                    <InputNumber style={{ width: '100%' }} min={0} value={riskAmount} onChange={(v) => setRiskAmount(v || 0)} />
+                  </div>
+                  <div>
+                    <Text>账期 (天)：</Text>
+                    <InputNumber style={{ width: '100%' }} min={1} value={riskTermDays} onChange={(v) => setRiskTermDays(v || 30)} />
+                  </div>
+                  <div>
+                    <Text>年化费率 (%)：</Text>
+                    <InputNumber style={{ width: '100%' }} min={0} precision={2} value={riskAnnualRate} onChange={(v) => setRiskAnnualRate(v || 0)} />
+                  </div>
+                  <div>
+                    <Text>手续费 (元)：</Text>
+                    <InputNumber style={{ width: '100%' }} min={0} precision={2} value={riskServiceFee} onChange={(v) => setRiskServiceFee(v || 0)} />
+                  </div>
+                </>
               )}
-              <div>
-                <Text>风险评分 (0-100)：</Text>
-                <InputNumber style={{ width: '100%' }} min={0} max={100} value={riskScore} onChange={(v) => setRiskScore(v || 0)} placeholder="选填" />
-              </div>
               <div>
                 <Text>审核备注：</Text>
                 <Input value={riskRemark} onChange={(e) => setRiskRemark(e.target.value)} placeholder="选填" />
@@ -426,22 +671,115 @@ function App() {
           </Modal>
 
           <Modal
+            title="生成债务质押合同"
+            open={debtModal.visible}
+            onOk={handleGenerateDebt}
+            onCancel={() => {
+              setDebtModal({ visible: false, orderId: null })
+              setDebtContractNo('')
+              setDebtContractURL('')
+              setDebtContractHash('')
+            }}
+            okText="生成合同"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <div>
+                <Text>合同编号：</Text>
+                <Input value={debtContractNo} onChange={(e) => setDebtContractNo(e.target.value)} placeholder="留空则由后端生成" />
+              </div>
+              <div>
+                <Text>合同文件 URL：</Text>
+                <Input value={debtContractURL} onChange={(e) => setDebtContractURL(e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <Text>合同哈希：</Text>
+                <Input value={debtContractHash} onChange={(e) => setDebtContractHash(e.target.value)} placeholder="选填" />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
             title="确认放款"
             open={disburseModal.visible}
             onOk={handleDisburse}
-            onCancel={() => { setDisburseModal({ visible: false, orderId: null }); setDisburseAmount(0); setDisburseTxNo('') }}
+            onCancel={() => {
+              setDisburseModal({ visible: false, orderId: null })
+              setDisbursementVoucher('')
+              setFundingCommission(0)
+              setCommissionVoucher('')
+              setDisburseRemark('')
+            }}
             okText="确认放款"
             okButtonProps={{ style: { background: '#52c41a', borderColor: '#52c41a' } }}
           >
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
-              <Paragraph>确认向买方放款，资金将划拨至卖方账户。</Paragraph>
+              <Paragraph>确认资金方分佣已支付，并向卖方定向放款。</Paragraph>
               <div>
-                <Text>放款金额 (元)：</Text>
-                <InputNumber style={{ width: '100%' }} min={0} value={disburseAmount} onChange={(v) => setDisburseAmount(v || 0)} />
+                <Text>分佣金额 (元)：</Text>
+                <InputNumber style={{ width: '100%' }} min={0} precision={2} value={fundingCommission} onChange={(v) => setFundingCommission(v || 0)} />
               </div>
               <div>
-                <Text>交易流水号：</Text>
-                <Input value={disburseTxNo} onChange={(e) => setDisburseTxNo(e.target.value)} placeholder="选填" />
+                <Text>分佣凭证 URL：</Text>
+                <Input value={commissionVoucher} onChange={(e) => setCommissionVoucher(e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <Text>放款凭证 URL：</Text>
+                <Input value={disbursementVoucher} onChange={(e) => setDisbursementVoucher(e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <Text>备注：</Text>
+                <Input value={disburseRemark} onChange={(e) => setDisburseRemark(e.target.value)} placeholder="选填" />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="记录货权质押"
+            open={pledgeModal.visible}
+            onOk={handleRecordPledge}
+            onCancel={() => {
+              setPledgeModal({ visible: false, orderId: null })
+              setPledgeVoucherURL('')
+              setReleaseCondition('')
+              setPledgeRemark('')
+            }}
+            okText="记录质押"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <div>
+                <Text>质押凭证 URL：</Text>
+                <Input value={pledgeVoucherURL} onChange={(e) => setPledgeVoucherURL(e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <Text>释放条件：</Text>
+                <Input value={releaseCondition} onChange={(e) => setReleaseCondition(e.target.value)} placeholder="例如买方结清账期款项且卖方完成对账" />
+              </div>
+              <div>
+                <Text>质押备注：</Text>
+                <Input value={pledgeRemark} onChange={(e) => setPledgeRemark(e.target.value)} placeholder="选填" />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="释放货权质押"
+            open={releaseModal.visible}
+            onOk={handleReleasePledge}
+            onCancel={() => {
+              setReleaseModal({ visible: false, orderId: null })
+              setReleaseReason('')
+              setReleaseVoucherURL('')
+            }}
+            okText="释放质押"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <div>
+                <Text>释放原因：</Text>
+                <Input value={releaseReason} onChange={(e) => setReleaseReason(e.target.value)} placeholder="必填" />
+              </div>
+              <div>
+                <Text>释放凭证 URL：</Text>
+                <Input value={releaseVoucherURL} onChange={(e) => setReleaseVoucherURL(e.target.value)} placeholder="选填，https://..." />
               </div>
             </Space>
           </Modal>
