@@ -90,7 +90,7 @@ export const logisticsOrderService = {
     return response.data
   },
 
-  async createQuote(orderId: number, payload: { price: number; estimated_days: number; remark?: string }) {
+  async createQuote(orderId: number, payload: { vehicle_info: string; driver_info: string; amount: number; estimated_delivery_at?: string; remark?: string }) {
     const response = await api.post<unknown, ApiResponse<OrderInfo>>(`/orders/${orderId}/logistics-quotes`, payload)
     return response.data
   },

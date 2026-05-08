@@ -148,11 +148,15 @@ export const orderService = {
       transaction_no?: string
       payer_account?: string
       payee_account?: string
+      title_voucher_url: string
+      title_remark?: string
       captured_at?: string
       gps_latitude?: number
       gps_longitude?: number
     },
   ) => api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/payments/direct`, payload).then((response) => response.data),
+  reselectWarehouse: (id: number, payload: { warehouse_service_id: number; confirm_note?: string }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/warehouse-selection`, payload).then((response) => response.data),
   buyerConfirm: (id: number, payload?: { confirm_note?: string }) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/buyer-confirm`, payload || {}).then((response) => response.data),
   setDeliveryInfo: (

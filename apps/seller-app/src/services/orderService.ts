@@ -132,8 +132,12 @@ export const sellerOrderService = {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/confirm-outbound`, payload)
     return response.data
   },
-  async createLogisticsBidding(id: number, payload?: { pickup_address?: string; destination_address?: string; requirement?: string }) {
+  async createLogisticsBidding(id: number, payload?: { pickup_address?: string; destination_address?: string; requirement?: string; freight_payer?: 'buyer' | 'seller' }) {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/logistics-biddings`, payload || {})
+    return response.data
+  },
+  async reportLogisticsNoCapacity(id: number, payload?: { no_capacity_reason?: string }) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/logistics-biddings/no-capacity`, payload || {})
     return response.data
   },
   async confirmLogisticsQuote(id: number, payload: { quote_id: number }) {

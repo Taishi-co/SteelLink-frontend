@@ -88,6 +88,21 @@ function App() {
   const [releaseReason, setReleaseReason] = useState('')
   const [releaseVoucherURL, setReleaseVoucherURL] = useState('')
 
+  const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
+    Modal.success({
+      title,
+      content: (
+        <Space direction="vertical" size={8}>
+          <Text>已完成：{title.replace('已完成', '')}</Text>
+          <Text type="secondary">下一步：{next}</Text>
+          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+        </Space>
+      ),
+      okText: '回资金方工作台',
+      onOk: () => setActiveTab(targetTab),
+    })
+  }
+
   const fetchRiskOrders = async () => {
     setLoading(true)
     try {
@@ -147,7 +162,7 @@ function App() {
     setCreatingProduct(true)
     try {
       await financeService.create(values)
-      message.success('金融产品已提交平台审核')
+      showCompleted('金融产品提交已完成', '等待平台管理端审核，通过后买卖方可在资金服务中申请。', 'products')
       productForm.resetFields()
       fetchProducts()
     } catch {
@@ -168,7 +183,7 @@ function App() {
         service_fee: riskApproved ? riskServiceFee : undefined,
         risk_remark: riskRemark || undefined,
       })
-      message.success(riskApproved ? '风控审批通过' : '风控审批拒绝')
+      showCompleted(riskApproved ? '风控审批已完成' : '风控拒绝已完成', riskApproved ? '等待买方确认授信金额和定价。' : '订单已终止并反馈到管理端事件记录。', riskApproved ? 'debt-contract' : 'all')
       setRiskModal({ visible: false, orderId: null })
       setRiskAmount(0)
       setRiskTermDays(30)
@@ -189,7 +204,7 @@ function App() {
         debt_contract_url: debtContractURL,
         debt_contract_hash: debtContractHash || undefined,
       })
-      message.success('债务合同已生成')
+      showCompleted('债务合同生成已完成', '等待买方签署债务合同并支付手续费。', 'debt-contract')
       setDebtModal({ visible: false, orderId: null })
       setDebtContractNo('')
       setDebtContractURL('')
@@ -209,7 +224,7 @@ function App() {
         commission_voucher: commissionVoucher,
         remark: disburseRemark || undefined,
       })
-      message.success('放款成功')
+      showCompleted('资金方放款已完成', '合规要求：必须继续记录货权质押后，订单才能进入物流履约。', 'all')
       setDisburseModal({ visible: false, orderId: null })
       setDisbursementVoucher('')
       setFundingCommission(0)
@@ -229,7 +244,7 @@ function App() {
         release_condition: releaseCondition,
         pledge_remark: pledgeRemark || undefined,
       })
-      message.success('货权质押已记录')
+      showCompleted('货权质押记录已完成', '订单已满足物流履约前置合规要求，等待卖方发起物流竞价。', 'all')
       setPledgeModal({ visible: false, orderId: null })
       setPledgeVoucherURL('')
       setReleaseCondition('')
@@ -247,7 +262,7 @@ function App() {
         reason: releaseReason,
         voucher_url: releaseVoucherURL || undefined,
       })
-      message.success('货权质押已释放')
+      showCompleted('货权质押释放已完成', '释放事件已进入订单链路，可回工作台查看。', 'all')
       setReleaseModal({ visible: false, orderId: null })
       setReleaseReason('')
       setReleaseVoucherURL('')
