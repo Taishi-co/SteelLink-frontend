@@ -73,12 +73,10 @@ export interface CartItem {
   id: number
   productId: number
   productName: string
-  imageUrl?: string
   specs: string
   price: number
   quantity: number
   seller: string
-  warehouseInfo?: WarehouseInfo
   unit?: string
   subTotal?: number
 }
@@ -87,13 +85,11 @@ export interface CartItemDTO {
   id: number
   product_id: number
   product_name: string
-  image_url?: string
   spec: string
   price: number
   quantity: number
   seller_id: number
   seller_name: string
-  warehouse_info?: WarehouseInfo
   unit: string
   sub_total: number
 }

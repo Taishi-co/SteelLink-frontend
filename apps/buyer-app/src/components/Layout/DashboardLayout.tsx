@@ -15,8 +15,6 @@ import {
   LogoutOutlined,
   UserOutlined,
   ArrowRightOutlined,
-  CloudServerOutlined,
-  TruckOutlined,
 } from '@ant-design/icons'
 import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
 import { useUserStore } from '@/stores'
@@ -38,9 +36,8 @@ const allNavItems: NavItem[] = [
   { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
   { key: '/dashboard/bidding', icon: <RiseOutlined />, label: '竞价管理', services: ['procurement'] },
   { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单', services: ['procurement', 'sales'] },
-  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资', services: ['finance'] },
-  { key: '/dashboard/warehouse', icon: <CloudServerOutlined />, label: '仓储管理', services: ['warehouse'] },
-  { key: '/dashboard/logistics', icon: <TruckOutlined />, label: '物流管理', services: ['logistics'] },
+  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '资金服务', services: ['procurement', 'sales'] },
+  { key: '/dashboard/logistics', icon: <ShopOutlined />, label: '仓储物流', services: ['logistics', 'warehouse'] },
   { key: '/dashboard/services', icon: <AppstoreOutlined />, label: '服务入口', roles: ['enterprise'] },
 ]
 

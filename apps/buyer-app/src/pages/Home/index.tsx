@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Typography, Row, Col, Card } from 'antd'
 import {
@@ -9,7 +8,6 @@ import {
   RocketOutlined,
   RobotOutlined,
 } from '@ant-design/icons'
-import { platformService, type PlatformStats } from '@/services/platformService'
 
 const { Title, Paragraph, Text } = Typography
 const sellerEntryHref = '/dashboard/enterprise'
@@ -37,62 +35,19 @@ const features = [
   },
 ]
 
+const stats = [
+  { value: '5000+', label: '入驻商家' },
+  { value: '10万+', label: 'SKU商品' },
+  { value: '100万+', label: '累计订单' },
+  { value: '50亿+', label: '交易金额' },
+]
+
 const partners = [
   '宝钢', '鞍钢', '首钢', '马钢', '莱钢', '沙钢',
   '日照', '本钢', '太钢', '邯钢', '安钢', '济钢',
 ]
 
-const emptyStats: PlatformStats = {
-  merchant_count: 0,
-  sku_count: 0,
-  order_count: 0,
-  transaction_amount: 0,
-}
-
-const formatCount = (value: number) => new Intl.NumberFormat('zh-CN').format(value)
-
-const formatAmount = (value: number) => {
-  if (value >= 100000000) {
-    return `${(value / 100000000).toFixed(2).replace(/\.?0+$/, '')}亿`
-  }
-  if (value >= 10000) {
-    return `${(value / 10000).toFixed(2).replace(/\.?0+$/, '')}万`
-  }
-  return `${formatCount(value)}元`
-}
-
 export default function HomePage() {
-  const [stats, setStats] = useState<PlatformStats>(emptyStats)
-  const [statsLoaded, setStatsLoaded] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-
-    platformService.getStats()
-      .then((data) => {
-        if (!cancelled) {
-          setStats(data)
-          setStatsLoaded(true)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setStatsLoaded(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const homeStats = [
-    { value: statsLoaded ? formatCount(stats.merchant_count) : '--', label: '入驻商家' },
-    { value: statsLoaded ? formatCount(stats.sku_count) : '--', label: 'SKU商品' },
-    { value: statsLoaded ? formatCount(stats.order_count) : '--', label: '累计订单' },
-    { value: statsLoaded ? formatAmount(stats.transaction_amount) : '--', label: '交易金额' },
-  ]
-
   return (
     <div className="bg-white">
       {/* Hero Section */}
@@ -130,7 +85,7 @@ export default function HomePage() {
       <section className="bg-gray-50 py-12">
         <div className="max-w-7xl mx-auto px-8">
           <Row gutter={32}>
-            {homeStats.map((stat, index) => (
+            {stats.map((stat, index) => (
               <Col key={index} span={6} className="text-center">
                 <Text className="text-4xl font-bold text-primary-600">{stat.value}</Text>
                 <p className="text-gray-500 mt-2">{stat.label}</p>

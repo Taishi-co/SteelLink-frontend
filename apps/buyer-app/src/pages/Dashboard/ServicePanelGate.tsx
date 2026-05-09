@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react'
 import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import { getServiceDefinition, type ServiceKey } from './serviceAccess'
+import { isServiceEnabled, getServiceDefinition, type ServiceKey } from './serviceAccess'
 import ServiceIconBadge from './ServiceIconBadge'
-import { certificationService } from '@/services/certificationService'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -15,27 +13,8 @@ interface ServicePanelGateProps {
 export default function ServicePanelGate({ serviceKey, children }: ServicePanelGateProps) {
   const navigate = useNavigate()
   const service = getServiceDefinition(serviceKey)
-  const [isEnabled, setIsEnabled] = useState(true)
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    certificationService.getMyServices().then((res) => {
-      if (res.code === 0 && res.data?.permissions) {
-        const permission = res.data.permissions.find((p) => p.service === serviceKey)
-        setIsEnabled(permission?.status === 2)
-      }
-    }).catch(() => {
-      setIsEnabled(false)
-    }).finally(() => {
-      setLoading(false)
-    })
-  }, [serviceKey])
-
-  if (loading) {
-    return <div className="min-h-[200px] flex items-center justify-center">加载中...</div>
-  }
-
-  if (isEnabled) {
+  if (isServiceEnabled(serviceKey)) {
     return <>{children}</>
   }
 

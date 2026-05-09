@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { Carousel, Row, Col, Card, Typography, Divider, Empty, Spin, message } from 'antd'
 import { Link } from 'react-router-dom'
-import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
 import { productService } from '@/services/productService'
 import type { Product } from '@/types'
 
@@ -11,9 +10,7 @@ const { Title, Paragraph } = Typography
 interface MallCategory {
   id: string
   name: string
-  displayName: string
   icon: string
-  imageUrl: string
 }
 
 const bannerItems = [
@@ -53,21 +50,16 @@ function getCategoryIcon(category: string) {
 export default function MallPage() {
   const [loading, setLoading] = useState(true)
   const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
 
   useEffect(() => {
-    const loadMallData = async () => {
+    const loadProducts = async () => {
       setLoading(true)
       try {
-        const [categoryResponse, productResponse] = await Promise.all([
-          categoryService.list(),
-          productService.getProducts({
-            page: 1,
-            page_size: 12,
-          }),
-        ])
-        setCategories(categoryResponse.data.length > 0 ? categoryResponse.data : fallbackProductCategories)
-        setProducts(productResponse.data.list)
+        const response = await productService.getProducts({
+          page: 1,
+          page_size: 12,
+        })
+        setProducts(response.data.list)
       } catch (error) {
         message.error('商城首页商品加载失败，请确认后端服务已启动')
       } finally {
@@ -75,18 +67,17 @@ export default function MallPage() {
       }
     }
 
-    void loadMallData()
+    void loadProducts()
   }, [])
 
   const mallCategories = useMemo<MallCategory[]>(() => {
-    return categories.map((category) => ({
-      id: `${category.id}`,
-      name: category.name,
-      displayName: category.display_name || category.name,
-      icon: category.icon || getCategoryIcon(category.name),
-      imageUrl: category.image_url,
+    const uniqueCategories = Array.from(new Set(products.map((product) => product.category).filter(Boolean)))
+    return uniqueCategories.map((category, index) => ({
+      id: `${index + 1}`,
+      name: category,
+      icon: getCategoryIcon(category),
     }))
-  }, [categories])
+  }, [products])
 
   const featuredProducts = useMemo(() => products.slice(0, 4), [products])
 
@@ -121,14 +112,8 @@ export default function MallPage() {
                       to={`/products?category=${encodeURIComponent(category.name)}`}
                       className="block rounded-lg p-4 text-center transition-colors hover:bg-gray-50"
                     >
-                      <div className="mb-2 flex h-12 items-center justify-center overflow-hidden rounded bg-gray-100 text-3xl">
-                        {category.imageUrl ? (
-                          <img src={category.imageUrl} alt={category.displayName} className="h-full w-full object-cover" />
-                        ) : (
-                          category.icon
-                        )}
-                      </div>
-                      <div className="text-gray-700">{category.displayName}</div>
+                      <div className="mb-2 text-3xl">{category.icon}</div>
+                      <div className="text-gray-700">{category.name}</div>
                     </Link>
                   </Col>
                 ))}

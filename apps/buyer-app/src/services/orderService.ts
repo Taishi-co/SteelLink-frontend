@@ -110,42 +110,6 @@ export interface OrderEventInfo {
   created_at: string
 }
 
-export interface WarehouseOrderInfo {
-  id: number
-  order_no: string
-  buyer_id: number
-  buyer_name: string
-  seller_id: number
-  seller_name: string
-  items: OrderItem[]
-  total_quantity: number
-  total_amount: number
-  status: number
-  created_at: string
-  delivery_info?: {
-    warehouse_id: number
-    warehouse_name: string
-    warehouse_code?: string
-    warehouse_address?: string
-    address: string
-  }
-}
-
-export const warehouseOrderService = {
-  listPending: async () => {
-    const response = await api.get<ApiResponse<{ list: WarehouseOrderInfo[] }>, ApiResponse<{ list: WarehouseOrderInfo[] }>>('/orders?status=12&role=warehouse')
-    return response.data.list
-  },
-  listAll: async () => {
-    const response = await api.get<ApiResponse<{ list: WarehouseOrderInfo[] }>, ApiResponse<{ list: WarehouseOrderInfo[] }>>('/orders?role=warehouse')
-    return response.data.list
-  },
-  warehouseConfirm: async (id: number, payload?: { confirmed: boolean; condition_note?: string }) => {
-    const response = await api.post<ApiResponse<WarehouseOrderInfo>, ApiResponse<WarehouseOrderInfo>>(`/orders/${id}/warehouse-confirm`, payload || {})
-    return response.data
-  },
-}
-
 export const orderService = {
   create: async (payload: CreateOrderPayload) => {
     const response = await api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>('/orders', payload)

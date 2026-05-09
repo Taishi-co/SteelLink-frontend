@@ -1,29 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { AutoComplete, Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
+import { Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
 import {
   AuditOutlined,
   BankOutlined,
-  CopyOutlined,
-  EyeOutlined,
   FileSearchOutlined,
   LoginOutlined,
   MessageOutlined,
-  ReloadOutlined,
   ShoppingCartOutlined,
   TruckOutlined,
 } from '@ant-design/icons'
 import { getBuyerToken } from '@/services/auth'
 import { aiProcurementService } from '@/services/aiProcurementService'
-import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
 import { serviceOfferService } from '@/services/serviceOfferService'
-import { supplyDemandService } from '@/services/supplyDemandService'
 import type {
   AIProcurementInfo,
   AIProcurementParseResult,
   AIProcurementStageCode,
-  LogisticsOption,
   MatchedProduct,
   OrderFormPayload,
   ParsedInstruction,
@@ -149,69 +143,6 @@ function scaledFreightEstimate(item: MatchedProduct, quantity: number) {
   return (item.freight_estimate / item.quantity) * quantity
 }
 
-function applyLogisticsOption(product: MatchedProduct, option: LogisticsOption): MatchedProduct {
-  return {
-    ...product,
-    logistics_service_id: option.service_id,
-    logistics_service_name: option.service_name,
-    logistics_route: option.route,
-    freight_estimate: option.freight_estimate,
-    landed_total: option.landed_total,
-    unit_landed_price: option.unit_landed_price,
-    logistics_match_status: 'matched',
-  }
-}
-
-function hasPendingLogisticsResolution(items: MatchedProduct[]) {
-  return items.some((item) => item.logistics_match_status === 'no_match' || item.logistics_match_status === 'destination_missing')
-}
-
-function mergeParsedInstruction(base: ParsedInstruction, values: Partial<ParsedInstruction>): ParsedInstruction {
-  const quantity = Number(values.quantity ?? base.quantity)
-  const confidence = Number(values.confidence ?? base.confidence)
-  return {
-    ...base,
-    ...values,
-    product_name: String(values.product_name ?? base.product_name ?? '').trim(),
-    category: String(values.category ?? base.category ?? '').trim(),
-    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : base.quantity,
-    unit: String(values.unit ?? base.unit ?? '').trim(),
-    usage: String(values.usage ?? base.usage ?? '').trim(),
-    financing_required: Boolean(values.financing_required ?? base.financing_required),
-    keywords: values.keywords && values.keywords.length > 0 ? values.keywords : base.keywords,
-    confidence: Number.isFinite(confidence) && confidence >= 0 ? confidence : base.confidence,
-    delivery_address: String(values.delivery_address ?? base.delivery_address ?? '').trim(),
-    delivery_address_source: values.delivery_address_source ?? base.delivery_address_source,
-    delivery_warehouse_id: values.delivery_warehouse_id ?? base.delivery_warehouse_id,
-    delivery_warehouse_name: String(values.delivery_warehouse_name ?? base.delivery_warehouse_name ?? '').trim(),
-  }
-}
-
-async function copyText(value: string) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value)
-    return
-  }
-
-  const textArea = document.createElement('textarea')
-  textArea.value = value
-  textArea.style.position = 'fixed'
-  textArea.style.left = '-9999px'
-  textArea.style.top = '0'
-  document.body.appendChild(textArea)
-  textArea.focus()
-  textArea.select()
-
-  try {
-    const copied = document.execCommand('copy')
-    if (!copied) {
-      throw new Error('copy failed')
-    }
-  } finally {
-    document.body.removeChild(textArea)
-  }
-}
-
 export default function AiProcurementPage() {
   const navigate = useNavigate()
   const params = useParams<{ step?: string }>()
@@ -227,7 +158,6 @@ export default function AiProcurementPage() {
   const [selectedProducts, setSelectedProducts] = useState<MatchedProduct[]>([])
   const [mine, setMine] = useState<AIProcurementInfo[]>([])
   const [warehouses, setWarehouses] = useState<WarehouseServiceItem[]>([])
-  const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
   const isLoggedIn = Boolean(getBuyerToken())
 
   const loadMine = useCallback(async () => {
@@ -257,12 +187,6 @@ export default function AiProcurementPage() {
   }, [])
 
   useEffect(() => {
-    categoryService.list()
-      .then((response) => setCategories(response.data.length > 0 ? response.data : fallbackProductCategories))
-      .catch(() => setCategories(fallbackProductCategories))
-  }, [])
-
-  useEffect(() => {
     if (result?.parsed) {
       instructionForm.setFieldsValue(result.parsed)
     }
@@ -281,14 +205,6 @@ export default function AiProcurementPage() {
   }, [orderForm, result?.parsed.delivery_address, selectedProducts])
 
   const currentStep = activeStep ? activeStep - 1 : 0
-  const categoryOptions = useMemo(
-    () =>
-      categories.map((category) => ({
-        label: category.display_name || category.name,
-        value: category.name,
-      })),
-    [categories],
-  )
 
   const updateResult = (patch: Partial<AIProcurementParseResult>) => {
     setResult((prev) => ({
@@ -308,13 +224,6 @@ export default function AiProcurementPage() {
       stages: patch.stages || prev?.stages || [],
     }))
   }
-
-  const getLatestParsedInstruction = useCallback(() => {
-    if (!result) {
-      return null
-    }
-    return mergeParsedInstruction(result.parsed, instructionForm.getFieldsValue())
-  }, [instructionForm, result])
 
   const handleParse = async () => {
     const value = prompt.trim()
@@ -349,13 +258,10 @@ export default function AiProcurementPage() {
     setBusy(true)
     try {
       const values = await instructionForm.validateFields()
-      const parsedForRequest = mergeParsedInstruction(result.parsed, values)
-      const confirmed = await aiProcurementService.confirmInstruction(prompt, parsedForRequest)
-      const confirmedParsed = mergeParsedInstruction(confirmed.parsed, parsedForRequest)
-      instructionForm.setFieldsValue(confirmedParsed)
-      const matched = await aiProcurementService.matchProducts(confirmedParsed)
+      const confirmed = await aiProcurementService.confirmInstruction(prompt, values)
+      const matched = await aiProcurementService.matchProducts(confirmed.parsed)
       updateResult({
-        parsed: confirmedParsed,
+        parsed: confirmed.parsed,
         matched_products: matched.matched_products,
         stages: matched.stages,
       })
@@ -375,20 +281,18 @@ export default function AiProcurementPage() {
       message.warning('请选择至少一个商品')
       return
     }
-    const parsedForRequest = getLatestParsedInstruction()
-    if (!parsedForRequest || !nearlyEqual(selectedQuantity, parsedForRequest.quantity)) {
-      message.warning(`拼单数量需要等于采购数量：${parsedForRequest?.quantity || 0}${parsedForRequest?.unit || ''}`)
+    if (!result || !nearlyEqual(selectedQuantity, result.parsed.quantity)) {
+      message.warning(`拼单数量需要等于采购数量：${result?.parsed.quantity || 0}${result?.parsed.unit || ''}`)
       return
     }
     setBusy(true)
     try {
       const matched = await aiProcurementService.matchLogisticsWarehouse({
-        parsed: parsedForRequest,
+        parsed: result.parsed,
         selected_products: selectedProducts,
       })
       setSelectedProducts(matched.matched_products)
       updateResult({
-        parsed: parsedForRequest,
         stages: matched.stages,
       })
       navigate('/ai-procurement/3')
@@ -408,14 +312,9 @@ export default function AiProcurementPage() {
     setBusy(true)
     try {
       const values = await orderForm.validateFields()
-      const parsedForRequest = getLatestParsedInstruction()
-      if (!parsedForRequest) {
-        message.warning('请先确认参数')
-        return
-      }
       const response = await aiProcurementService.generateOrder({
         prompt,
-        parsed: parsedForRequest,
+        parsed: result.parsed,
         selected_products: selectedProducts,
         order_form: {
           ...toOrderFormPayload(values),
@@ -497,27 +396,6 @@ export default function AiProcurementPage() {
     navigate(`/ai-procurement/${step}`)
   }
 
-  const handleRepeatProcurement = (item: AIProcurementInfo) => {
-    setPrompt(item.prompt)
-    setResult(null)
-    setCurrentProcurement(null)
-    setSelectedProducts([])
-    instructionForm.resetFields()
-    orderForm.resetFields()
-    navigate('/ai-procurement')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    message.success('已填入采购对话，可重新解析')
-  }
-
-  const handleCopyProcurementPrompt = async (item: AIProcurementInfo) => {
-    try {
-      await copyText(item.prompt)
-      message.success('采购对话已复制')
-    } catch {
-      message.error('复制失败，请手动复制采购对话')
-    }
-  }
-
   const handleToggleProduct = (product: MatchedProduct) => {
     setSelectedProducts((prev) => {
       const exists = prev.some((item) => item.product_id === product.product_id)
@@ -544,67 +422,6 @@ export default function AiProcurementPage() {
           }
         : item
     )))
-  }
-
-  const handleSelectLogisticsOption = (product: MatchedProduct, serviceID: number) => {
-    const option = product.logistics_options?.find((item) => item.service_id === serviceID)
-    if (!option) {
-      return
-    }
-    setSelectedProducts((prev) => prev.map((item) => (
-      item.product_id === product.product_id ? applyLogisticsOption(item, option) : item
-    )))
-  }
-
-  const handlePublishLogisticsDemand = async (product: MatchedProduct) => {
-    if (!result) {
-      return
-    }
-    setBusy(true)
-    try {
-      await supplyDemandService.create({
-        type: 'logistics',
-        title: `AI采购物流需求：${product.product_name}`,
-        category: '物流运输',
-        material: product.product_name,
-        quantity: product.quantity,
-        unit: result.parsed.unit,
-        delivery_address: product.destination_address || result.parsed.delivery_address,
-        description: [
-          `商品：${product.product_name}`,
-          `数量：${product.quantity}${result.parsed.unit}`,
-          `发货仓库：${product.origin_warehouse_name || String(product.warehouse?.warehouse_name || '-')}`,
-          `起运地址：${product.origin_address || String(product.warehouse?.address || '-')}`,
-          `收货地址：${product.destination_address || result.parsed.delivery_address || '-'}`,
-          '来源：AI采购物流仓储匹配未找到合适物流方案',
-        ].join('\n'),
-        tags: ['AI采购', '物流需求'],
-      })
-      message.success('已发布物流需求，可在供需撮合查看')
-      navigate('/matching')
-    } catch (error) {
-      message.error('物流需求发布失败')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleNegotiateLogistics = (product: MatchedProduct) => {
-    setSelectedProducts((prev) => prev.map((item) => (
-      item.product_id === product.product_id
-        ? {
-            ...item,
-            logistics_service_id: undefined,
-            logistics_service_name: '协商解决',
-            logistics_route: '待买卖双方或平台协调',
-            freight_estimate: 0,
-            landed_total: item.total_amount,
-            unit_landed_price: item.unit_price,
-            logistics_match_status: 'negotiation',
-          }
-        : item
-    )))
-    message.info(`${product.product_name} 已标记为协商解决`)
   }
 
   const setExamplePrompt = (value: string) => {
@@ -684,13 +501,9 @@ export default function AiProcurementPage() {
             instructionForm={instructionForm}
             orderForm={orderForm}
             warehouses={warehouses}
-            categoryOptions={categoryOptions}
             onConfirmInstruction={handleConfirmInstruction}
             onToggleProduct={handleToggleProduct}
             onProductQuantityChange={handleProductQuantityChange}
-            onSelectLogisticsOption={handleSelectLogisticsOption}
-            onPublishLogisticsDemand={handlePublishLogisticsDemand}
-            onNegotiateLogistics={handleNegotiateLogistics}
             onConfirmProduct={handleConfirmProduct}
             onGenerateOrder={handleGenerateOrder}
             onMatchFinance={handleMatchFinance}
@@ -703,8 +516,6 @@ export default function AiProcurementPage() {
             loadingMine={loadingMine}
             onRefreshMine={loadMine}
             onOpenProcurement={openProcurement}
-            onRepeatProcurement={handleRepeatProcurement}
-            onCopyProcurementPrompt={handleCopyProcurementPrompt}
             onSetExamplePrompt={setExamplePrompt}
           />
         )}
@@ -719,8 +530,6 @@ function HomeSections({
   loadingMine,
   onRefreshMine,
   onOpenProcurement,
-  onRepeatProcurement,
-  onCopyProcurementPrompt,
   onSetExamplePrompt,
 }: {
   isLoggedIn: boolean
@@ -728,8 +537,6 @@ function HomeSections({
   loadingMine: boolean
   onRefreshMine: () => Promise<void>
   onOpenProcurement: (item: AIProcurementInfo, step?: number) => void
-  onRepeatProcurement: (item: AIProcurementInfo) => void
-  onCopyProcurementPrompt: (item: AIProcurementInfo) => Promise<void>
   onSetExamplePrompt: (value: string) => void
 }) {
   return (
@@ -744,31 +551,20 @@ function HomeSections({
             {mine.length > 0 ? (
               <Space direction="vertical" size="middle" className="w-full">
                 {mine.map((item) => (
-                  <div
+                  <button
                     key={item.id}
-                    className="w-full rounded border border-gray-100 bg-white p-4 transition hover:border-primary-300"
+                    type="button"
+                    className="w-full rounded border border-gray-100 bg-white p-4 text-left transition hover:border-primary-300 hover:bg-primary-50"
+                    onClick={() => onOpenProcurement(item)}
                   >
-                    <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
-                      <div className="min-w-0">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
                         <Text strong>{item.procurement_no}</Text>
-                        <div className="mt-1 break-words text-sm text-gray-500">{item.prompt}</div>
+                        <div className="mt-1 text-sm text-gray-500">{item.prompt}</div>
                       </div>
-                      <div className="flex flex-col gap-3 lg:items-end">
-                        <Tag color={item.status === 'review_submitted' ? 'green' : 'blue'}>{item.status}</Tag>
-                        <Space wrap>
-                          <Button icon={<ReloadOutlined />} onClick={() => onRepeatProcurement(item)}>
-                            再买一次
-                          </Button>
-                          <Button icon={<EyeOutlined />} onClick={() => onOpenProcurement(item)}>
-                            查看详情
-                          </Button>
-                          <Button icon={<CopyOutlined />} onClick={() => void onCopyProcurementPrompt(item)}>
-                            复制
-                          </Button>
-                        </Space>
-                      </div>
+                      <Tag color={item.status === 'review_submitted' ? 'green' : 'blue'}>{item.status}</Tag>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </Space>
             ) : (
@@ -807,13 +603,9 @@ function StepPage({
   instructionForm,
   orderForm,
   warehouses,
-  categoryOptions,
   onConfirmInstruction,
   onToggleProduct,
   onProductQuantityChange,
-  onSelectLogisticsOption,
-  onPublishLogisticsDemand,
-  onNegotiateLogistics,
   onConfirmProduct,
   onGenerateOrder,
   onMatchFinance,
@@ -828,13 +620,9 @@ function StepPage({
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
   warehouses: WarehouseServiceItem[]
-  categoryOptions: Array<{ label: string; value: string }>
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
-  onSelectLogisticsOption: (product: MatchedProduct, serviceID: number) => void
-  onPublishLogisticsDemand: (product: MatchedProduct) => Promise<void>
-  onNegotiateLogistics: (product: MatchedProduct) => void
   onConfirmProduct: () => Promise<void>
   onGenerateOrder: () => Promise<void>
   onMatchFinance: (required: boolean) => Promise<void>
@@ -871,13 +659,9 @@ function StepPage({
           instructionForm,
           orderForm,
           warehouses,
-          categoryOptions,
           onConfirmInstruction,
           onToggleProduct,
           onProductQuantityChange,
-          onSelectLogisticsOption,
-          onPublishLogisticsDemand,
-          onNegotiateLogistics,
           onConfirmProduct,
           onGenerateOrder,
           onMatchFinance,
@@ -898,19 +682,15 @@ function renderStepContent(props: {
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
   warehouses: WarehouseServiceItem[]
-  categoryOptions: Array<{ label: string; value: string }>
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
-  onSelectLogisticsOption: (product: MatchedProduct, serviceID: number) => void
-  onPublishLogisticsDemand: (product: MatchedProduct) => Promise<void>
-  onNegotiateLogistics: (product: MatchedProduct) => void
   onConfirmProduct: () => Promise<void>
   onGenerateOrder: () => Promise<void>
   onMatchFinance: (required: boolean) => Promise<void>
   onSubmitReview: () => void
 }) {
-  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm, warehouses, categoryOptions } = props
+  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm, warehouses } = props
 
   if (activeStep === 1) {
     return (
@@ -918,18 +698,7 @@ function renderStepContent(props: {
         <Form form={instructionForm} layout="vertical">
           <Row gutter={16}>
             <Col xs={24} md={12}><Form.Item name="product_name" label="采购物品" rules={[{ required: true }]}><Input /></Form.Item></Col>
-            <Col xs={24} md={12}>
-              <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择或输入品类' }]}>
-                <AutoComplete
-                  options={categoryOptions}
-                  placeholder="请选择品类，不存在时可直接输入"
-                  filterOption={(inputValue, option) =>
-                    String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
-                    String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
-                  }
-                />
-              </Form.Item>
-            </Col>
+            <Col xs={24} md={12}><Form.Item name="category" label="品类" rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="quantity" label="采购数量" rules={[{ required: true }]}><InputNumber className="w-full" min={0.01} /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="unit" label="单位" rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="financing_required" label="是否需要融资" valuePropName="checked"><Switch /></Form.Item></Col>
@@ -1055,69 +824,23 @@ function renderStepContent(props: {
             </div>
             <Space direction="vertical" size="small" className="w-full">
               {selectedProducts.map((item) => (
-                <div key={item.product_id} className="rounded border border-gray-100 bg-white p-4">
-                  <Descriptions bordered size="small" column={{ xs: 1, md: 4 }}>
-                    <Descriptions.Item label="商品">{item.product_name}</Descriptions.Item>
-                    <Descriptions.Item label="钢厂">{item.steel_mill || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="数量">{item.quantity} {result.parsed.unit}</Descriptions.Item>
-                    <Descriptions.Item label="到手金额">{formatMoney(productLandedTotal(item))}</Descriptions.Item>
-                    <Descriptions.Item label="发货仓库">{item.origin_warehouse_name || String(item.warehouse?.warehouse_name || '-')}</Descriptions.Item>
-                    <Descriptions.Item label="起运地址">{item.origin_address || String(item.warehouse?.address || '-')}</Descriptions.Item>
-                    <Descriptions.Item label="收货地址">{item.destination_address || result.parsed.delivery_address || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="当前方案">{item.logistics_service_name || (item.logistics_match_status === 'no_match' ? '暂无适合物流' : '-')}</Descriptions.Item>
-                  </Descriptions>
-
-                  {item.logistics_options && item.logistics_options.length > 0 ? (
-                    <Radio.Group
-                      className="mt-4 w-full"
-                      value={item.logistics_service_id}
-                      onChange={(event) => props.onSelectLogisticsOption(item, Number(event.target.value))}
-                    >
-                      <Space direction="vertical" size="small" className="w-full">
-                        {item.logistics_options.map((option) => (
-                          <Radio key={option.service_id} value={option.service_id} className="w-full rounded border border-gray-100 p-3">
-                            <div className="grid gap-3 md:grid-cols-[1fr_180px_160px] md:items-center">
-                              <div>
-                                <Text strong>{option.service_name}</Text>
-                                <div className="mt-1 text-sm text-gray-500">{option.route || '线路待确认'} · {option.vehicle_type || '车型待确认'} · {option.match_reason}</div>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {option.service_scope ? <Tag>{option.service_scope}</Tag> : null}
-                                  {option.load_capacity ? <Tag>载重 {option.load_capacity}{result.parsed.unit}</Tag> : null}
-                                  {option.price_rule ? <Tag>{option.price_rule}</Tag> : null}
-                                </div>
-                              </div>
-                              <div>
-                                <Text strong>{formatMoney(option.freight_estimate)}</Text>
-                                <div className="mt-1 text-sm text-gray-500">预估运费</div>
-                              </div>
-                              <div>
-                                <Text strong>{formatMoney(option.landed_total)}</Text>
-                                <div className="mt-1 text-sm text-gray-500">到手总额</div>
-                              </div>
-                            </div>
-                          </Radio>
-                        ))}
-                      </Space>
-                    </Radio.Group>
-                  ) : (
-                    <div className="mt-4 rounded border border-dashed border-gray-200 bg-gray-50 p-4">
-                      <Text>当前发货仓库到收货地点暂无适合物流方案。</Text>
-                      <Space wrap className="mt-3">
-                        <Button type="primary" loading={busy} onClick={() => void props.onPublishLogisticsDemand(item)}>发布物流需求</Button>
-                        <Button onClick={() => props.onNegotiateLogistics(item)}>选择协商解决</Button>
-                      </Space>
-                    </div>
-                  )}
-                </div>
+                <Descriptions key={item.product_id} bordered size="small" column={{ xs: 1, md: 4 }}>
+                  <Descriptions.Item label="商品">{item.product_name}</Descriptions.Item>
+                  <Descriptions.Item label="钢厂">{item.steel_mill || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="数量">{item.quantity} {result.parsed.unit}</Descriptions.Item>
+                  <Descriptions.Item label="到手金额">{formatMoney(productLandedTotal(item))}</Descriptions.Item>
+                  <Descriptions.Item label="发货仓库">{item.origin_warehouse_name || String(item.warehouse?.warehouse_name || '-')}</Descriptions.Item>
+                  <Descriptions.Item label="起运地址">{item.origin_address || String(item.warehouse?.address || '-')}</Descriptions.Item>
+                  <Descriptions.Item label="收货地址">{item.destination_address || result.parsed.delivery_address || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="推荐物流">{item.logistics_service_name || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="运输线路">{item.logistics_route || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="预估运费">{formatMoney(item.freight_estimate)}</Descriptions.Item>
+                </Descriptions>
               ))}
             </Space>
-            {hasPendingLogisticsResolution(selectedProducts) ? (
-              <Button type="primary" icon={<ShoppingCartOutlined />} disabled>确认物流仓储方案，填写订单</Button>
-            ) : (
-              <Link to="/ai-procurement/4">
-                <Button type="primary" icon={<ShoppingCartOutlined />}>确认物流仓储方案，填写订单</Button>
-              </Link>
-            )}
+            <Link to="/ai-procurement/4">
+              <Button type="primary" icon={<ShoppingCartOutlined />}>确认物流仓储方案，填写订单</Button>
+            </Link>
           </Space>
         ) : (
           <Empty description="请先在商品匹配阶段选择商品" />
