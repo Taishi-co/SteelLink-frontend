@@ -24,6 +24,7 @@ export default function SellerLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [user, setUser] = useState(getSellerUser())
+  const [switchingBuyer, setSwitchingBuyer] = useState(false)
   const buyerBaseURL = import.meta.env.DEV ? 'http://localhost:5173' : ''
 
   useEffect(() => {
@@ -96,8 +97,21 @@ export default function SellerLayout() {
 
   const defaultPath = ready ? '/dashboard' : '/identity'
 
-  const switchToBuyerCenter = (path = '/') => {
-    window.location.href = `${buyerBaseURL}${path}`
+  const switchToBuyerCenter = async (path = '/') => {
+    setSwitchingBuyer(true)
+    try {
+      const response = await sellerAuthService.createSwitchSession()
+      if (response.code !== 0 || !response.data?.switch_token) {
+        throw new Error(response.message || '切换买家中心失败')
+      }
+      const params = new URLSearchParams({
+        switch_token: response.data.switch_token,
+        redirect: path,
+      })
+      window.location.href = `${buyerBaseURL}/login?${params.toString()}`
+    } catch {
+      window.location.href = `${buyerBaseURL}${path}`
+    }
   }
 
   if (location.pathname === '/') {
@@ -129,7 +143,7 @@ export default function SellerLayout() {
         <Header className="bg-white px-6 flex items-center justify-between shadow-sm h-16">
           <Text className="text-lg font-medium">卖家后台</Text>
           <Space size="middle">
-            <Button icon={<HomeOutlined />} onClick={() => switchToBuyerCenter('/')}>买家首页</Button>
+            <Button icon={<HomeOutlined />} loading={switchingBuyer} onClick={() => switchToBuyerCenter('/')}>买家首页</Button>
             <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
               <Space className="cursor-pointer">
                 <Avatar icon={<UserOutlined />} />
