@@ -50,6 +50,8 @@ const accountItems = [
 
 const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
 const financeWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5177/finance/' : '/finance/'
+const logisticsWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5175/logistics/' : '/logistics/'
+const warehouseWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5176/warehouse/' : '/warehouse/'
 
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
@@ -224,7 +226,7 @@ export default function DashboardLayout() {
               </a>
             )}
             {approvedServices.has('logistics') && (
-              <Link to="/dashboard/logistics">
+              <a href={logisticsWorkbenchHref}>
                 <div
                   className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
                   style={{ background: 'rgba(37,99,235,.14)', border: '1px solid rgba(37,99,235,.25)' }}
@@ -237,10 +239,10 @@ export default function DashboardLayout() {
                     </>
                   )}
                 </div>
-              </Link>
+              </a>
             )}
             {approvedServices.has('warehouse') && (
-              <Link to="/dashboard/warehouse">
+              <a href={warehouseWorkbenchHref}>
                 <div
                   className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
                   style={{ background: 'rgba(22,163,74,.14)', border: '1px solid rgba(22,163,74,.25)' }}
@@ -253,7 +255,7 @@ export default function DashboardLayout() {
                     </>
                   )}
                 </div>
-              </Link>
+              </a>
             )}
             <Link to="/mall">
               <div

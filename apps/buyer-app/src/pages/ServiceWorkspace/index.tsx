@@ -18,6 +18,9 @@ import { uploadService } from '@/services/uploadService'
 
 type ServiceKey = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
 
+const logisticsWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5175/logistics/' : '/logistics/'
+const warehouseWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5176/warehouse/' : '/warehouse/'
+
 const serviceConfig: Record<ServiceKey, {
   title: string
   description: string
@@ -51,7 +54,7 @@ const serviceConfig: Record<ServiceKey, {
     enterpriseRole: '物流方',
     icon: <TruckOutlined />,
     actions: [
-      { label: '进入物流管理中心', href: '/dashboard/logistics' },
+      { label: '进入物流管理中心', href: logisticsWorkbenchHref },
       { label: '物流资源管理', href: '/dashboard/logistics-resources' },
     ],
   },
@@ -61,7 +64,7 @@ const serviceConfig: Record<ServiceKey, {
     enterpriseRole: '仓储方',
     icon: <HomeOutlined />,
     actions: [
-      { label: '进入仓储管理中心', href: '/dashboard/warehouse' },
+      { label: '进入仓储管理中心', href: warehouseWorkbenchHref },
       { label: '仓储资源管理', href: '/dashboard/warehouse-resources' },
     ],
   },
