@@ -68,6 +68,20 @@ const movementStatusText: Record<string, string> = {
   completed: '已完成',
 }
 
+function formatContractStatus(contractInfo?: { buyer_signed: boolean; seller_signed: boolean }) {
+  if (!contractInfo) return '-'
+  if (contractInfo.buyer_signed && contractInfo.seller_signed) {
+    return '双方已签，已进入下一步'
+  }
+  if (contractInfo.buyer_signed) {
+    return '买家已签，卖家未签'
+  }
+  if (contractInfo.seller_signed) {
+    return '卖家已签，买家未签'
+  }
+  return '双方未签'
+}
+
 function getCurrentStep(status: number) {
   if (status === 0 || status === 1) return 0
   if (status === 12 || status === 23) return 1
@@ -100,10 +114,16 @@ function getStatusNotice(status: number, _hasPaymentVoucher: boolean, _hasDelive
     return { type: 'warning' as const, title: '当前状态：卖方确认已完成', message: '下一步：请确认订单最终版本。' }
   }
   if (status === 2) {
-    if (contractInfo?.buyer_signed) {
-      return { type: 'info' as const, title: '当前状态：买方签署已完成', message: '下一步：等待卖家签署后进入支付阶段。' }
+    if (contractInfo?.buyer_signed && contractInfo?.seller_signed) {
+      return { type: 'success' as const, title: '当前状态：双方签署已完成', message: '签署状态：买家已签，卖家已签。下一步：进入支付或融资阶段。' }
     }
-    return { type: 'warning' as const, title: '当前状态：待签合同', message: '下一步：请签署交易合同。' }
+    if (contractInfo?.buyer_signed) {
+      return { type: 'info' as const, title: '当前状态：买方签署已完成', message: '签署状态：买家已签，卖家未签。下一步：等待卖家签署后进入支付阶段。' }
+    }
+    if (contractInfo?.seller_signed) {
+      return { type: 'warning' as const, title: '当前状态：卖方签署已完成', message: '签署状态：卖家已签，买家未签。下一步：请签署交易合同；双方签署后进入支付阶段。' }
+    }
+    return { type: 'warning' as const, title: '当前状态：待签合同', message: '签署状态：买家未签，卖家未签。下一步：请签署交易合同；双方签署后进入支付阶段。' }
   }
   if (status === 3) {
     return { type: 'warning' as const, title: '当前状态：待支付/融资', message: '下一步：请上传支付与货权监管凭证，或申请托盘融资。' }
@@ -495,7 +515,7 @@ export default function OrderDetailPage() {
               <Card title="合同信息" className="mt-6">
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="合同编号">{order.contract_info.contract_no || '-'}</Descriptions.Item>
-                  <Descriptions.Item label="签署状态">{order.contract_info.sign_status || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="签署状态">{formatContractStatus(order.contract_info)}</Descriptions.Item>
                   <Descriptions.Item label="买家签署">{order.contract_info.buyer_signed ? '已签署' : '未签署'}</Descriptions.Item>
                   <Descriptions.Item label="卖家签署">{order.contract_info.seller_signed ? '已签署' : '未签署'}</Descriptions.Item>
                   <Descriptions.Item label="签署时间">

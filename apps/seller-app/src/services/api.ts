@@ -17,6 +17,7 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    config.headers['X-Trade-Role'] = 'seller'
     return config
   },
   (error) => Promise.reject(error),

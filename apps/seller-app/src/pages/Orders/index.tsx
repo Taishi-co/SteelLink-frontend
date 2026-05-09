@@ -77,6 +77,20 @@ function formatDate(value?: string) {
   return value.replace('T', ' ').slice(0, 19)
 }
 
+function formatContractStatus(contractInfo?: { buyer_signed: boolean; seller_signed: boolean }) {
+  if (!contractInfo) return '-'
+  if (contractInfo.buyer_signed && contractInfo.seller_signed) {
+    return '双方已签，已进入下一步'
+  }
+  if (contractInfo.buyer_signed) {
+    return '买家已签，卖家未签'
+  }
+  if (contractInfo.seller_signed) {
+    return '卖家已签，买家未签'
+  }
+  return '双方未签'
+}
+
 function getPrimaryProduct(order: SellerOrderInfo) {
   return order.items[0]
 }
@@ -84,7 +98,18 @@ function getPrimaryProduct(order: SellerOrderInfo) {
 function getSellerGuidance(order?: SellerOrderInfo | null) {
   if (!order) return { type: 'info' as const, title: '当前状态：订单详情', next: '请查看订单信息。' }
   if (order.status === 13) return { type: 'warning' as const, title: '当前状态：待卖方确认', next: '核对条款后确认订单，随后等待买方确认。' }
-  if (order.status === 2) return { type: 'info' as const, title: order.contract_info?.seller_signed ? '当前状态：卖方签署已完成' : '当前状态：待签合同', next: order.contract_info?.seller_signed ? '等待买方签署后进入支付节点。' : '请签署合同；双方签署后进入支付节点。' }
+  if (order.status === 2) {
+    if (order.contract_info?.buyer_signed && order.contract_info?.seller_signed) {
+      return { type: 'success' as const, title: '当前状态：双方签署已完成', next: '签署状态：买家已签，卖家已签。已进入支付节点。' }
+    }
+    if (order.contract_info?.seller_signed) {
+      return { type: 'info' as const, title: '当前状态：卖方签署已完成', next: '签署状态：卖家已签，买家未签。等待买方签署后进入支付节点。' }
+    }
+    if (order.contract_info?.buyer_signed) {
+      return { type: 'warning' as const, title: '当前状态：买方签署已完成', next: '签署状态：买家已签，卖家未签。请先查看详情并完成签署。' }
+    }
+    return { type: 'warning' as const, title: '当前状态：待签合同', next: '签署状态：买家未签，卖家未签。请签署合同；双方签署后进入支付节点。' }
+  }
   if (order.status === 4) return { type: 'warning' as const, title: '当前状态：买方支付已完成', next: '请确认收款；之后发起物流竞价。' }
   if (order.status === 15) return { type: 'info' as const, title: '当前状态：物流竞价已发起', next: '等待物流方报价，也可在无运力时反馈平台。' }
   if (order.status === 16) return { type: 'warning' as const, title: '当前状态：物流报价已完成', next: '如合同约定卖方承担运费，请确认物流报价。' }
@@ -222,14 +247,14 @@ export default function OrdersPage() {
     setActionLoading(true)
     try {
       const detail = await sellerOrderService.signContract(order.id)
-      if (detail.contract_info?.buyer_signed && detail.contract_info?.seller_signed) {
-        showCompleted('合同签署已完成', '双方已签署，等待买方支付或申请托盘垫资。', detail)
-      } else {
-        showCompleted('合同签署已完成', '等待买方签署；双方签署后进入支付节点。', detail)
-      }
       setSelectedOrder(detail)
       setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
       setIsModalOpen(true)
+      if (detail.contract_info?.buyer_signed && detail.contract_info?.seller_signed) {
+        message.success('合同已完成双方签署，进入支付节点')
+      } else {
+        message.success('卖方签署已完成，等待买方签署')
+      }
     } catch (error: unknown) {
       message.error(getErrorMessage(error, '签署合同失败'))
     } finally {
@@ -380,7 +405,7 @@ export default function OrdersPage() {
             }}>确认条款</Button>
           )}
           {record.status === 2 && !record.contract_info?.seller_signed && (
-            <Button type="link" size="small" onClick={() => void handleSignContract(record)}>
+            <Button type="link" size="small" onClick={() => void openOrderDetail(record)}>
               签署合同
             </Button>
           )}
@@ -572,7 +597,7 @@ export default function OrdersPage() {
 
             <Descriptions bordered column={2} size="middle" style={{ marginTop: 16 }}>
               <Descriptions.Item label="合同编号">{selectedOrder.contract_info?.contract_no || '-'}</Descriptions.Item>
-              <Descriptions.Item label="合同状态">{selectedOrder.contract_info?.sign_status || '-'}</Descriptions.Item>
+              <Descriptions.Item label="合同状态">{formatContractStatus(selectedOrder.contract_info)}</Descriptions.Item>
               <Descriptions.Item label="买家签署">{selectedOrder.contract_info?.buyer_signed ? '已签署' : '未签署'}</Descriptions.Item>
               <Descriptions.Item label="卖家签署">{selectedOrder.contract_info?.seller_signed ? '已签署' : '未签署'}</Descriptions.Item>
               <Descriptions.Item label="合同文件" span={2}>
