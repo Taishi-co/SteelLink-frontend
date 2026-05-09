@@ -25,12 +25,20 @@ export interface OrderInfo {
   items: OrderItem[]
   total_quantity: number
   total_amount: number
+  tax_total_amount?: number
+  currency?: string
   status: number
   created_at: string
+  remark?: Record<string, unknown>
   delivery_info?: {
     warehouse_id: number
+    warehouse_service_id?: number
+    warehouse_enterprise_id?: number
     warehouse_name: string
     warehouse_code?: string
+    warehouse_province?: string
+    warehouse_city?: string
+    warehouse_district?: string
     warehouse_address?: string
     address: string
   }
@@ -40,6 +48,7 @@ export interface OrderEventInfo {
   id: number
   event_type: string
   actor_user_id: number
+  actor_enterprise_id?: number
   actor_service: string
   from_status: number
   to_status: number
