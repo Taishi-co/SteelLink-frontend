@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Col, Form, Input, InputNumber, Layout, List, Modal, Row, Select, Space, Spin, Table, Tag, Typography, message } from 'antd'
+import { Badge, Button, Card, Col, Form, Input, InputNumber, Layout, List, Modal, Row, Select, Space, Spin, Steps, Table, Tag, Typography, Upload, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import type { UploadFile } from 'antd/es/upload'
 import {
   CarOutlined,
   DatabaseOutlined,
@@ -15,11 +16,14 @@ import {
   AppstoreOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  UploadOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
 import { logisticsOrderService, logisticsFulfillmentService } from '@/services/orderService'
-import type { OrderInfo, LogisticsOrder } from '@/services/orderService'
+import type { OrderInfo, LogisticsOrder, ShipmentTaskInfo } from '@/services/orderService'
 import { logisticsResourceService } from '@/services/logisticsResourceService'
 import type { LogisticsResource, LogisticsResourcePayload } from '@/services/logisticsResourceService'
+import { uploadService } from '@/services/uploadService'
 import { hasLogisticsCapability } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
@@ -70,6 +74,16 @@ function App() {
   const [quotePrice, setQuotePrice] = useState<number>(0)
   const [quoteDays, setQuoteDays] = useState<number>(3)
   const [quoteRemark, setQuoteRemark] = useState('')
+  
+  // 履约相关状态
+  const [fulfillmentModal, setFulfillmentModal] = useState<{
+    visible: boolean
+    orderId: number | null
+    action: 'pickup' | 'deliver' | 'signature' | null
+  }>({ visible: false, orderId: null, action: null })
+  const [fulfillmentLoading, setFulfillmentLoading] = useState(false)
+  const [fulfillmentFileList, setFulfillmentFileList] = useState<UploadFile[]>([])
+  const [fulfillmentRemark, setFulfillmentRemark] = useState('')
 
   const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
     Modal.success({
@@ -249,14 +263,66 @@ function App() {
     }
   }
 
-  const handleShipmentProgress = async (orderId: number, action: string) => {
+  const handleConfirmLogisticsQuote = async (orderId: number, quoteId: number) => {
     try {
-      await logisticsOrderService.shipmentProgress(orderId, action)
-      showCompleted('运输状态更新已完成', action === 'delivered' ? '等待买方确认收货。' : '继续推进运输履约。', 'all')
+      await logisticsOrderService.confirmLogisticsQuote(orderId, quoteId)
+      showCompleted('物流报价已确认', '请按约定时间到指定仓库提货。', 'all')
+      fetchAll()
+    } catch {
+      message.error('确认物流报价失败')
+    }
+  }
+
+  // 履约相关函数
+  const openFulfillmentModal = (orderId: number, action: 'pickup' | 'deliver' | 'signature') => {
+    setFulfillmentModal({ visible: true, orderId, action })
+    setFulfillmentFileList([])
+    setFulfillmentRemark('')
+  }
+
+  const handleFulfillmentSubmit = async () => {
+    if (fulfillmentModal.orderId === null || !fulfillmentModal.action) {
+      return
+    }
+    if (fulfillmentFileList.length === 0) {
+      message.warning('请上传凭证文件')
+      return
+    }
+    setFulfillmentLoading(true)
+    try {
+      const file = fulfillmentFileList[0].originFileObj || fulfillmentFileList[0] as unknown as File
+      const purpose = fulfillmentModal.action === 'pickup' ? 'shipment_pickup' : fulfillmentModal.action === 'deliver' ? 'shipment_delivery' : 'shipment_signature'
+      const uploadResult = await uploadService.upload(file as File, purpose)
+      await logisticsOrderService.shipmentProgress(fulfillmentModal.orderId, fulfillmentModal.action, {
+        voucher_url: uploadResult.url,
+        remark: fulfillmentRemark,
+      })
+      const nextStep = fulfillmentModal.action === 'pickup' 
+        ? '继续运输并在送达时更新状态。' 
+        : fulfillmentModal.action === 'deliver' 
+        ? '等待买方确认收货。' 
+        : '履约完成！'
+      showCompleted('运输状态更新已完成', nextStep, 'all')
+      setFulfillmentModal({ visible: false, orderId: null, action: null })
       fetchAll()
     } catch {
       message.error('操作失败')
+    } finally {
+      setFulfillmentLoading(false)
     }
+  }
+
+  const getShipmentStepInfo = (shipmentTask?: ShipmentTaskInfo) => {
+    if (!shipmentTask) {
+      return { currentStep: 0, steps: ['等待确认报价', '等待确认报价', '等待确认报价', '等待确认报价'] }
+    }
+    const steps = ['待提货', '已提货', '已送达', '已签收']
+    let currentStep = 0
+    if (shipmentTask.status === 'pending_pickup') currentStep = 0
+    if (shipmentTask.status === 'picked_up') currentStep = 1
+    if (shipmentTask.status === 'delivered') currentStep = 2
+    if (shipmentTask.status === 'signed') currentStep = 3
+    return { currentStep, steps }
   }
 
   const biddingColumns: ColumnsType<OrderInfo> = [
@@ -361,7 +427,7 @@ function App() {
       render: (v: number) => `¥${v?.toLocaleString()}`,
     },
     {
-      title: '状态',
+      title: '订单状态',
       dataIndex: 'status',
       key: 'status',
       width: 120,
@@ -371,19 +437,57 @@ function App() {
       },
     },
     {
-      title: '运输操作',
-      key: 'shipment',
-      width: 160,
+      title: '履约进度',
+      key: 'shipment_progress',
+      width: 200,
       render: (_: unknown, record: OrderInfo) => {
-        if (record.status === 17) {
+        if (!record.shipment_task) {
+          return <span className="text-gray-400">--</span>
+        }
+        const { currentStep, steps } = getShipmentStepInfo(record.shipment_task)
+        return (
+          <Steps current={currentStep} size="small" direction="vertical">
+            {steps.map((step, index) => (
+              <Steps.Step key={index} title={step} />
+            ))}
+          </Steps>
+        )
+      },
+    },
+    {
+      title: '物流操作',
+      key: 'logistics_action',
+      width: 150,
+      render: (_: unknown, record: OrderInfo) => {
+        if (record.status === 16 && record.logistics_bidding?.selected_quote_id) {
           return (
-            <Space>
-              <Button size="small" onClick={() => handleShipmentProgress(record.id, 'pickup')}>已提货</Button>
-              <Button size="small" onClick={() => handleShipmentProgress(record.id, 'in-transit')}>运输中</Button>
-              <Button size="small" type="primary" onClick={() => handleShipmentProgress(record.id, 'delivered')}>已送达</Button>
-            </Space>
+            <Button type="primary" size="small" onClick={() => handleConfirmLogisticsQuote(record.id, record.logistics_bidding!.selected_quote_id!)}>
+              确认报价
+            </Button>
           )
         }
+        {(record.status === 6 || record.status === 17 || record.status === 7) && record.shipment_task && (
+          <Space direction="vertical" size="small">
+            {record.shipment_task.status === 'pending_pickup' && (
+              <Button type="primary" size="small" icon={<CarOutlined />} onClick={() => openFulfillmentModal(record.id, 'pickup')}>
+                确认提货
+              </Button>
+            )}
+            {record.shipment_task.status === 'picked_up' && (
+              <Button type="primary" size="small" icon={<FileTextOutlined />} onClick={() => openFulfillmentModal(record.id, 'deliver')}>
+                确认送达
+              </Button>
+            )}
+            {record.shipment_task.status === 'delivered' && (
+              <Button type="primary" size="small" icon={<CheckCircleOutlined />} onClick={() => openFulfillmentModal(record.id, 'signature')}>
+                上传签收
+              </Button>
+            )}
+            {record.shipment_task.status === 'signed' && (
+              <Tag color="success">履约完成</Tag>
+            )}
+          </Space>
+        )}
         return null
       },
     },
@@ -705,6 +809,46 @@ function App() {
                   value={quoteRemark}
                   onChange={(e) => setQuoteRemark(e.target.value)}
                   placeholder="备注信息"
+                />
+              </div>
+            </Space>
+          </Modal>
+
+          {/* 履约模态框 */}
+          <Modal
+            title={
+              fulfillmentModal.action === 'pickup' 
+                ? '确认提货' 
+                : fulfillmentModal.action === 'deliver' 
+                ? '确认送达' 
+                : '上传签收凭证'
+            }
+            open={fulfillmentModal.visible}
+            onOk={handleFulfillmentSubmit}
+            onCancel={() => setFulfillmentModal({ visible: false, orderId: null, action: null })}
+            okText="确认"
+            okButtonProps={{ loading: fulfillmentLoading }}
+            width={500}
+            destroyOnClose
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <div>
+                <Text strong>请上传凭证文件：</Text>
+                <Upload
+                  fileList={fulfillmentFileList}
+                  onChange={(info) => setFulfillmentFileList(info.fileList)}
+                  beforeUpload={() => false}
+                  maxCount={1}
+                >
+                  <Button icon={<UploadOutlined />}>选择文件</Button>
+                </Upload>
+              </div>
+              <div>
+                <Text>备注（选填）：</Text>
+                <Input
+                  value={fulfillmentRemark}
+                  onChange={(e) => setFulfillmentRemark(e.target.value)}
+                  placeholder="添加备注信息"
                 />
               </div>
             </Space>

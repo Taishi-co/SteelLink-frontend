@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Space, Spin, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
-import { ArrowLeftOutlined, CarOutlined, CheckCircleOutlined, EnvironmentOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Radio, Space, Spin, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
+import { ArrowLeftOutlined, CarOutlined, CheckCircleOutlined, ClockCircleOutlined, EnvironmentOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { getErrorMessage, hasFormErrorFields, timelineColor } from '@steellink/shared/utils'
-import { orderService } from '@/services/orderService'
+import { orderService, type LogisticsQuoteInfo } from '@/services/orderService'
 import { productService } from '@/services/productService'
 import { uploadService } from '@/services/uploadService'
 import { serviceFulfillmentService } from '@/services/serviceFulfillmentService'
@@ -38,6 +38,13 @@ const statusMap: Record<number, { label: string; color: string }> = {
   22: { label: '待签署融资合同', color: 'gold' },
   23: { label: '待重新选仓', color: 'volcano' },
   24: { label: '待重新发起物流', color: 'volcano' },
+}
+
+const shipmentStatusText: Record<string, string> = {
+  pending_pickup: '待提货',
+  picked_up: '已提货',
+  delivered: '已送达',
+  signed: '已签收',
 }
 
 const orderSteps = [
@@ -146,8 +153,11 @@ function getStatusNotice(status: number, _hasPaymentVoucher: boolean, _hasDelive
   if (status === 24) {
     return { type: 'warning' as const, title: '当前状态：待重新发起物流', message: '下一步：等待卖方重新发起物流，平台管理端已收到异常反馈。' }
   }
-  if (status === 5 || status === 17) {
+  if (status === 5) {
     return { type: 'info' as const, title: '当前状态：物流确认已完成', message: '下一步：等待物流方运输履约。' }
+  }
+  if (status === 17) {
+    return { type: 'info' as const, title: '当前状态：发货任务执行中', message: '下一步：等待发货任务完成，收到货物后确认签收。' }
   }
   if (status === 6 || status === 7) {
     return { type: 'info' as const, title: '当前状态：运输履约中', message: '下一步：收到货物后确认签收。' }
@@ -209,6 +219,11 @@ export default function OrderDetailPage() {
   const [signing, setSigning] = useState(false)
   const [warehouseOpen, setWarehouseOpen] = useState(false)
   const [savingWarehouse, setSavingWarehouse] = useState(false)
+  const [logisticsQuotes, setLogisticsQuotes] = useState<LogisticsQuoteInfo[]>([])
+  const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null)
+  const [logisticsModalOpen, setLogisticsModalOpen] = useState(false)
+  const [logisticsLoading, setLogisticsLoading] = useState(false)
+  const [confirmingLogistics, setConfirmingLogistics] = useState(false)
   const [form] = Form.useForm()
   const [deliveryForm] = Form.useForm()
   const [receiptForm] = Form.useForm()
@@ -336,18 +351,6 @@ export default function OrderDetailPage() {
     } finally {
       setSavingDelivery(false)
     }
-  }
-
-  const openDeliveryModal = () => {
-    deliveryForm.setFieldsValue({
-      driver_name: order?.delivery_info?.driver_name,
-      driver_phone: order?.delivery_info?.driver_phone,
-      driver_id_card: order?.delivery_info?.driver_id_card,
-      plate_number: order?.delivery_info?.plate_number,
-      address: order?.delivery_info?.address,
-      estimated_time: order?.delivery_info?.estimated_time,
-    })
-    setDeliveryOpen(true)
   }
 
   const handleConfirmReceipt = async () => {
@@ -610,18 +613,31 @@ export default function OrderDetailPage() {
                   </Descriptions.Item>
                   <Descriptions.Item label="保障方式">{activeGuarantee?.guarantee_type || logisticsOrder?.guarantee_type || '待创建履约保障'}</Descriptions.Item>
                   <Descriptions.Item label="出入库状态">{latestMovement ? movementStatusText[latestMovement.status] || latestMovement.status : '暂无出入库记录'}</Descriptions.Item>
-                  <Descriptions.Item label="物流状态">{logisticsOrder ? logisticsStatusText[logisticsOrder.status] || logisticsOrder.status : '暂无物流订单'}</Descriptions.Item>
+                  <Descriptions.Item label="物流状态">{logisticsOrder ? logisticsStatusText[logisticsOrder.status] || logisticsOrder.status : order.shipment_task ? shipmentStatusText[order.shipment_task.status] || order.shipment_task.status : '暂无物流订单'}</Descriptions.Item>
                 </Descriptions>
-                <Steps
-                  current={logisticsOrder?.status === 'completed' ? 4 : logisticsOrder?.status === 'in_transit' ? 3 : logisticsOrder?.status === 'accepted' ? 2 : latestMovement?.status === 'completed' ? 1 : 0}
-                  items={[
-                    { title: '仓库锁货', description: '订单创建后锁定捆包库存', icon: <SafetyCertificateOutlined /> },
-                    { title: '出库作业', description: latestMovement ? movementStatusText[latestMovement.status] || latestMovement.status : pickupWarehouseName || '等待提货点', icon: <CarOutlined /> },
-                    { title: '物流接单', description: logisticsOrder?.plate_number || order.delivery_info?.plate_number || '待物流商接单', icon: <EnvironmentOutlined /> },
-                    { title: '在途跟踪', description: logisticsOrder?.tracking_events?.[0]?.description || (logisticsOrder ? logisticsStatusText[logisticsOrder.status] : '待发车'), icon: <CarOutlined /> },
-                    { title: '签收归档', description: order.receipt_voucher ? '回单已上传' : '待买家确认', icon: <CheckCircleOutlined /> },
-                  ]}
-                />
+                {order.shipment_task && (
+                  <Steps
+                    current={order.shipment_task.status === 'signed' ? 3 : order.shipment_task.status === 'delivered' ? 2 : order.shipment_task.status === 'picked_up' ? 1 : 0}
+                    items={[
+                      { title: '待提货', description: order.shipment_task.status === 'pending_pickup' ? '等待物流方提货' : '已安排提货', icon: <ClockCircleOutlined /> },
+                      { title: '已提货', description: order.shipment_task.picked_up_at ? new Date(order.shipment_task.picked_up_at).toLocaleString() : order.delivery_info?.plate_number || '运输中', icon: <CarOutlined /> },
+                      { title: '已送达', description: order.shipment_task.delivered_at ? new Date(order.shipment_task.delivered_at).toLocaleString() : '待送达', icon: <EnvironmentOutlined /> },
+                      { title: '已签收', description: order.shipment_task.signed_at ? new Date(order.shipment_task.signed_at).toLocaleString() : '待签收', icon: <CheckCircleOutlined /> },
+                    ]}
+                  />
+                )}
+                {!order.shipment_task && (
+                  <Steps
+                    current={logisticsOrder?.status === 'completed' ? 4 : logisticsOrder?.status === 'in_transit' ? 3 : logisticsOrder?.status === 'accepted' ? 2 : latestMovement?.status === 'completed' ? 1 : 0}
+                    items={[
+                      { title: '仓库锁货', description: '订单创建后锁定捆包库存', icon: <SafetyCertificateOutlined /> },
+                      { title: '出库作业', description: latestMovement ? movementStatusText[latestMovement.status] || latestMovement.status : pickupWarehouseName || '等待提货点', icon: <CarOutlined /> },
+                      { title: '物流接单', description: logisticsOrder?.plate_number || order.delivery_info?.plate_number || '待物流商接单', icon: <EnvironmentOutlined /> },
+                      { title: '在途跟踪', description: logisticsOrder?.tracking_events?.[0]?.description || (logisticsOrder ? logisticsStatusText[logisticsOrder.status] : '待发车'), icon: <CarOutlined /> },
+                      { title: '签收归档', description: order.receipt_voucher ? '回单已上传' : '待买家确认', icon: <CheckCircleOutlined /> },
+                    ]}
+                  />
+                )}
                 {logisticsOrder?.tracking_events?.length ? (
                   <Timeline
                     items={logisticsOrder.tracking_events.map((event) => ({
@@ -701,9 +717,23 @@ export default function OrderDetailPage() {
                     签署融资合同并支付手续费
                   </Button>
                 )}
-                {order.status === 16 && (
-                  <Button type="primary" onClick={() => message.info('请选择并确认物流报价')}>
-                    确认物流资源
+                {(order.status === 15 || order.status === 16) && (
+                  <Button type={order.status === 16 ? 'primary' : 'default'} onClick={() => {
+                    setLogisticsModalOpen(true)
+                    setSelectedQuoteId(null)
+                    setLogisticsLoading(true)
+                    orderService.listLogisticsQuotes(Number(id))
+                      .then((quotes) => {
+                        setLogisticsQuotes(quotes)
+                      })
+                      .catch((error: unknown) => {
+                        message.error(getErrorMessage(error, '获取报价列表失败'))
+                      })
+                      .finally(() => {
+                        setLogisticsLoading(false)
+                      })
+                  }}>
+                    {order.status === 15 ? '查看物流报价' : '确认物流资源'}
                   </Button>
                 )}
                 {canCancelOrder && (
@@ -711,11 +741,7 @@ export default function OrderDetailPage() {
                     取消订单
                   </Button>
                 )}
-                {order.status === 5 && (
-                  <Button type="primary" icon={<CarOutlined />} onClick={openDeliveryModal}>
-                    {order.delivery_info?.pickup_code ? '修改提货信息' : '录入提货信息'}
-                  </Button>
-                )}
+                
                 {(order.status === 6 || order.status === 7 || order.status === 17) && (
                   <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setReceiptOpen(true)}>
                     确认收货
@@ -860,6 +886,96 @@ export default function OrderDetailPage() {
                   </Upload>
                 </Form.Item>
               </Form>
+            </Modal>
+
+            <Modal
+              title={order?.status === 15 ? '查看物流报价' : '确认物流资源'}
+              open={logisticsModalOpen}
+              onCancel={() => { setLogisticsModalOpen(false); setLogisticsQuotes([]); setSelectedQuoteId(null) }}
+              onOk={order?.status === 16 ? () => {
+                if (!selectedQuoteId) {
+                  message.warning('请先选择一个物流报价')
+                  return
+                }
+                setConfirmingLogistics(true)
+                orderService.confirmLogisticsQuote(Number(id), { quote_id: selectedQuoteId })
+                  .then(() => {
+                    message.success('物流资源确认成功，进入待提货阶段')
+                    setLogisticsModalOpen(false)
+                    setLogisticsQuotes([])
+                    setSelectedQuoteId(null)
+                    void queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+                  })
+                  .catch((error: unknown) => {
+                    message.error(getErrorMessage(error, '确认物流失败'))
+                  })
+                  .finally(() => {
+                    setConfirmingLogistics(false)
+                  })
+              } : undefined}
+              okText={order?.status === 16 ? '确认选择' : undefined}
+              okButtonProps={order?.status === 16 ? { loading: confirmingLogistics, disabled: !selectedQuoteId } : { style: { display: 'none' } }}
+              cancelText={order?.status === 16 ? '取消' : '关闭'}
+              width={720}
+              destroyOnHidden
+            >
+              {order && (
+                <div>
+                  <Alert
+                    type="info"
+                    showIcon
+                    message={order.status === 15 ? '物流报价进行中，以下是已有的报价。卖家结束报价后会选择物流，然后需要你确认。' : '请确认卖家选定的物流报价'}
+                    style={{ marginBottom: 16 }}
+                  />
+                  <Descriptions bordered column={2} size="small" style={{ marginBottom: 16 }}>
+                    <Descriptions.Item label="订单号">{order.order_no}</Descriptions.Item>
+                    <Descriptions.Item label="卖家企业">{order.seller_name}</Descriptions.Item>
+                    <Descriptions.Item label="商品">{item?.product_name || '-'}</Descriptions.Item>
+                    <Descriptions.Item label="数量">{order.total_quantity} 吨</Descriptions.Item>
+                  </Descriptions>
+                  <Spin spinning={logisticsLoading}>
+                    {logisticsQuotes.length === 0 ? (
+                      <div className="text-center py-8">
+                        <ClockCircleOutlined className="text-4xl text-gray-300 mb-4" />
+                        <div className="text-gray-500">暂无物流报价</div>
+                      </div>
+                    ) : (
+                      <Radio.Group value={selectedQuoteId} onChange={(e) => order.status === 16 && setSelectedQuoteId(e.target.value)}>
+                        <Space direction="vertical" className="w-full">
+                          {logisticsQuotes.map((quote) => (
+                            <Radio key={quote.id} value={quote.id} className="w-full" disabled={order.status === 15}>
+                              <Card className="w-full" hoverable={order.status === 16}>
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <div className="font-medium text-gray-900">{quote.logistics_name}</div>
+                                    <div className="text-sm text-gray-500 mt-1">
+                                      <span>车辆信息：{quote.vehicle_info || '未填写'}</span>
+                                      <span className="mx-2">|</span>
+                                      <span>司机信息：{quote.driver_info || '未填写'}</span>
+                                    </div>
+                                    <div className="text-sm text-gray-500 mt-1">
+                                      <span>预计提货：{quote.estimated_pickup_at || '未填写'}</span>
+                                      <span className="mx-2">|</span>
+                                      <span>预计送达：{quote.estimated_delivery_at || '未填写'}</span>
+                                    </div>
+                                    {quote.remark && (
+                                      <div className="text-sm text-gray-500 mt-1">备注：{quote.remark}</div>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-xl font-bold text-blue-600">¥{quote.amount.toLocaleString()}</div>
+                                    <div className="text-xs text-gray-500 mt-1">报价时间：{new Date(quote.created_at).toLocaleString()}</div>
+                                  </div>
+                                </div>
+                              </Card>
+                            </Radio>
+                          ))}
+                        </Space>
+                      </Radio.Group>
+                    )}
+                  </Spin>
+                </div>
+              )}
             </Modal>
           </>
         )}

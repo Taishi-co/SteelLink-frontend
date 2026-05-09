@@ -15,6 +15,23 @@ export interface OrderItem {
   total_amount: number
 }
 
+export interface ShipmentTaskInfo {
+  id: number
+  order_id: number
+  order_no: string
+  logistics_enterprise_id: number
+  logistics_quote_id: number
+  status: 'pending_pickup' | 'picked_up' | 'delivered' | 'signed'
+  pickup_voucher?: string
+  delivery_voucher?: string
+  signature_voucher?: string
+  picked_up_at?: string
+  delivered_at?: string
+  signed_at?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface OrderInfo {
   id: number
   order_no: string
@@ -37,7 +54,9 @@ export interface OrderInfo {
     destination_address?: string
     requirement?: string
     quotes?: LogisticsQuote[]
+    selected_quote_id?: number
   }
+  shipment_task?: ShipmentTaskInfo
 }
 
 export interface LogisticsQuote {
@@ -97,6 +116,11 @@ export const logisticsOrderService = {
 
   async shipmentProgress(orderId: number, action: string, payload?: Record<string, unknown>) {
     const response = await api.post<unknown, ApiResponse<OrderInfo>>(`/orders/${orderId}/shipments/${action}`, payload || {})
+    return response.data
+  },
+
+  async confirmLogisticsQuote(orderId: number, quoteId: number) {
+    const response = await api.post<unknown, ApiResponse<OrderInfo>>(`/orders/${orderId}/logistics-confirm`, { quote_id: quoteId })
     return response.data
   },
 }
