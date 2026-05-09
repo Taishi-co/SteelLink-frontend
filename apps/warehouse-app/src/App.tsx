@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Col, Form, InputNumber, Layout, List, Modal, Row, Select, Space, Spin, Switch, Table, Tag, Typography, Input, message } from 'antd'
+import { Badge, Button, Card, Col, Descriptions, Form, InputNumber, Layout, List, Modal, Row, Select, Space, Spin, Switch, Table, Tag, Typography, Input, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   CheckCircleOutlined,
@@ -18,7 +18,7 @@ import {
   DashboardOutlined,
 } from '@ant-design/icons'
 import { warehouseOrderService, warehouseMovementService } from '@/services/orderService'
-import type { OrderInfo, WarehouseMovement } from '@/services/orderService'
+import type { OrderEventInfo, OrderInfo, WarehouseMovement } from '@/services/orderService'
 import { warehouseResourceService } from '@/services/warehouseResourceService'
 import type { WarehouseResource, WarehouseResourcePayload } from '@/services/warehouseResourceService'
 import { hasWarehouseCapability } from '@/services/auth'
@@ -74,6 +74,17 @@ function App() {
   const [confirmModal, setConfirmModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [confirmRemark, setConfirmRemark] = useState('')
   const [confirmOk, setConfirmOk] = useState(true)
+  const [detailModalVisible, setDetailModalVisible] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState<OrderInfo | null>(null)
+  const [orderEvents, setOrderEvents] = useState<OrderEventInfo[]>([])
+
+  const formatDateTime = (value?: string) => value ? value.slice(0, 19).replace('T', ' ') : '--'
+  const formatMoney = (value?: number) => `¥${(value || 0).toLocaleString()}`
+  const statusTag = (status?: number) => {
+    const meta = statusMap[status || 0] || { label: `状态${status}`, color: 'default' }
+    return <Tag color={meta.color}>{meta.label}</Tag>
+  }
 
   const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
     Modal.success({
@@ -243,6 +254,25 @@ function App() {
     }
   }
 
+  const openOrderDetail = async (record: OrderInfo) => {
+    setDetailModalVisible(true)
+    setSelectedOrder(record)
+    setOrderEvents([])
+    setDetailLoading(true)
+    try {
+      const [detail, events] = await Promise.all([
+        warehouseOrderService.getById(record.id),
+        warehouseOrderService.listEvents(record.id),
+      ])
+      setSelectedOrder(detail)
+      setOrderEvents(events || [])
+    } catch {
+      message.error('获取订单详情失败')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
   const orderColumns: ColumnsType<OrderInfo> = [
     { title: '订单号', dataIndex: 'order_no', key: 'order_no', width: 160 },
     { title: '买方', dataIndex: 'buyer_name', key: 'buyer_name', width: 120 },
@@ -260,19 +290,21 @@ function App() {
       key: 'status',
       width: 120,
       render: (s: number) => {
-        const meta = statusMap[s] || { label: `状态${s}`, color: 'default' }
-        return <Tag color={meta.color}>{meta.label}</Tag>
+        return statusTag(s)
       },
     },
-    { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 160, render: (v: string) => v?.slice(0, 19).replace('T', ' ') },
+    { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 160, render: (v: string) => formatDateTime(v) },
     {
       title: '操作',
       key: 'action',
-      width: 160,
+      width: 220,
       render: (_: unknown, record: OrderInfo) => {
         if (record.status === 12) {
           return (
             <Space>
+              <Button size="small" onClick={() => openOrderDetail(record)}>
+                查看
+              </Button>
               <Button
                 type="primary"
                 size="small"
@@ -292,7 +324,7 @@ function App() {
             </Space>
           )
         }
-        return <Tag>查看</Tag>
+        return <Button size="small" onClick={() => openOrderDetail(record)}>查看</Button>
       },
     },
   ]
@@ -662,6 +694,90 @@ function App() {
               value={confirmRemark}
               onChange={(e) => setConfirmRemark(e.target.value)}
             />
+          </Modal>
+
+          <Modal
+            title={selectedOrder ? `订单详情 ${selectedOrder.order_no}` : '订单详情'}
+            open={detailModalVisible}
+            onCancel={() => setDetailModalVisible(false)}
+            footer={<Button onClick={() => setDetailModalVisible(false)}>关闭</Button>}
+            width={920}
+          >
+            <Spin spinning={detailLoading}>
+              {selectedOrder && (
+                <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                  <Descriptions bordered size="small" column={2}>
+                    <Descriptions.Item label="订单号">{selectedOrder.order_no}</Descriptions.Item>
+                    <Descriptions.Item label="状态">{statusTag(selectedOrder.status)}</Descriptions.Item>
+                    <Descriptions.Item label="买方">{selectedOrder.buyer_name || '--'}</Descriptions.Item>
+                    <Descriptions.Item label="卖方">{selectedOrder.seller_name || '--'}</Descriptions.Item>
+                    <Descriptions.Item label="总数量">{selectedOrder.total_quantity || 0}</Descriptions.Item>
+                    <Descriptions.Item label="订单金额">{formatMoney(selectedOrder.total_amount)}</Descriptions.Item>
+                    <Descriptions.Item label="创建时间">{formatDateTime(selectedOrder.created_at)}</Descriptions.Item>
+                    <Descriptions.Item label="币种">{selectedOrder.currency || 'CNY'}</Descriptions.Item>
+                  </Descriptions>
+
+                  <Card size="small" title="仓储与交付">
+                    <Descriptions size="small" column={2}>
+                      <Descriptions.Item label="仓库">{selectedOrder.delivery_info?.warehouse_name || '--'}</Descriptions.Item>
+                      <Descriptions.Item label="仓库编码">{selectedOrder.delivery_info?.warehouse_code || '--'}</Descriptions.Item>
+                      <Descriptions.Item label="仓库地址">
+                        {selectedOrder.delivery_info?.warehouse_address || selectedOrder.delivery_info?.address || '--'}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="收货地址">{selectedOrder.delivery_info?.address || '--'}</Descriptions.Item>
+                    </Descriptions>
+                  </Card>
+
+                  <Card size="small" title="商品明细">
+                    <Table
+                      size="small"
+                      columns={[
+                        { title: '商品', dataIndex: 'product_name', key: 'product_name' },
+                        { title: '商品编号', dataIndex: 'product_no', key: 'product_no', width: 140 },
+                        { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 90 },
+                        { title: '单价', dataIndex: 'unit_price', key: 'unit_price', width: 110, render: (v: number) => formatMoney(v) },
+                        { title: '金额', dataIndex: 'total_amount', key: 'total_amount', width: 120, render: (v: number) => formatMoney(v) },
+                      ]}
+                      dataSource={selectedOrder.items || []}
+                      rowKey={(item) => `${item.product_id}-${item.product_no}`}
+                      pagination={false}
+                      locale={{ emptyText: '暂无商品明细' }}
+                    />
+                  </Card>
+
+                  <Card size="small" title="履约事件">
+                    <List
+                      size="small"
+                      dataSource={orderEvents}
+                      locale={{ emptyText: '暂无事件记录' }}
+                      renderItem={(event) => (
+                        <List.Item>
+                          <List.Item.Meta
+                            title={
+                              <Space>
+                                <Tag>{event.actor_service || 'system'}</Tag>
+                                <Text>{event.event_type}</Text>
+                                <Text type="secondary">
+                                  {`${statusMap[event.from_status]?.label || event.from_status} -> ${statusMap[event.to_status]?.label || event.to_status}`}
+                                </Text>
+                              </Space>
+                            }
+                            description={
+                              <Space direction="vertical" size={2}>
+                                <Text type="secondary">{formatDateTime(event.created_at)}</Text>
+                                {event.payload && Object.keys(event.payload).length > 0 && (
+                                  <Text type="secondary">{JSON.stringify(event.payload)}</Text>
+                                )}
+                              </Space>
+                            }
+                          />
+                        </List.Item>
+                      )}
+                    />
+                  </Card>
+                </Space>
+              )}
+            </Spin>
           </Modal>
         </Content>
       </Layout>
