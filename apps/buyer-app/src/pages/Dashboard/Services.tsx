@@ -62,6 +62,7 @@ export default function ServicesPage() {
             const status = getPermissionStatus(service.key)
             const statusInfo = STATUS_LABELS[status] || STATUS_LABELS[0]
             const isEnabled = status === 2
+            const targetRoute = isEnabled ? service.route : `/dashboard/services/${service.key}`
             return (
               <Col xs={24} lg={8} key={service.key}>
                 <Card className="h-full rounded-lg">
@@ -93,10 +94,9 @@ export default function ServicesPage() {
                       <Button
                         type={isEnabled ? 'primary' : 'default'}
                         icon={<ArrowRightOutlined />}
-                        onClick={() => isEnabled ? navigate(service.route) : navigate('/dashboard/enterprise')}
-                        disabled={status === 1}
+                        onClick={() => navigate(targetRoute)}
                       >
-                        {isEnabled ? '进入面板' : status === 1 ? '审核中' : '申请开通'}
+                        {isEnabled ? '进入面板' : '申请/查看'}
                       </Button>
                     </div>
                   </div>
