@@ -123,12 +123,21 @@ export interface OrderSummary {
 }
 
 export interface FinancePlan {
+  finance_service_id?: number
+  funding_enterprise_id?: number
   provider: string
   product_name: string
+  finance_type?: string
   amount: number
+  min_amount?: number
+  max_amount?: number
   rate: number
   term_days: number
+  required_documents?: string[]
+  supported_scenarios?: string[]
   matched: boolean
+  ai_recommended?: boolean
+  selected?: boolean
   reason: string
 }
 
@@ -230,9 +239,10 @@ export const aiProcurementService = {
     return response.data
   },
 
-  matchFinance: async (id: number, financingRequired: boolean) => {
+  matchFinance: async (id: number, financingRequired: boolean, selectedFinanceServiceId?: number) => {
     const response = await api.post<ApiResponse<AIProcurementInfo>, ApiResponse<AIProcurementInfo>>(`/ai-procurements/${id}/match-finance`, {
       financing_required: financingRequired,
+      selected_finance_service_id: selectedFinanceServiceId,
     })
     return response.data
   },
