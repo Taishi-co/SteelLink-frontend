@@ -10,7 +10,7 @@
 | 编号 | 场景 | 前置条件 | 步骤 | 期望结果 |
 | --- | --- | --- | --- | --- |
 | TC-01 | 买家查看物流仓储市场 | 启动 buyer-app | 进入 `/service-market` | 页面展示仓储、运输、监管与增值服务，主导航高亮“物流仓储” |
-| TC-02 | 开通服务 | 登录 buyer-app | 进入 `/dashboard/services`，开通物流、仓储、资金服务 | 侧边栏显示物流平台、仓储平台、资金服务入口 |
+| TC-02 | 申请服务能力 | 登录 buyer-app | 进入 `/dashboard/services`，点击物流、仓储或资金服务的“申请/查看” | 页面进入 `/dashboard/services/:service` 对应能力申请页，不跳转到 `/dashboard/enterprise` |
 | TC-03 | 查看物流平台面板 | 已开通物流服务 | 进入 `/dashboard/logistics` | 页面展示运单、车辆线路、异常与结算数据 |
 | TC-04 | 查看仓储平台面板 | 已开通仓储服务 | 进入 `/dashboard/warehouse` | 页面展示仓容、预约、库存监管与作业数据 |
 | TC-05 | 查看资金服务面板 | 已开通资金服务 | 进入 `/dashboard/finance` | 页面展示授信、融资申请、放款与贷后数据 |

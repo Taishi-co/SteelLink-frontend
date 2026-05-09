@@ -20,7 +20,7 @@ SteelLink 买家工作台已预留 `/dashboard/finance` 与 `/dashboard/logistic
 ### In Scope
 
 - 买家端新增物流仓储服务市场页面，合并展示仓储、运输、监管和增值服务。
-- 新增 `/dashboard/services` 服务入口，支持开通/关闭物流、仓储、资金服务。
+- 新增 `/dashboard/services` 服务入口，展示物流、仓储、资金服务申请状态；未开通或审核中的服务进入 `/dashboard/services/:service` 申请/查看页，审核通过后进入对应业务面板。
 - 将物流平台面板放入 `/dashboard/logistics`，用于运单承接、车辆线路、在途异常和结算概览。
 - 新增 `/dashboard/warehouse` 仓储平台面板，用于仓容、入出库预约、库存监管和作业看板。
 - 将资金服务平台面板放入 `/dashboard/finance`，用于融资申请、授信、放款和贷后监控。
@@ -62,7 +62,7 @@ SteelLink 买家工作台已预留 `/dashboard/finance` 与 `/dashboard/logistic
 - 受影响 API: 使用 `warehouse-services`、`logistics-services`、`warehouse-movements`、`warehouses/:id/products`、`logistics/orders`、`logistics/estimate`、`orders/:id/service-fulfillment` 等真实接口。
 - 请求/响应变化: 卖家商品发布继续向后端提交 `warehouse_info`，平台登记仓库会额外提交 `warehouse_id`；仓库 CRUD、物流商 CRUD、商品仓库关系、出入库、运输委托、价格估算和订单履约追踪均读取后端接口。
 - 环境变量变化: 无
-- 当前数据来源: 后端接口与浏览器本地服务开通状态。服务开通状态后续仍需替换为企业服务订阅接口。
+- 当前数据来源: 后端接口与企业服务权限接口；服务总览不再使用浏览器本地开通态作为申请入口。
 
 ## 权限影响
 
@@ -72,7 +72,7 @@ SteelLink 买家工作台已预留 `/dashboard/finance` 与 `/dashboard/logistic
 ## 验收标准
 
 1. 买家可从首页导航进入物流仓储服务市场，并同时看到仓储与运输服务能力。
-2. 用户可在 `/dashboard/services` 开通物流、仓储、资金服务。
+2. 用户可在 `/dashboard/services` 看到物流、仓储、资金服务申请状态，点击未开通服务后进入对应能力申请页，不应跳转到 `/dashboard/enterprise`。
 3. 开通后可在 `/dashboard/logistics`、`/dashboard/warehouse`、`/dashboard/finance` 看到对应面板。
 4. 每个面板都有概览指标、待办事项、核心业务表格和下一步业务判断入口。
 5. 页面依赖真实后端接口，接口异常时保留空态或提示。
