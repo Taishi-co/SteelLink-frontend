@@ -15,6 +15,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   AppstoreOutlined,
+  DashboardOutlined,
 } from '@ant-design/icons'
 import { warehouseOrderService, warehouseMovementService } from '@/services/orderService'
 import type { OrderInfo, WarehouseMovement } from '@/services/orderService'
@@ -57,10 +58,10 @@ const resourceStatusMap: Record<number, { label: string; color: string }> = {
   4: { label: '已下线', color: 'default' },
 }
 
-type TabKey = 'pending' | 'movements' | 'resources' | 'all'
+type TabKey = 'dashboard' | 'pending' | 'movements' | 'resources' | 'all'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<TabKey>('pending')
+  const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
   const [pendingOrders, setPendingOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
   const [movements, setMovements] = useState<WarehouseMovement[]>([])
@@ -201,7 +202,12 @@ function App() {
   }
 
   useEffect(() => {
-    if (activeTab === 'pending') fetchPending()
+    if (activeTab === 'dashboard') {
+      fetchPending()
+      fetchMovements()
+      fetchResources()
+      fetchAll()
+    } else if (activeTab === 'pending') fetchPending()
     else if (activeTab === 'all') fetchAll()
     else if (activeTab === 'movements') fetchMovements()
     else if (activeTab === 'resources') fetchResources()
@@ -337,6 +343,7 @@ function App() {
   ]
 
   const menuItems = [
+    { key: 'dashboard' as TabKey, label: '工作台概览', icon: <DashboardOutlined /> },
     { key: 'pending' as TabKey, label: '待确认订单', icon: <ExclamationCircleOutlined /> },
     { key: 'movements' as TabKey, label: '出入库管理', icon: <DatabaseOutlined /> },
     { key: 'resources' as TabKey, label: '仓库资源管理', icon: <AppstoreOutlined /> },
@@ -391,13 +398,63 @@ function App() {
         <Header style={{ background: '#fff', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text strong>仓储方工作台</Text>
           <Space>
-            <Button icon={<CalendarOutlined />} onClick={() => { if (activeTab === 'pending') fetchPending(); else if (activeTab === 'movements') fetchMovements(); else if (activeTab === 'resources') fetchResources(); else fetchAll(); }}>
+            <Button icon={<CalendarOutlined />} onClick={() => { if (activeTab === 'dashboard') { fetchPending(); fetchMovements(); fetchResources(); fetchAll(); } else if (activeTab === 'pending') fetchPending(); else if (activeTab === 'movements') fetchMovements(); else if (activeTab === 'resources') fetchResources(); else fetchAll(); }}>
               刷新
             </Button>
             <Button icon={<HomeOutlined />} href="/">买家首页</Button>
           </Space>
         </Header>
         <Content className="service-content" style={{ padding: 24 }}>
+          {activeTab === 'dashboard' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">待确认订单</Typography.Text><br /><Title level={3}>{pendingOrders.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">出入库记录</Typography.Text><br /><Title level={3}>{movements.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">仓库资源</Typography.Text><br /><Title level={3}>{resources.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">全部订单</Typography.Text><br /><Title level={3}>{allOrders.length}</Title></Card>
+                </Col>
+              </Row>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} xl={15}>
+                  <Card title="仓储管理中心" extra={<Tag color="green">独立服务商工作台</Tag>}>
+                    <List
+                      dataSource={[
+                        { title: '待仓库确认订单', description: `${pendingOrders.length} 单等待仓储方确认`, icon: <ExclamationCircleOutlined />, tab: 'pending' as TabKey },
+                        { title: '待处理出入库', description: `${movements.filter((item) => item.status === 'pending').length} 笔作业等待开始`, icon: <DatabaseOutlined />, tab: 'movements' as TabKey },
+                        { title: '作业中记录', description: `${movements.filter((item) => item.status === 'in_progress').length} 笔作业正在处理`, icon: <CalendarOutlined />, tab: 'movements' as TabKey },
+                        { title: '已审核仓库', description: `${resources.filter((item) => item.status === 2).length} 个仓库可对外服务`, icon: <CheckCircleOutlined />, tab: 'resources' as TabKey },
+                      ]}
+                      renderItem={(item) => (
+                        <List.Item
+                          actions={[<Button key="open" type="link" onClick={() => setActiveTab(item.tab)}>处理</Button>]}
+                        >
+                          <List.Item.Meta avatar={item.icon} title={item.title} description={item.description} />
+                        </List.Item>
+                      )}
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} xl={9}>
+                  <Card title="快捷操作">
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <Button block type="primary" icon={<ExclamationCircleOutlined />} onClick={() => setActiveTab('pending')}>处理待确认订单</Button>
+                      <Button block icon={<DatabaseOutlined />} onClick={() => setActiveTab('movements')}>进入出入库管理</Button>
+                      <Button block icon={<AppstoreOutlined />} onClick={() => setActiveTab('resources')}>管理仓库资源</Button>
+                      <Button block icon={<InboxOutlined />} onClick={() => setActiveTab('all')}>查看全部订单</Button>
+                    </Space>
+                  </Card>
+                </Col>
+              </Row>
+            </>
+          )}
+
           {activeTab === 'pending' && (
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>

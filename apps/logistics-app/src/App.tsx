@@ -13,6 +13,8 @@ import {
   EditOutlined,
   DeleteOutlined,
   AppstoreOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons'
 import { logisticsOrderService, logisticsFulfillmentService } from '@/services/orderService'
 import type { OrderInfo, LogisticsOrder } from '@/services/orderService'
@@ -51,10 +53,10 @@ const resourceStatusMap: Record<number, { label: string; color: string }> = {
   4: { label: '已下线', color: 'default' },
 }
 
-type TabKey = 'bidding' | 'logistics-orders' | 'resources' | 'all'
+type TabKey = 'dashboard' | 'bidding' | 'logistics-orders' | 'resources' | 'all'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<TabKey>('bidding')
+  const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
   const [biddingOrders, setBiddingOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
   const [logisticsOrders, setLogisticsOrders] = useState<LogisticsOrder[]>([])
@@ -191,7 +193,12 @@ function App() {
   }
 
   useEffect(() => {
-    if (activeTab === 'bidding') fetchBidding()
+    if (activeTab === 'dashboard') {
+      fetchBidding()
+      fetchLogisticsOrders()
+      fetchResources()
+      fetchAll()
+    } else if (activeTab === 'bidding') fetchBidding()
     else if (activeTab === 'all') fetchAll()
     else if (activeTab === 'logistics-orders') fetchLogisticsOrders()
     else if (activeTab === 'resources') fetchResources()
@@ -383,6 +390,7 @@ function App() {
   ]
 
   const menuItems = [
+    { key: 'dashboard' as TabKey, label: '工作台概览', icon: <RocketOutlined /> },
     { key: 'bidding' as TabKey, label: '物流竞价', icon: <DollarCircleOutlined /> },
     { key: 'logistics-orders' as TabKey, label: '物流订单', icon: <CarOutlined /> },
     { key: 'resources' as TabKey, label: '运力资源管理', icon: <AppstoreOutlined /> },
@@ -437,13 +445,63 @@ function App() {
         <Header style={{ background: '#fff', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text strong>物流方工作台</Text>
           <Space>
-            <Button icon={<EnvironmentOutlined />} onClick={() => { if (activeTab === 'bidding') fetchBidding(); else if (activeTab === 'logistics-orders') fetchLogisticsOrders(); else if (activeTab === 'resources') fetchResources(); else fetchAll(); }}>
+            <Button icon={<EnvironmentOutlined />} onClick={() => { if (activeTab === 'dashboard') { fetchBidding(); fetchLogisticsOrders(); fetchResources(); fetchAll(); } else if (activeTab === 'bidding') fetchBidding(); else if (activeTab === 'logistics-orders') fetchLogisticsOrders(); else if (activeTab === 'resources') fetchResources(); else fetchAll(); }}>
               刷新
             </Button>
             <Button icon={<HomeOutlined />} href="/">买家首页</Button>
           </Space>
         </Header>
         <Content className="service-content" style={{ padding: 24 }}>
+          {activeTab === 'dashboard' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">待报价竞价</Typography.Text><br /><Title level={3}>{biddingOrders.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">物流履约单</Typography.Text><br /><Title level={3}>{logisticsOrders.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">运力资源</Typography.Text><br /><Title level={3}>{resources.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">全部订单</Typography.Text><br /><Title level={3}>{allOrders.length}</Title></Card>
+                </Col>
+              </Row>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} xl={15}>
+                  <Card title="物流管理中心" extra={<Tag color="blue">独立服务商工作台</Tag>}>
+                    <List
+                      dataSource={[
+                        { title: '待报价物流竞价', description: `${biddingOrders.length} 单等待报价`, icon: <DollarCircleOutlined />, tab: 'bidding' as TabKey },
+                        { title: '待接单物流订单', description: `${logisticsOrders.filter((item) => item.status === 'pending').length} 单等待接单`, icon: <ClockCircleOutlined />, tab: 'logistics-orders' as TabKey },
+                        { title: '在途履约', description: `${logisticsOrders.filter((item) => item.status === 'accepted' || item.status === 'in_transit').length} 单正在运输`, icon: <CarOutlined />, tab: 'logistics-orders' as TabKey },
+                        { title: '已审核运力', description: `${resources.filter((item) => item.status === 2).length} 条线路可参与匹配`, icon: <CheckCircleOutlined />, tab: 'resources' as TabKey },
+                      ]}
+                      renderItem={(item) => (
+                        <List.Item
+                          actions={[<Button key="open" type="link" onClick={() => setActiveTab(item.tab)}>处理</Button>]}
+                        >
+                          <List.Item.Meta avatar={item.icon} title={item.title} description={item.description} />
+                        </List.Item>
+                      )}
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} xl={9}>
+                  <Card title="快捷操作">
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <Button block type="primary" icon={<DollarCircleOutlined />} onClick={() => setActiveTab('bidding')}>进入物流竞价</Button>
+                      <Button block icon={<CarOutlined />} onClick={() => setActiveTab('logistics-orders')}>查看物流订单</Button>
+                      <Button block icon={<AppstoreOutlined />} onClick={() => setActiveTab('resources')}>管理运力资源</Button>
+                      <Button block icon={<DatabaseOutlined />} onClick={() => setActiveTab('all')}>查看全部订单</Button>
+                    </Space>
+                  </Card>
+                </Col>
+              </Row>
+            </>
+          )}
+
           {activeTab === 'bidding' && (
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
