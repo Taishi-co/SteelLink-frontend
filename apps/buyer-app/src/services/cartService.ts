@@ -15,10 +15,12 @@ function mapCartItem(item: CartItemDTO) {
     id: item.id,
     productId: item.product_id,
     productName: item.product_name,
+    imageUrl: item.image_url,
     specs: item.spec,
     price: item.price,
     quantity: item.quantity,
     seller: item.seller_name,
+    warehouseInfo: item.warehouse_info,
     unit: item.unit,
     subTotal: item.sub_total,
   }

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Card, Table, Button, InputNumber, Space, Typography, Empty, Divider, message, Row, Col, Spin } from 'antd'
-import { DeleteOutlined, ShoppingCartOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { Card, Table, Button, InputNumber, Space, Typography, Empty, Divider, message, Row, Col, Spin, Image, Tag } from 'antd'
+import { DeleteOutlined, ShoppingCartOutlined, SafetyCertificateOutlined, ShopOutlined } from '@ant-design/icons'
 import { useCartStore } from '@/stores/cartStore'
 import type { CartItem } from '@/types'
 
@@ -35,35 +35,68 @@ export default function CartPage() {
 
   const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
+  const formatWarehouseAddress = (record: CartItem) => {
+    const warehouse = record.warehouseInfo
+    if (!warehouse) {
+      return ''
+    }
+    return [warehouse.province, warehouse.city, warehouse.district, warehouse.address].filter(Boolean).join('')
+  }
+
   const columns = [
     {
       title: '商品信息',
       dataIndex: 'productName',
       key: 'name',
       render: (name: string, record: CartItem) => (
-        <div>
-          <Row gutter={12} align="middle">
-            <Col span={24}>
-              <Link to={`/products/${record.productId}`} className="text-gray-800 hover:text-primary-600 font-medium">
-                {name}
-              </Link>
-            </Col>
-            <Col span={24}>
-              <Text type="secondary" className="text-xs">
-                {record.specs}
-              </Text>
-            </Col>
-            <Col span={24}>
-              <Space size="small">
-                <Text type="secondary" className="text-xs">
-                  <ShoppingCartOutlined className="mr-1" />
-                  卖家：{record.seller}
-                </Text>
-              </Space>
-            </Col>
-          </Row>
+        <div className="flex gap-3 items-start min-w-[320px]">
+          <Image
+            src={record.imageUrl}
+            alt={name}
+            width={72}
+            height={72}
+            className="rounded object-cover bg-gray-100"
+            fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Crect width='72' height='72' fill='%23f3f4f6'/%3E%3Cpath d='M18 49h36l-8-13-8 9-6-7-14 11Z' fill='%23cbd5e1'/%3E%3Ccircle cx='26' cy='25' r='5' fill='%23cbd5e1'/%3E%3C/svg%3E"
+            preview={false}
+          />
+          <div className="min-w-0 flex-1">
+            <Link to={`/products/${record.productId}`} className="text-gray-800 hover:text-primary-600 font-medium">
+              {name}
+            </Link>
+            <Text type="secondary" className="text-xs block mt-1">
+              {record.specs || '暂无规格'}
+            </Text>
+            <Text type="secondary" className="text-xs block mt-1">
+              <ShoppingCartOutlined className="mr-1" />
+              卖家：{record.seller || '暂无卖家信息'}
+            </Text>
+          </div>
         </div>
       ),
+    },
+    {
+      title: '可发货仓库',
+      key: 'warehouse',
+      width: 260,
+      render: (_: unknown, record: CartItem) => {
+        const warehouse = record.warehouseInfo
+        const address = formatWarehouseAddress(record)
+        if (!warehouse?.warehouse_name) {
+          return <Tag color="default">暂无绑定仓库</Tag>
+        }
+        return (
+          <Space direction="vertical" size={2}>
+            <Text className="text-sm font-medium">
+              <ShopOutlined className="mr-1 text-blue-500" />
+              {warehouse.warehouse_name}
+            </Text>
+            {warehouse.warehouse_code ? (
+              <Text type="secondary" className="text-xs">仓库编码：{warehouse.warehouse_code}</Text>
+            ) : null}
+            {address ? <Text type="secondary" className="text-xs">{address}</Text> : null}
+          </Space>
+        )
+      },
     },
     {
       title: '单价',
