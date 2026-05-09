@@ -362,7 +362,7 @@ export default function ProductsPage() {
                         仓库：{product.warehouseInfo?.warehouse_name || '-'} · {product.warehouseInfo?.province || '-'} / {product.warehouseInfo?.city || '-'}
                       </Paragraph>
                       <Paragraph className="!mb-1 text-xs text-gray-500">
-                        仓库编码：{product.warehouseInfo?.warehouse_code || '-'} · 捆包号：{product.bundleNo || '-'}
+                        仓库编码：{product.warehouseInfo?.warehouse_code || '-'}
                       </Paragraph>
                       <div className="text-lg font-bold text-red-500">
                         ￥{product.unitPrice.toLocaleString()}
