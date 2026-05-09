@@ -50,7 +50,6 @@ const accountItems = [
   { key: '/dashboard/enterprise', icon: <BankOutlined />, label: '企业信息' },
 ]
 
-const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
 const financeWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5177/finance/' : '/finance/'
 const logisticsWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5175/logistics/' : '/logistics/'
 const warehouseWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5176/warehouse/' : '/warehouse/'
@@ -61,6 +60,7 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useUserStore()
+  const sellerBaseURL = import.meta.env.DEV ? 'http://localhost:5174' : ''
 
   useEffect(() => {
     if (!hasEnterpriseAccess(user)) {
@@ -82,13 +82,44 @@ export default function DashboardLayout() {
     )
   }, [servicePermissions])
 
+  const fallbackServices = useMemo(() => {
+    const services = new Set<string>()
+    switch (user?.enterpriseRole) {
+      case 'buyer':
+        services.add('procurement')
+        break
+      case 'seller':
+        services.add('sales')
+        break
+      case 'logistics':
+        services.add('logistics')
+        break
+      case 'warehouse':
+        services.add('warehouse')
+        break
+      case 'fund':
+        services.add('finance')
+        break
+      default:
+        break
+    }
+    return services
+  }, [user?.enterpriseRole])
+
+  const effectiveServices = useMemo(() => {
+    if (approvedServices.size > 0) {
+      return approvedServices
+    }
+    return fallbackServices
+  }, [approvedServices, fallbackServices])
+
   const navItems = useMemo(() => {
     return allNavItems.filter((item) => {
       if (item.roles && !item.roles.includes(user?.role || '')) return false
-      if (item.services && !item.services.some((s) => approvedServices.has(s))) return false
+      if (item.services && !item.services.some((s) => effectiveServices.has(s))) return false
       return true
     })
-  }, [user?.role, approvedServices])
+  }, [user?.role, effectiveServices])
 
   const handleLogout = () => {
     clearBuyerSession()
@@ -97,6 +128,10 @@ export default function DashboardLayout() {
   }
 
   const identityLabel = getIdentityStatusLabel(user?.identityStatus ?? 0)
+
+  const switchToSellerCenter = () => {
+    window.location.href = `${sellerBaseURL}/seller/dashboard`
+  }
 
   const getSelectedKey = () => {
     const exact = navItems.find(item => location.pathname === item.key)
@@ -196,22 +231,21 @@ export default function DashboardLayout() {
 
           <div className="px-2.5 mb-2">
             {hasEnterpriseAccess(user) && (
-              <a href={sellerDashboardHref}>
-                <div
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
-                  style={{ background: 'rgba(16,185,129,.14)', border: '1px solid rgba(16,185,129,.25)' }}
-                >
-                  <ShopOutlined className="text-emerald-400 text-sm" />
-                  {!collapsed && (
-                    <>
-                      <span className="text-xs text-emerald-400 font-semibold flex-1">进入卖家中心</span>
-                      <ArrowRightOutlined className="text-emerald-400 text-[10px]" />
-                    </>
-                  )}
-                </div>
-              </a>
+              <div
+                className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
+                style={{ background: 'rgba(16,185,129,.14)', border: '1px solid rgba(16,185,129,.25)' }}
+                onClick={switchToSellerCenter}
+              >
+                <ShopOutlined className="text-emerald-400 text-sm" />
+                {!collapsed && (
+                  <>
+                    <span className="text-xs text-emerald-400 font-semibold flex-1">进入卖家中心</span>
+                    <ArrowRightOutlined className="text-emerald-400 text-[10px]" />
+                  </>
+                )}
+              </div>
             )}
-            {approvedServices.has('finance') && (
+            {effectiveServices.has('finance') && (
               <a href={financeWorkbenchHref}>
                 <div
                   className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
@@ -227,7 +261,7 @@ export default function DashboardLayout() {
                 </div>
               </a>
             )}
-            {approvedServices.has('logistics') && (
+            {effectiveServices.has('logistics') && (
               <a href={logisticsWorkbenchHref}>
                 <div
                   className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
@@ -243,7 +277,7 @@ export default function DashboardLayout() {
                 </div>
               </a>
             )}
-            {approvedServices.has('warehouse') && (
+            {effectiveServices.has('warehouse') && (
               <a href={warehouseWorkbenchHref}>
                 <div
                   className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
