@@ -126,7 +126,7 @@ function getStatusNotice(status: number, _hasPaymentVoucher: boolean, _hasDelive
     return { type: 'warning' as const, title: '当前状态：待签合同', message: '签署状态：买家未签，卖家未签。下一步：请签署交易合同；双方签署后进入支付阶段。' }
   }
   if (status === 3) {
-    return { type: 'warning' as const, title: '当前状态：待支付/融资', message: '下一步：请上传支付与货权监管凭证，或申请托盘融资。' }
+    return { type: 'warning' as const, title: '当前状态：待支付/融资', message: '下一步：请上传支付凭证，或申请托盘融资。' }
   }
   if (status === 21) {
     return { type: 'info' as const, title: '当前状态：融资申请已完成', message: '下一步：等待资金方进行风控审批。' }
@@ -272,16 +272,13 @@ export default function OrderDetailPage() {
       const values = await form.validateFields()
       setUploading(true)
       const uploaded = await uploadService.upload(getUploadFile(values.voucher_file), 'payment_voucher')
-      const titleUploaded = await uploadService.upload(getUploadFile(values.title_voucher_file), 'title_voucher')
-      await orderService.directPayment(Number(id), {
+      await orderService.uploadPaymentVoucher(Number(id), {
         voucher_url: uploaded.url,
         transaction_no: values.transaction_no,
         payer_account: values.payer_account,
         payee_account: values.payee_account,
-        title_voucher_url: titleUploaded.url,
-        title_remark: values.title_remark,
       })
-      showCompleted('支付与货权监管凭证已完成', '等待卖方发起物流竞价。')
+      showCompleted('支付凭证已完成', '等待卖方发起物流竞价。')
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       form.resetFields()
@@ -683,7 +680,7 @@ export default function OrderDetailPage() {
                 )}
                 {order.status === 3 && (
                   <Button type="primary" icon={<UploadOutlined />} onClick={() => setOpen(true)}>
-                    上传支付/货权凭证
+                    上传支付凭证
                   </Button>
                 )}
                 {order.status === 23 && (
@@ -731,7 +728,7 @@ export default function OrderDetailPage() {
             </Card>
 
             <Modal
-              title="上传支付与货权监管凭证"
+              title="上传支付凭证"
               open={open}
               onCancel={() => setOpen(false)}
               onOk={handleUploadVoucher}
@@ -749,17 +746,6 @@ export default function OrderDetailPage() {
                     <Button icon={<UploadOutlined />}>选择文件</Button>
                   </Upload>
                 </Form.Item>
-                <Form.Item
-                  name="title_voucher_file"
-                  label="货权/仓单监管凭证"
-                  valuePropName="fileList"
-                  getValueFromEvent={(event) => event?.fileList ?? []}
-                  rules={[{ required: true, message: '请上传货权/仓单监管凭证' }]}
-                >
-                  <Upload beforeUpload={() => false} maxCount={1}>
-                    <Button icon={<UploadOutlined />}>选择文件</Button>
-                  </Upload>
-                </Form.Item>
                 <Form.Item name="transaction_no" label="交易流水号">
                   <Input />
                 </Form.Item>
@@ -767,9 +753,6 @@ export default function OrderDetailPage() {
                   <Input />
                 </Form.Item>
                 <Form.Item name="payee_account" label="收款账户">
-                  <Input />
-                </Form.Item>
-                <Form.Item name="title_remark" label="货权监管备注">
                   <Input />
                 </Form.Item>
               </Form>
