@@ -604,6 +604,10 @@ export default function AiProcurementPage() {
           }
         : item
     )))
+    orderForm.setFieldsValue({
+      delivery_method: '物流服务商协商',
+      delivery_note: `${product.product_name} 物流方案先协商确认，以最终报价、时效和履约保障为准。`,
+    })
     message.info(`${product.product_name} 已标记为协商解决`)
   }
 
@@ -1068,37 +1072,43 @@ function renderStepContent(props: {
                   </Descriptions>
 
                   {item.logistics_options && item.logistics_options.length > 0 ? (
-                    <Radio.Group
-                      className="mt-4 w-full"
-                      value={item.logistics_service_id}
-                      onChange={(event) => props.onSelectLogisticsOption(item, Number(event.target.value))}
-                    >
-                      <Space direction="vertical" size="small" className="w-full">
-                        {item.logistics_options.map((option) => (
-                          <Radio key={option.service_id} value={option.service_id} className="w-full rounded border border-gray-100 p-3">
-                            <div className="grid gap-3 md:grid-cols-[1fr_180px_160px] md:items-center">
-                              <div>
-                                <Text strong>{option.service_name}</Text>
-                                <div className="mt-1 text-sm text-gray-500">{option.route || '线路待确认'} · {option.vehicle_type || '车型待确认'} · {option.match_reason}</div>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {option.service_scope ? <Tag>{option.service_scope}</Tag> : null}
-                                  {option.load_capacity ? <Tag>载重 {option.load_capacity}{result.parsed.unit}</Tag> : null}
-                                  {option.price_rule ? <Tag>{option.price_rule}</Tag> : null}
+                    <>
+                      <Radio.Group
+                        className="mt-4 w-full"
+                        value={item.logistics_service_id}
+                        onChange={(event) => props.onSelectLogisticsOption(item, Number(event.target.value))}
+                      >
+                        <Space direction="vertical" size="small" className="w-full">
+                          {item.logistics_options.map((option) => (
+                            <Radio key={option.service_id} value={option.service_id} className="w-full rounded border border-gray-100 p-3">
+                              <div className="grid gap-3 md:grid-cols-[1fr_180px_160px] md:items-center">
+                                <div>
+                                  <Text strong>{option.service_name}</Text>
+                                  <div className="mt-1 text-sm text-gray-500">{option.route || '线路待确认'} · {option.vehicle_type || '车型待确认'} · {option.match_reason}</div>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {option.service_scope ? <Tag>{option.service_scope}</Tag> : null}
+                                    {option.load_capacity ? <Tag>载重 {option.load_capacity}{result.parsed.unit}</Tag> : null}
+                                    {option.price_rule ? <Tag>{option.price_rule}</Tag> : null}
+                                  </div>
+                                </div>
+                                <div>
+                                  <Text strong>{formatMoney(option.freight_estimate)}</Text>
+                                  <div className="mt-1 text-sm text-gray-500">预估运费</div>
+                                </div>
+                                <div>
+                                  <Text strong>{formatMoney(option.landed_total)}</Text>
+                                  <div className="mt-1 text-sm text-gray-500">到手总额</div>
                                 </div>
                               </div>
-                              <div>
-                                <Text strong>{formatMoney(option.freight_estimate)}</Text>
-                                <div className="mt-1 text-sm text-gray-500">预估运费</div>
-                              </div>
-                              <div>
-                                <Text strong>{formatMoney(option.landed_total)}</Text>
-                                <div className="mt-1 text-sm text-gray-500">到手总额</div>
-                              </div>
-                            </div>
-                          </Radio>
-                        ))}
+                            </Radio>
+                          ))}
+                        </Space>
+                      </Radio.Group>
+                      <Space wrap className="mt-4">
+                        <Button onClick={() => props.onNegotiateLogistics(item)}>采用协商报价</Button>
+                        <Text type="secondary">已有推荐物流时，也可以先与服务商协商运价、时效和履约保障。</Text>
                       </Space>
-                    </Radio.Group>
+                    </>
                   ) : (
                     <div className="mt-4 rounded border border-dashed border-gray-200 bg-gray-50 p-4">
                       <Text>当前发货仓库到收货地点暂无适合物流方案。</Text>
@@ -1137,7 +1147,7 @@ function renderStepContent(props: {
                 <Col xs={24} md={8}><Form.Item name="contact_name" label="联系人" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="warehouse_name" label="卖家发货仓库" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                <Col xs={24} md={12}><Form.Item name="delivery_method" label="物流方式" rules={[{ required: true }]}><Radio.Group><Radio value="平台协同配送">平台协同配送</Radio><Radio value="自行提货">自行提货</Radio></Radio.Group></Form.Item></Col>
+                <Col xs={24} md={12}><Form.Item name="delivery_method" label="物流方式" rules={[{ required: true }]}><Radio.Group><Radio value="平台协同配送">平台协同配送</Radio><Radio value="物流服务商协商">物流服务商协商</Radio><Radio value="自行提货">自行提货</Radio></Radio.Group></Form.Item></Col>
                 <Col xs={24}><Form.Item name="delivery_address" label="收货地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="payment_method" label="付款方式" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="delivery_note" label="交付说明"><Input /></Form.Item></Col>
