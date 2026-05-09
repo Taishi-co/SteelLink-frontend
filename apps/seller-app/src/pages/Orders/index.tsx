@@ -452,6 +452,17 @@ export default function OrdersPage() {
               finally { setActionLoading(false) }
             }}>对账确认</Button>
           )}
+          {record.status === 19 && (
+            <Button type="link" size="small" onClick={async () => {
+              setActionLoading(true)
+              try {
+                const detail = await sellerOrderService.archive(record.id)
+                showCompleted('订单归档完成', '交易闭环已完成，可回工作台查看历史订单记录。', detail)
+                setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+              } catch (error: unknown) { message.error(getErrorMessage(error, '归档失败')) }
+              finally { setActionLoading(false) }
+            }}>订单归档</Button>
+          )}
         </Space>
       ),
     },

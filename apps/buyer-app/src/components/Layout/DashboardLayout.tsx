@@ -87,9 +87,15 @@ export default function DashboardLayout() {
     switch (user?.enterpriseRole) {
       case 'buyer':
         services.add('procurement')
+        services.add('warehouse')
+        services.add('logistics')
+        services.add('finance')
         break
       case 'seller':
         services.add('sales')
+        services.add('warehouse')
+        services.add('logistics')
+        services.add('finance')
         break
       case 'logistics':
         services.add('logistics')
