@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, Card, Form, Input, Tabs, Typography, message } from 'antd'
 import { LockOutlined, MobileOutlined, UserOutlined } from '@ant-design/icons'
@@ -25,13 +25,13 @@ export default function LoginPage() {
   const redirect = params.get('redirect')
   const switchToken = params.get('switch_token')
 
-  const goAfterLogin = () => {
+  const goAfterLogin = useCallback(() => {
     if (redirect?.startsWith('/seller/')) {
       navigate(redirect.replace(/^\/seller/, '') || '/', { replace: true })
       return
     }
     navigate('/dashboard', { replace: true })
-  }
+  }, [navigate, redirect])
 
   useEffect(() => {
     if (!switchToken) {
@@ -67,7 +67,7 @@ export default function LoginPage() {
     return () => {
       cancelled = true
     }
-  }, [switchToken])
+  }, [goAfterLogin, switchToken])
 
   const handleLogin = async (values: LoginValues) => {
     setLoading(true)

@@ -12,6 +12,7 @@
 - [x] `pnpm --filter @steellink/seller-app build` 已通过
 - [ ] `./harness/release.sh docs/features/SL-FE-NOTIFICATIONS` 已通过
 - [ ] 已确认后端通知接口已发布
+- [ ] 已确认后端 WebSocket 订阅接口已发布
 
 ## 回滚信息
 
