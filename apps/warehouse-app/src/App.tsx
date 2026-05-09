@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Col, Layout, List, Modal, Row, Space, Spin, Table, Tag, Typography, Input, message } from 'antd'
+import { Badge, Button, Card, Col, Form, InputNumber, Layout, List, Modal, Row, Select, Space, Spin, Switch, Table, Tag, Typography, Input, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   CheckCircleOutlined,
@@ -11,9 +11,16 @@ import {
   BankOutlined,
   CalendarOutlined,
   ExclamationCircleOutlined,
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  AppstoreOutlined,
+  DashboardOutlined,
 } from '@ant-design/icons'
 import { warehouseOrderService, warehouseMovementService } from '@/services/orderService'
 import type { OrderInfo, WarehouseMovement } from '@/services/orderService'
+import { warehouseResourceService } from '@/services/warehouseResourceService'
+import type { WarehouseResource, WarehouseResourcePayload } from '@/services/warehouseResourceService'
 import { hasWarehouseCapability } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
@@ -44,13 +51,25 @@ const statusMap: Record<number, { label: string; color: string }> = {
   24: { label: '待重新发起物流', color: 'volcano' },
 }
 
-type TabKey = 'pending' | 'movements' | 'all'
+const resourceStatusMap: Record<number, { label: string; color: string }> = {
+  1: { label: '待审核', color: 'orange' },
+  2: { label: '已通过', color: 'success' },
+  3: { label: '已驳回', color: 'error' },
+  4: { label: '已下线', color: 'default' },
+}
+
+type TabKey = 'dashboard' | 'pending' | 'movements' | 'resources' | 'all'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<TabKey>('pending')
+  const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
   const [pendingOrders, setPendingOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
   const [movements, setMovements] = useState<WarehouseMovement[]>([])
+  const [resources, setResources] = useState<WarehouseResource[]>([])
+  const [resourceLoading, setResourceLoading] = useState(false)
+  const [resourceModalVisible, setResourceModalVisible] = useState(false)
+  const [editingResource, setEditingResource] = useState<WarehouseResource | null>(null)
+  const [resourceForm] = Form.useForm<WarehouseResourcePayload>()
   const [loading, setLoading] = useState(false)
   const [confirmModal, setConfirmModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [confirmRemark, setConfirmRemark] = useState('')
@@ -107,10 +126,91 @@ function App() {
     }
   }
 
+  const fetchResources = async () => {
+    setResourceLoading(true)
+    try {
+      const list = await warehouseResourceService.listMine()
+      setResources(list || [])
+    } catch {
+      message.error('获取仓库资源列表失败')
+    } finally {
+      setResourceLoading(false)
+    }
+  }
+
+  const openCreateResource = () => {
+    setEditingResource(null)
+    resourceForm.resetFields()
+    setResourceModalVisible(true)
+  }
+
+  const openEditResource = (record: WarehouseResource) => {
+    setEditingResource(record)
+    resourceForm.setFieldsValue({
+      warehouse_name: record.warehouse_name,
+      province: record.province,
+      city: record.city,
+      district: record.district,
+      address: record.address,
+      capacity: record.capacity,
+      available_capacity: record.available_capacity,
+      service_types: record.service_types,
+      price_rule: record.price_rule,
+      loading_capacity: record.loading_capacity,
+      business_hours: record.business_hours,
+      pledge_supervision: record.pledge_supervision,
+      outbound_voucher_req: record.outbound_voucher_req,
+      description: record.description,
+    })
+    setResourceModalVisible(true)
+  }
+
+  const handleResourceSubmit = async () => {
+    try {
+      const values = await resourceForm.validateFields()
+      if (editingResource) {
+        await warehouseResourceService.update(editingResource.id, values)
+        message.success('仓库资源更新成功')
+      } else {
+        await warehouseResourceService.create(values as WarehouseResourcePayload)
+        message.success('仓库资源创建成功，等待平台审核')
+      }
+      setResourceModalVisible(false)
+      fetchResources()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('操作失败')
+    }
+  }
+
+  const handleResourceOffline = async (record: WarehouseResource) => {
+    Modal.confirm({
+      title: '确认下线该仓库资源？',
+      content: `仓库：${record.warehouse_name}，下线后买家将无法看到该资源。`,
+      okText: '确认下线',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await warehouseResourceService.delete(record.id)
+          message.success('仓库资源已下线')
+          fetchResources()
+        } catch {
+          message.error('下线失败')
+        }
+      },
+    })
+  }
+
   useEffect(() => {
-    if (activeTab === 'pending') fetchPending()
+    if (activeTab === 'dashboard') {
+      fetchPending()
+      fetchMovements()
+      fetchResources()
+      fetchAll()
+    } else if (activeTab === 'pending') fetchPending()
     else if (activeTab === 'all') fetchAll()
     else if (activeTab === 'movements') fetchMovements()
+    else if (activeTab === 'resources') fetchResources()
   }, [activeTab])
 
   const handleWarehouseConfirm = async () => {
@@ -243,8 +343,10 @@ function App() {
   ]
 
   const menuItems = [
+    { key: 'dashboard' as TabKey, label: '工作台概览', icon: <DashboardOutlined /> },
     { key: 'pending' as TabKey, label: '待确认订单', icon: <ExclamationCircleOutlined /> },
     { key: 'movements' as TabKey, label: '出入库管理', icon: <DatabaseOutlined /> },
+    { key: 'resources' as TabKey, label: '仓库资源管理', icon: <AppstoreOutlined /> },
     { key: 'all' as TabKey, label: '全部订单', icon: <InboxOutlined /> },
   ]
 
@@ -296,13 +398,63 @@ function App() {
         <Header style={{ background: '#fff', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text strong>仓储方工作台</Text>
           <Space>
-            <Button icon={<CalendarOutlined />} onClick={() => { if (activeTab === 'pending') fetchPending(); else if (activeTab === 'movements') fetchMovements(); else fetchAll(); }}>
+            <Button icon={<CalendarOutlined />} onClick={() => { if (activeTab === 'dashboard') { fetchPending(); fetchMovements(); fetchResources(); fetchAll(); } else if (activeTab === 'pending') fetchPending(); else if (activeTab === 'movements') fetchMovements(); else if (activeTab === 'resources') fetchResources(); else fetchAll(); }}>
               刷新
             </Button>
             <Button icon={<HomeOutlined />} href="/">买家首页</Button>
           </Space>
         </Header>
         <Content className="service-content" style={{ padding: 24 }}>
+          {activeTab === 'dashboard' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">待确认订单</Typography.Text><br /><Title level={3}>{pendingOrders.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">出入库记录</Typography.Text><br /><Title level={3}>{movements.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">仓库资源</Typography.Text><br /><Title level={3}>{resources.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card><Typography.Text type="secondary">全部订单</Typography.Text><br /><Title level={3}>{allOrders.length}</Title></Card>
+                </Col>
+              </Row>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} xl={15}>
+                  <Card title="仓储管理中心" extra={<Tag color="green">独立服务商工作台</Tag>}>
+                    <List
+                      dataSource={[
+                        { title: '待仓库确认订单', description: `${pendingOrders.length} 单等待仓储方确认`, icon: <ExclamationCircleOutlined />, tab: 'pending' as TabKey },
+                        { title: '待处理出入库', description: `${movements.filter((item) => item.status === 'pending').length} 笔作业等待开始`, icon: <DatabaseOutlined />, tab: 'movements' as TabKey },
+                        { title: '作业中记录', description: `${movements.filter((item) => item.status === 'in_progress').length} 笔作业正在处理`, icon: <CalendarOutlined />, tab: 'movements' as TabKey },
+                        { title: '已审核仓库', description: `${resources.filter((item) => item.status === 2).length} 个仓库可对外服务`, icon: <CheckCircleOutlined />, tab: 'resources' as TabKey },
+                      ]}
+                      renderItem={(item) => (
+                        <List.Item
+                          actions={[<Button key="open" type="link" onClick={() => setActiveTab(item.tab)}>处理</Button>]}
+                        >
+                          <List.Item.Meta avatar={item.icon} title={item.title} description={item.description} />
+                        </List.Item>
+                      )}
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} xl={9}>
+                  <Card title="快捷操作">
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <Button block type="primary" icon={<ExclamationCircleOutlined />} onClick={() => setActiveTab('pending')}>处理待确认订单</Button>
+                      <Button block icon={<DatabaseOutlined />} onClick={() => setActiveTab('movements')}>进入出入库管理</Button>
+                      <Button block icon={<AppstoreOutlined />} onClick={() => setActiveTab('resources')}>管理仓库资源</Button>
+                      <Button block icon={<InboxOutlined />} onClick={() => setActiveTab('all')}>查看全部订单</Button>
+                    </Space>
+                  </Card>
+                </Col>
+              </Row>
+            </>
+          )}
+
           {activeTab === 'pending' && (
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -338,6 +490,157 @@ function App() {
                 <Table columns={orderColumns} dataSource={allOrders} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 940 }} locale={{ emptyText: '暂无订单' }} />
               </Spin>
             </Card>
+          )}
+
+          {activeTab === 'resources' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">仓库资源总数</Typography.Text><br /><Title level={3}>{resources.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">已通过</Typography.Text><br /><Title level={3}>{resources.filter(r => r.status === 2).length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">待审核</Typography.Text><br /><Title level={3}>{resources.filter(r => r.status === 1).length}</Title></Card>
+                </Col>
+              </Row>
+              <Card
+                title="仓库资源管理"
+                extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreateResource}>新建仓库资源</Button>}
+              >
+                <Spin spinning={resourceLoading}>
+                  <Table
+                    columns={[
+                      { title: '仓库名称', dataIndex: 'warehouse_name', key: 'warehouse_name', width: 160 },
+                      { title: '省/市/区', key: 'region', width: 140, render: (_: unknown, r: WarehouseResource) => `${r.province || ''}${r.city || ''}${r.district || ''}` },
+                      { title: '地址', dataIndex: 'address', key: 'address', width: 180, ellipsis: true },
+                      { title: '总容量', dataIndex: 'capacity', key: 'capacity', width: 90, render: (v: number) => v ? `${v}` : '--' },
+                      { title: '可用容量', dataIndex: 'available_capacity', key: 'available_capacity', width: 90, render: (v: number) => v ? `${v}` : '--' },
+                      {
+                        title: '服务类型',
+                        dataIndex: 'service_types',
+                        key: 'service_types',
+                        width: 140,
+                        render: (v: string[]) => v?.length ? v.map((t, i) => <Tag key={i}>{t}</Tag>) : '--',
+                      },
+                      {
+                        title: '审核状态',
+                        dataIndex: 'status',
+                        key: 'status',
+                        width: 100,
+                        render: (s: number) => {
+                          const meta = resourceStatusMap[s] || { label: `状态${s}`, color: 'default' }
+                          return <Tag color={meta.color}>{meta.label}</Tag>
+                        },
+                      },
+                      {
+                        title: '审核备注',
+                        dataIndex: 'audit_remark',
+                        key: 'audit_remark',
+                        width: 140,
+                        ellipsis: true,
+                        render: (v: string) => v || '--',
+                      },
+                      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 140, render: (v: string) => v?.slice(0, 10) },
+                      {
+                        title: '操作',
+                        key: 'action',
+                        width: 140,
+                        render: (_: unknown, record: WarehouseResource) => (
+                          <Space>
+                            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditResource(record)} disabled={record.status === 4}>编辑</Button>
+                            <Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={() => handleResourceOffline(record)} disabled={record.status === 4}>下线</Button>
+                          </Space>
+                        ),
+                      },
+                    ]}
+                    dataSource={resources}
+                    rowKey="id"
+                    pagination={{ pageSize: 10 }}
+                    scroll={{ x: 1200 }}
+                    locale={{ emptyText: '暂无仓库资源，点击"新建仓库资源"开始上架' }}
+                  />
+                </Spin>
+              </Card>
+
+              <Modal
+                title={editingResource ? '编辑仓库资源' : '新建仓库资源'}
+                open={resourceModalVisible}
+                onOk={handleResourceSubmit}
+                onCancel={() => setResourceModalVisible(false)}
+                width={720}
+                okText={editingResource ? '保存' : '提交审核'}
+                destroyOnClose
+              >
+                <Form form={resourceForm} layout="vertical">
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item name="warehouse_name" label="仓库名称" rules={[{ required: true, message: '请输入仓库名称' }]}>
+                        <Input placeholder="例：华东一号仓" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item name="address" label="详细地址" rules={[{ required: true, message: '请输入详细地址' }]}>
+                        <Input placeholder="例：上海市浦东新区XX路100号" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Row gutter={16}>
+                    <Col span={8}>
+                      <Form.Item name="province" label="省份"><Input placeholder="省" /></Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item name="city" label="城市"><Input placeholder="市" /></Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item name="district" label="区/县"><Input placeholder="区" /></Form.Item>
+                    </Col>
+                  </Row>
+                  <Row gutter={16}>
+                    <Col span={8}>
+                      <Form.Item name="capacity" label="总容量(吨)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item name="available_capacity" label="可用容量(吨)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item name="loading_capacity" label="装卸能力"><Input placeholder="例：500吨/日" /></Form.Item>
+                    </Col>
+                  </Row>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item name="service_types" label="服务类型">
+                        <Select mode="multiple" placeholder="选择服务类型" options={[
+                          { label: '仓储保管', value: '仓储保管' },
+                          { label: '代储代管', value: '代储代管' },
+                          { label: '质押监管', value: '质押监管' },
+                          { label: '过户交割', value: '过户交割' },
+                          { label: '加工分拣', value: '加工分拣' },
+                        ]} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item name="business_hours" label="营业时间"><Input placeholder="例：周一至周五 8:00-18:00" /></Form.Item>
+                    </Col>
+                  </Row>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item name="price_rule" label="价格规则"><Input placeholder="例：30元/吨/天" /></Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item name="outbound_voucher_req" label="出库凭证要求"><Input placeholder="例：需卖方盖章出库单" /></Form.Item>
+                    </Col>
+                  </Row>
+                  <Form.Item name="pledge_supervision" label="支持质押监管" valuePropName="checked">
+                    <Switch />
+                  </Form.Item>
+                  <Form.Item name="description" label="描述">
+                    <Input.TextArea rows={3} placeholder="仓库特色、资质、服务优势等" />
+                  </Form.Item>
+                </Form>
+              </Modal>
+            </>
           )}
 
           <Modal

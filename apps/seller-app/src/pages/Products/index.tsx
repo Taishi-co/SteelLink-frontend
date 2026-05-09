@@ -259,10 +259,20 @@ export default function ProductsPage() {
   const loadPlatformWarehouses = async () => {
     setWarehouseLoading(true)
     try {
-      const response = await serviceOfferService.listWarehouses({ page_size: 100 })
-      setPlatformWarehouses(response.data.list)
+      const [publicResponse, mineResponse] = await Promise.allSettled([
+        serviceOfferService.listWarehouses({ page_size: 100 }),
+        serviceOfferService.listMyWarehouses(),
+      ])
+      const merged = new Map<number, WarehouseServiceItem>()
+      if (publicResponse.status === 'fulfilled') {
+        publicResponse.value.data.list.forEach((item) => merged.set(item.id, item))
+      }
+      if (mineResponse.status === 'fulfilled') {
+        mineResponse.value.data.forEach((item) => merged.set(item.id, item))
+      }
+      setPlatformWarehouses(Array.from(merged.values()))
     } catch {
-      message.warning('平台仓库列表加载失败，可切换为手动填写仓库')
+      message.warning('仓库列表加载失败，可切换为手动填写仓库')
     } finally {
       setWarehouseLoading(false)
     }
@@ -349,7 +359,7 @@ export default function ProductsPage() {
     form.resetFields()
     form.setFieldsValue({
       goodsType: 'spot',
-      warehouseBindingMode: 'manual',
+      warehouseBindingMode: 'platform',
       deliveryDays: 3,
       quoteValidity: 72,
       imageFiles: [],
@@ -657,6 +667,9 @@ export default function ProductsPage() {
             <Button icon={<RiseOutlined />} onClick={() => navigate('/bidding')}>
               参与竞价
             </Button>
+            <Button onClick={() => navigate('/warehouses')}>
+              仓库管理
+            </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
               发布商品
             </Button>
@@ -830,8 +843,9 @@ export default function ProductsPage() {
                       loading={warehouseLoading}
                       onChange={handlePlatformWarehouseChange}
                       options={platformWarehouses.map((warehouse) => ({
-                        label: `${warehouse.warehouse_name}（WH-${String(warehouse.id).padStart(6, '0')}）`,
+                        label: `${warehouse.warehouse_name}（WH-${String(warehouse.id).padStart(6, '0')}）${warehouse.status === 2 ? '' : ' · 待审核'}`,
                         value: warehouse.id,
+                        disabled: warehouse.status !== 2,
                       }))}
                     />
                   </Form.Item>

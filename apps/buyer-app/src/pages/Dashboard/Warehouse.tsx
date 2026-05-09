@@ -7,18 +7,30 @@ import {
   BarcodeOutlined,
   CalendarOutlined,
   CheckCircleOutlined,
+  CiCircleOutlined,
   DatabaseOutlined,
   DeleteOutlined,
   EditOutlined,
+  EyeOutlined,
   InboxOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
 import { serviceFulfillmentService, type WarehouseMovementInfo, type WarehouseProductInfo } from '@/services/serviceFulfillmentService'
+import { warehouseOrderService } from '@/services/orderService'
 import ServicePanelGate from './ServicePanelGate'
 
 const { Title, Paragraph, Text } = Typography
+
+const orderStatusLabels: Record<number, { label: string; color: string }> = {
+  12: { label: '待仓库确认', color: 'purple' },
+  13: { label: '待卖方确认', color: 'default' },
+  5: { label: '待提货', color: 'blue' },
+  6: { label: '配送中', color: 'processing' },
+  7: { label: '已送达', color: 'cyan' },
+  8: { label: '已完成', color: 'success' },
+}
 
 const movementStatusText: Record<string, string> = {
   pending: '待作业',
@@ -71,6 +83,27 @@ export default function WarehousePage() {
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingWarehouse, setEditingWarehouse] = useState<WarehouseServiceItem | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<{
+    id: number
+    order_no: string
+    buyer_name: string
+    seller_name: string
+    warehouse_name: string
+    warehouse_address: string
+    product_name: string
+    quantity: number
+    unit: string
+    total_amount: number
+    status: number
+    status_text: string
+    created_at: string
+  } | null>(null)
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false)
+  const [confirmLoading, setConfirmLoading] = useState(false)
+  const [confirmOrderRef, setConfirmOrderRef] = useState<typeof orders[0] | null>(null)
+  const [rejectModalVisible, setRejectModalVisible] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectOrderRef, setRejectOrderRef] = useState<typeof orders[0] | null>(null)
   const { data: warehouseData, isError: warehouseError, isLoading: warehouseLoading } = useQuery({
     queryKey: ['dashboard-warehouse-services'],
     queryFn: () => serviceOfferService.listWarehouses({ page_size: 100 }),
@@ -118,6 +151,125 @@ export default function WarehousePage() {
       void queryClient.invalidateQueries({ queryKey: ['dashboard-warehouse-services'] })
     },
   })
+
+  const { data: orderData, isLoading: orderLoading, refetch: refetchOrders } = useQuery({
+    queryKey: ['dashboard-warehouse-orders'],
+    queryFn: async () => {
+      const [pendingList, allList] = await Promise.all([
+        warehouseOrderService.listPending(),
+        warehouseOrderService.listAll(),
+      ])
+      const allOrders = [...new Map([...pendingList, ...allList].map(o => [o.id, o])).values()]
+      return allOrders.map(order => ({
+        id: order.id,
+        order_no: order.order_no,
+        buyer_name: order.buyer_name,
+        seller_name: order.seller_name,
+        warehouse_name: order.delivery_info?.warehouse_name || '',
+        warehouse_address: order.delivery_info?.warehouse_address || '',
+        product_name: order.items?.[0]?.product_name || '未知商品',
+        quantity: order.total_quantity || 0,
+        unit: '吨',
+        total_amount: order.total_amount || 0,
+        status: order.status,
+        status_text: orderStatusLabels[order.status]?.label || '未知',
+        created_at: order.created_at || '',
+      }))
+    },
+  })
+
+  const orders = orderData ?? []
+  const pendingOrders = orders.filter(o => o.status === 12)
+
+  const handleViewOrderDetail = (order: typeof orders[0]) => {
+    setSelectedOrder(order)
+  }
+
+  const handleConfirmOrder = async () => {
+    if (!confirmOrderRef) return
+    setConfirmLoading(true)
+    try {
+      await warehouseOrderService.warehouseConfirm(confirmOrderRef.id, { confirmed: true })
+      message.success('确认成功')
+      setConfirmModalVisible(false)
+      setConfirmOrderRef(null)
+      void refetchOrders()
+    } catch (error) {
+      message.error('确认失败')
+    } finally {
+      setConfirmLoading(false)
+    }
+  }
+
+  const handleRejectOrder = async () => {
+    if (!rejectOrderRef) return
+    try {
+      await warehouseOrderService.warehouseConfirm(rejectOrderRef.id, { confirmed: false, condition_note: rejectReason })
+      message.success('已驳回')
+      setRejectModalVisible(false)
+      setRejectOrderRef(null)
+      setRejectReason('')
+      void refetchOrders()
+    } catch (error) {
+      message.error('驳回失败')
+    }
+  }
+
+  const orderColumns: ColumnsType<typeof orders[0]> = [
+    { title: '订单编号', dataIndex: 'order_no', key: 'order_no', width: 180, render: (text: string) => <code className="text-sm">{text}</code> },
+    { title: '买家', dataIndex: 'buyer_name', key: 'buyer_name', width: 120 },
+    { title: '卖家', dataIndex: 'seller_name', key: 'seller_name', width: 120 },
+    { title: '商品', dataIndex: 'product_name', key: 'product_name', ellipsis: true },
+    { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 80, render: (quantity: number, record: typeof orders[0]) => `${quantity} ${record.unit}` },
+    { title: '金额', dataIndex: 'total_amount', key: 'total_amount', width: 100, render: (amount: number) => `¥${amount.toLocaleString('zh-CN')}` },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status: number) => {
+        const info = orderStatusLabels[status] || { label: '未知', color: 'default' }
+        return <Tag color={info.color}>{info.label}</Tag>
+      },
+    },
+    { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 120 },
+    {
+      title: '操作',
+      key: 'action',
+      width: 180,
+      render: (_: unknown, record: typeof orders[0]) => (
+        <Space>
+          <Button size="small" onClick={() => handleViewOrderDetail(record)} icon={<EyeOutlined />}>详情</Button>
+          {record.status === 12 && (
+            <>
+              <Button
+                size="small"
+                type="primary"
+                onClick={() => {
+                  setConfirmOrderRef(record)
+                  setConfirmModalVisible(true)
+                }}
+                icon={<CheckCircleOutlined />}
+              >
+                确认
+              </Button>
+              <Button
+                size="small"
+                danger
+                onClick={() => {
+                  setRejectOrderRef(record)
+                  setRejectModalVisible(true)
+                }}
+                icon={<CiCircleOutlined />}
+              >
+                驳回
+              </Button>
+            </>
+          )}
+        </Space>
+      ),
+    },
+  ]
 
   const openCreateWarehouse = () => {
     setEditingWarehouse(null)
@@ -241,6 +393,14 @@ export default function WarehousePage() {
           <Table loading={warehouseLoading} columns={warehouseColumns} dataSource={warehouses} rowKey="id" pagination={false} scroll={{ x: 1100 }} />
         </Card>
 
+        <Card className="mt-4 rounded-lg" title={`待仓库确认订单 (${pendingOrders.length})`}>
+          <Table loading={orderLoading} columns={orderColumns} dataSource={pendingOrders} rowKey="id" pagination={false} scroll={{ x: 1100 }} />
+        </Card>
+
+        <Card className="mt-4 rounded-lg" title="全部订单">
+          <Table loading={orderLoading} columns={orderColumns} dataSource={orders.filter(o => o.status !== 12)} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 1100 }} />
+        </Card>
+
         <Row gutter={[16, 16]} className="mt-4">
           <Col xs={24} xl={15}>
             <Card className="rounded-lg" title="商品与仓库关系">
@@ -320,6 +480,117 @@ export default function WarehousePage() {
               <Input.TextArea rows={3} />
             </Form.Item>
           </Form>
+        </Modal>
+
+        <Modal
+          title="订单详情"
+          visible={!!selectedOrder}
+          onCancel={() => setSelectedOrder(null)}
+          footer={null}
+          width={600}
+        >
+          {selectedOrder && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="font-mono text-lg">{selectedOrder.order_no}</span>
+                <Tag color={orderStatusLabels[selectedOrder.status]?.color}>
+                  {orderStatusLabels[selectedOrder.status]?.label}
+                </Tag>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Text className="text-gray-500">买家企业</Text>
+                  <div className="font-medium">{selectedOrder.buyer_name}</div>
+                </div>
+                <div>
+                  <Text className="text-gray-500">卖家企业</Text>
+                  <div className="font-medium">{selectedOrder.seller_name}</div>
+                </div>
+              </div>
+
+              <div>
+                <Text className="text-gray-500">提货仓库</Text>
+                <div className="font-medium">{selectedOrder.warehouse_name}</div>
+                <Text className="text-sm text-gray-400">{selectedOrder.warehouse_address}</Text>
+              </div>
+
+              <div className="border-t pt-4">
+                <Text className="text-gray-500">商品信息</Text>
+                <div className="font-medium">{selectedOrder.product_name}</div>
+                <div className="text-sm">数量：{selectedOrder.quantity} {selectedOrder.unit}</div>
+                <div className="text-sm">金额：¥{selectedOrder.total_amount.toLocaleString('zh-CN')}</div>
+              </div>
+
+              <div className="border-t pt-4">
+                <Text className="text-gray-500">创建时间</Text>
+                <div>{selectedOrder.created_at}</div>
+              </div>
+
+              {selectedOrder.status === 12 && (
+                <div className="flex gap-3 mt-4">
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      setConfirmOrderRef(selectedOrder)
+                      setConfirmModalVisible(true)
+                    }}
+                    icon={<CheckCircleOutlined />}
+                  >
+                    确认入库
+                  </Button>
+                  <Button
+                    danger
+                    onClick={() => {
+                      setRejectOrderRef(selectedOrder)
+                      setRejectModalVisible(true)
+                    }}
+                    icon={<CiCircleOutlined />}
+                  >
+                    驳回订单
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </Modal>
+
+        <Modal
+          title="确认订单"
+          open={confirmModalVisible}
+          onCancel={() => setConfirmModalVisible(false)}
+          onOk={handleConfirmOrder}
+          okText="确认入库"
+          okType="primary"
+          loading={confirmLoading}
+        >
+          <p>确定要确认该订单的入库吗？</p>
+          {confirmOrderRef && (
+            <p className="text-sm text-gray-500 mt-2">订单编号：{confirmOrderRef.order_no}</p>
+          )}
+        </Modal>
+
+        <Modal
+          title="驳回订单"
+          open={rejectModalVisible}
+          onCancel={() => {
+            setRejectModalVisible(false)
+            setRejectReason('')
+          }}
+          onOk={handleRejectOrder}
+          okText="确认驳回"
+          okType="danger"
+        >
+          <p>请输入驳回原因：</p>
+          <textarea
+            className="w-full h-24 mt-2 p-3 border rounded-lg resize-none"
+            placeholder="请输入驳回原因..."
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+          />
+          {rejectOrderRef && (
+            <p className="text-sm text-gray-500 mt-2">订单编号：{rejectOrderRef.order_no}</p>
+          )}
         </Modal>
       </div>
     </ServicePanelGate>

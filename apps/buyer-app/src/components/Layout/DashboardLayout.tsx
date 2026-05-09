@@ -10,11 +10,14 @@ import {
   DollarOutlined,
   AppstoreOutlined,
   ShopOutlined,
+  HomeOutlined,
+  TruckOutlined,
   LineChartOutlined,
   RiseOutlined,
   LogoutOutlined,
   UserOutlined,
   ArrowRightOutlined,
+  CloudServerOutlined,
 } from '@ant-design/icons'
 import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
 import { useUserStore } from '@/stores'
@@ -36,8 +39,9 @@ const allNavItems: NavItem[] = [
   { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
   { key: '/dashboard/bidding', icon: <RiseOutlined />, label: '竞价管理', services: ['procurement'] },
   { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单', services: ['procurement', 'sales'] },
-  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '资金服务', services: ['procurement', 'sales'] },
-  { key: '/dashboard/logistics', icon: <ShopOutlined />, label: '仓储物流', services: ['logistics', 'warehouse'] },
+  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资', services: ['finance'] },
+  { key: '/dashboard/warehouse', icon: <CloudServerOutlined />, label: '仓储管理', services: ['warehouse'] },
+  { key: '/dashboard/logistics', icon: <TruckOutlined />, label: '物流管理', services: ['logistics'] },
   { key: '/dashboard/services', icon: <AppstoreOutlined />, label: '服务入口', roles: ['enterprise'] },
 ]
 
@@ -48,6 +52,8 @@ const accountItems = [
 
 const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
 const financeWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5177/finance/' : '/finance/'
+const logisticsWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5175/logistics/' : '/logistics/'
+const warehouseWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5176/warehouse/' : '/warehouse/'
 
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
@@ -216,6 +222,38 @@ export default function DashboardLayout() {
                     <>
                       <span className="text-xs text-violet-300 font-semibold flex-1">进入资金方工作台</span>
                       <ArrowRightOutlined className="text-violet-300 text-[10px]" />
+                    </>
+                  )}
+                </div>
+              </a>
+            )}
+            {approvedServices.has('logistics') && (
+              <a href={logisticsWorkbenchHref}>
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
+                  style={{ background: 'rgba(37,99,235,.14)', border: '1px solid rgba(37,99,235,.25)' }}
+                >
+                  <TruckOutlined className="text-blue-300 text-sm" />
+                  {!collapsed && (
+                    <>
+                      <span className="text-xs text-blue-300 font-semibold flex-1">进入物流管理中心</span>
+                      <ArrowRightOutlined className="text-blue-300 text-[10px]" />
+                    </>
+                  )}
+                </div>
+              </a>
+            )}
+            {approvedServices.has('warehouse') && (
+              <a href={warehouseWorkbenchHref}>
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
+                  style={{ background: 'rgba(22,163,74,.14)', border: '1px solid rgba(22,163,74,.25)' }}
+                >
+                  <HomeOutlined className="text-emerald-300 text-sm" />
+                  {!collapsed && (
+                    <>
+                      <span className="text-xs text-emerald-300 font-semibold flex-1">进入仓储管理中心</span>
+                      <ArrowRightOutlined className="text-emerald-300 text-[10px]" />
                     </>
                   )}
                 </div>
