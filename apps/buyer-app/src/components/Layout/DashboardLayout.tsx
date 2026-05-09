@@ -18,6 +18,7 @@ import {
   UserOutlined,
   ArrowRightOutlined,
   CloudServerOutlined,
+  MailOutlined,
 } from '@ant-design/icons'
 import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
 import { useUserStore } from '@/stores'
@@ -36,6 +37,7 @@ interface NavItem {
 
 const allNavItems: NavItem[] = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '个人工作台' },
+  { key: '/dashboard/notifications', icon: <MailOutlined />, label: '站内信' },
   { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
   { key: '/dashboard/bidding', icon: <RiseOutlined />, label: '竞价管理', services: ['procurement'] },
   { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单', services: ['procurement', 'sales'] },

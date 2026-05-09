@@ -4,6 +4,7 @@ import { TeamOutlined, UserOutlined, LogoutOutlined, ShoppingCartOutlined, Order
 import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
 import { getIdentityStatusLabel } from '@/services/certificationService'
 import { useUserStore } from '@/stores'
+import NotificationBell from '@/components/NotificationBell'
 
 const { Header: AntHeader } = Layout
 
@@ -78,6 +79,7 @@ export default function HomeHeader() {
                   <Button icon={<ShopOutlined />}>卖家中心</Button>
                 </a>
               )}
+              <NotificationBell />
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
                 <div className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
                   <Avatar size="small" icon={<UserOutlined />} className="bg-blue-500" />
