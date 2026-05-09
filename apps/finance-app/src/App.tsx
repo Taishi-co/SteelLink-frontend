@@ -8,6 +8,8 @@ import {
   FileSearchOutlined,
   HomeOutlined,
   SafetyCertificateOutlined,
+  EditOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import { financeOrderService } from '@/services/orderService'
 import type { OrderInfo } from '@/services/orderService'
@@ -55,6 +57,9 @@ function App() {
   const [financeProducts, setFinanceProducts] = useState<FinanceServiceItem[]>([])
   const [productLoading, setProductLoading] = useState(false)
   const [creatingProduct, setCreatingProduct] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<FinanceServiceItem | null>(null)
+  const [editProductModalVisible, setEditProductModalVisible] = useState(false)
+  const [editProductForm] = Form.useForm()
   const [riskOrders, setRiskOrders] = useState<OrderInfo[]>([])
   const [debtOrders, setDebtOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
@@ -170,6 +175,55 @@ function App() {
     } finally {
       setCreatingProduct(false)
     }
+  }
+
+  const openEditProduct = (record: FinanceServiceItem) => {
+    setEditingProduct(record)
+    editProductForm.setFieldsValue({
+      name: record.name,
+      finance_type: record.finance_type,
+      min_amount: record.min_amount,
+      max_amount: record.max_amount,
+      term_days: record.term_days,
+      annual_rate: record.annual_rate,
+      fee_rule: record.fee_rule,
+      risk_control_rule: record.risk_control_rule,
+      description: record.description,
+    })
+    setEditProductModalVisible(true)
+  }
+
+  const handleEditProduct = async () => {
+    if (!editingProduct) return
+    try {
+      const values = await editProductForm.validateFields()
+      await financeService.update(editingProduct.id, values)
+      message.success('金融产品更新成功')
+      setEditProductModalVisible(false)
+      setEditingProduct(null)
+      fetchProducts()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('更新失败')
+    }
+  }
+
+  const handleOfflineProduct = async (record: FinanceServiceItem) => {
+    Modal.confirm({
+      title: '确认下线该金融产品？',
+      content: `产品：${record.name}，下线后买方将无法申请该产品。`,
+      okText: '确认下线',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await financeService.delete(record.id)
+          message.success('金融产品已下线')
+          fetchProducts()
+        } catch {
+          message.error('下线失败')
+        }
+      },
+    })
   }
 
   const handleSubmitRisk = async () => {
@@ -450,6 +504,17 @@ function App() {
       },
     },
     { title: '审核备注', dataIndex: 'audit_remark', key: 'audit_remark', width: 180, render: (v?: string) => v || '-' },
+    {
+      title: '操作',
+      key: 'action',
+      width: 140,
+      render: (_: unknown, record: FinanceServiceItem) => (
+        <Space>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditProduct(record)} disabled={record.status === 4}>编辑</Button>
+          <Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={() => handleOfflineProduct(record)} disabled={record.status === 4}>下线</Button>
+        </Space>
+      ),
+    },
   ]
 
   const menuItems = [
@@ -797,6 +862,64 @@ function App() {
                 <Input value={releaseVoucherURL} onChange={(e) => setReleaseVoucherURL(e.target.value)} placeholder="选填，https://..." />
               </div>
             </Space>
+          </Modal>
+
+          <Modal
+            title={editingProduct ? '编辑金融产品' : '查看金融产品'}
+            open={editProductModalVisible}
+            onOk={handleEditProduct}
+            onCancel={() => { setEditProductModalVisible(false); setEditingProduct(null) }}
+            width={640}
+            okText="保存"
+            destroyOnClose
+          >
+            <Form form={editProductForm} layout="vertical">
+              <Form.Item name="name" label="产品名称" rules={[{ required: true, message: '请输入产品名称' }]}>
+                <Input placeholder="例：供应链托盘融资" />
+              </Form.Item>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="finance_type" label="融资类型">
+                    <Input placeholder="例：存货质押融资" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="term_days" label="账期(天)">
+                    <InputNumber style={{ width: '100%' }} min={1} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="min_amount" label="最低额度(元)">
+                    <InputNumber style={{ width: '100%' }} min={0} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="max_amount" label="最高额度(元)">
+                    <InputNumber style={{ width: '100%' }} min={0} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="annual_rate" label="年化费率(%)">
+                    <InputNumber style={{ width: '100%' }} min={0} precision={4} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="fee_rule" label="手续费规则">
+                    <Input placeholder="例如按授信金额 0.3%" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="risk_control_rule" label="风控要求">
+                <Input.TextArea rows={3} />
+              </Form.Item>
+              <Form.Item name="description" label="服务描述">
+                <Input.TextArea rows={3} />
+              </Form.Item>
+            </Form>
           </Modal>
         </Content>
       </Layout>

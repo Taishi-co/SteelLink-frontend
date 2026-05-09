@@ -36,4 +36,14 @@ export const financeService = {
     const response = await api.post<unknown, ApiResponse<FinanceServiceItem>>('/finance-services', payload)
     return response.data
   },
+
+  async update(id: number, payload: Partial<FinanceServiceItem>) {
+    const response = await api.put<unknown, ApiResponse<FinanceServiceItem>>(`/finance-services/${id}`, payload)
+    return response.data
+  },
+
+  async delete(id: number) {
+    const response = await api.delete<unknown, ApiResponse<void>>(`/finance-services/${id}`)
+    return response.data
+  },
 }

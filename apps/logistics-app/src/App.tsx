@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Col, Input, InputNumber, Layout, List, Modal, Row, Space, Spin, Table, Tag, Typography, message } from 'antd'
+import { Badge, Button, Card, Col, Form, Input, InputNumber, Layout, List, Modal, Row, Select, Space, Spin, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   CarOutlined,
@@ -9,9 +9,15 @@ import {
   SafetyCertificateOutlined,
   EnvironmentOutlined,
   DollarCircleOutlined,
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons'
 import { logisticsOrderService, logisticsFulfillmentService } from '@/services/orderService'
 import type { OrderInfo, LogisticsOrder } from '@/services/orderService'
+import { logisticsResourceService } from '@/services/logisticsResourceService'
+import type { LogisticsResource, LogisticsResourcePayload } from '@/services/logisticsResourceService'
 import { hasLogisticsCapability } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
@@ -38,13 +44,25 @@ const statusMap: Record<number, { label: string; color: string }> = {
   24: { label: '待重新发起物流', color: 'volcano' },
 }
 
-type TabKey = 'bidding' | 'logistics-orders' | 'all'
+const resourceStatusMap: Record<number, { label: string; color: string }> = {
+  1: { label: '待审核', color: 'orange' },
+  2: { label: '已通过', color: 'success' },
+  3: { label: '已驳回', color: 'error' },
+  4: { label: '已下线', color: 'default' },
+}
+
+type TabKey = 'bidding' | 'logistics-orders' | 'resources' | 'all'
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('bidding')
   const [biddingOrders, setBiddingOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
   const [logisticsOrders, setLogisticsOrders] = useState<LogisticsOrder[]>([])
+  const [resources, setResources] = useState<LogisticsResource[]>([])
+  const [resourceLoading, setResourceLoading] = useState(false)
+  const [resourceModalVisible, setResourceModalVisible] = useState(false)
+  const [editingResource, setEditingResource] = useState<LogisticsResource | null>(null)
+  const [resourceForm] = Form.useForm<LogisticsResourcePayload>()
   const [loading, setLoading] = useState(false)
   const [quoteModal, setQuoteModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [quotePrice, setQuotePrice] = useState<number>(0)
@@ -102,10 +120,81 @@ function App() {
     }
   }
 
+  const fetchResources = async () => {
+    setResourceLoading(true)
+    try {
+      const list = await logisticsResourceService.listMine()
+      setResources(list || [])
+    } catch {
+      message.error('获取运力资源列表失败')
+    } finally {
+      setResourceLoading(false)
+    }
+  }
+
+  const openCreateResource = () => {
+    setEditingResource(null)
+    resourceForm.resetFields()
+    setResourceModalVisible(true)
+  }
+
+  const openEditResource = (record: LogisticsResource) => {
+    setEditingResource(record)
+    resourceForm.setFieldsValue({
+      name: record.name,
+      route_start: record.route_start,
+      route_end: record.route_end,
+      service_scope: record.service_scope,
+      vehicle_type: record.vehicle_type,
+      load_capacity: record.load_capacity,
+      price_rule: record.price_rule,
+      fleet_name: record.fleet_name,
+      description: record.description,
+    })
+    setResourceModalVisible(true)
+  }
+
+  const handleResourceSubmit = async () => {
+    try {
+      const values = await resourceForm.validateFields()
+      if (editingResource) {
+        await logisticsResourceService.update(editingResource.id, values)
+        message.success('运力资源更新成功')
+      } else {
+        await logisticsResourceService.create(values as LogisticsResourcePayload)
+        message.success('运力资源创建成功，等待平台审核')
+      }
+      setResourceModalVisible(false)
+      fetchResources()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('操作失败')
+    }
+  }
+
+  const handleResourceOffline = async (record: LogisticsResource) => {
+    Modal.confirm({
+      title: '确认下线该运力资源？',
+      content: `线路：${record.name}（${record.route_start} → ${record.route_end}），下线后将不再参与物流竞价匹配。`,
+      okText: '确认下线',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await logisticsResourceService.delete(record.id)
+          message.success('运力资源已下线')
+          fetchResources()
+        } catch {
+          message.error('下线失败')
+        }
+      },
+    })
+  }
+
   useEffect(() => {
     if (activeTab === 'bidding') fetchBidding()
     else if (activeTab === 'all') fetchAll()
     else if (activeTab === 'logistics-orders') fetchLogisticsOrders()
+    else if (activeTab === 'resources') fetchResources()
   }, [activeTab])
 
   const handleSubmitQuote = async () => {
@@ -296,6 +385,7 @@ function App() {
   const menuItems = [
     { key: 'bidding' as TabKey, label: '物流竞价', icon: <DollarCircleOutlined /> },
     { key: 'logistics-orders' as TabKey, label: '物流订单', icon: <CarOutlined /> },
+    { key: 'resources' as TabKey, label: '运力资源管理', icon: <AppstoreOutlined /> },
     { key: 'all' as TabKey, label: '全部订单', icon: <DatabaseOutlined /> },
   ]
 
@@ -347,7 +437,7 @@ function App() {
         <Header style={{ background: '#fff', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text strong>物流方工作台</Text>
           <Space>
-            <Button icon={<EnvironmentOutlined />} onClick={() => { if (activeTab === 'bidding') fetchBidding(); else if (activeTab === 'logistics-orders') fetchLogisticsOrders(); else fetchAll(); }}>
+            <Button icon={<EnvironmentOutlined />} onClick={() => { if (activeTab === 'bidding') fetchBidding(); else if (activeTab === 'logistics-orders') fetchLogisticsOrders(); else if (activeTab === 'resources') fetchResources(); else fetchAll(); }}>
               刷新
             </Button>
             <Button icon={<HomeOutlined />} href="/">买家首页</Button>
@@ -389,6 +479,138 @@ function App() {
                 <Table columns={allOrderColumns} dataSource={allOrders} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 940 }} locale={{ emptyText: '暂无订单' }} />
               </Spin>
             </Card>
+          )}
+
+          {activeTab === 'resources' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">运力资源总数</Typography.Text><br /><Title level={3}>{resources.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">已通过</Typography.Text><br /><Title level={3}>{resources.filter(r => r.status === 2).length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">待审核</Typography.Text><br /><Title level={3}>{resources.filter(r => r.status === 1).length}</Title></Card>
+                </Col>
+              </Row>
+              <Card
+                title="运力资源管理"
+                extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreateResource}>新建运力资源</Button>}
+              >
+                <Spin spinning={resourceLoading}>
+                  <Table
+                    columns={[
+                      { title: '线路名称', dataIndex: 'name', key: 'name', width: 160 },
+                      { title: '起始地', dataIndex: 'route_start', key: 'route_start', width: 120 },
+                      { title: '目的地', dataIndex: 'route_end', key: 'route_end', width: 120 },
+                      { title: '车型', dataIndex: 'vehicle_type', key: 'vehicle_type', width: 100, render: (v: string) => v || '--' },
+                      { title: '载重(吨)', dataIndex: 'load_capacity', key: 'load_capacity', width: 90, render: (v: number) => v ? `${v}` : '--' },
+                      { title: '车队', dataIndex: 'fleet_name', key: 'fleet_name', width: 120, render: (v: string) => v || '--' },
+                      { title: '价格规则', dataIndex: 'price_rule', key: 'price_rule', width: 140, ellipsis: true, render: (v: string) => v || '--' },
+                      {
+                        title: '审核状态',
+                        dataIndex: 'status',
+                        key: 'status',
+                        width: 100,
+                        render: (s: number) => {
+                          const meta = resourceStatusMap[s] || { label: `状态${s}`, color: 'default' }
+                          return <Tag color={meta.color}>{meta.label}</Tag>
+                        },
+                      },
+                      {
+                        title: '审核备注',
+                        dataIndex: 'audit_remark',
+                        key: 'audit_remark',
+                        width: 140,
+                        ellipsis: true,
+                        render: (v: string) => v || '--',
+                      },
+                      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 140, render: (v: string) => v?.slice(0, 10) },
+                      {
+                        title: '操作',
+                        key: 'action',
+                        width: 140,
+                        render: (_: unknown, record: LogisticsResource) => (
+                          <Space>
+                            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditResource(record)} disabled={record.status === 4}>编辑</Button>
+                            <Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={() => handleResourceOffline(record)} disabled={record.status === 4}>下线</Button>
+                          </Space>
+                        ),
+                      },
+                    ]}
+                    dataSource={resources}
+                    rowKey="id"
+                    pagination={{ pageSize: 10 }}
+                    scroll={{ x: 1200 }}
+                    locale={{ emptyText: '暂无运力资源，点击"新建运力资源"开始上架' }}
+                  />
+                </Spin>
+              </Card>
+
+              <Modal
+                title={editingResource ? '编辑运力资源' : '新建运力资源'}
+                open={resourceModalVisible}
+                onOk={handleResourceSubmit}
+                onCancel={() => setResourceModalVisible(false)}
+                width={720}
+                okText={editingResource ? '保存' : '提交审核'}
+                destroyOnClose
+              >
+                <Form form={resourceForm} layout="vertical">
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item name="name" label="线路名称" rules={[{ required: true, message: '请输入线路名称' }]}>
+                        <Input placeholder="例：上海-杭州干线" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item name="fleet_name" label="车队名称"><Input placeholder="例：华东一号车队" /></Form.Item>
+                    </Col>
+                  </Row>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item name="route_start" label="起始地" rules={[{ required: true, message: '请输入起始地' }]}>
+                        <Input placeholder="例：上海市" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item name="route_end" label="目的地" rules={[{ required: true, message: '请输入目的地' }]}>
+                        <Input placeholder="例：杭州市" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Row gutter={16}>
+                    <Col span={8}>
+                      <Form.Item name="vehicle_type" label="车型">
+                        <Select placeholder="选择车型" options={[
+                          { label: '平板车', value: '平板车' },
+                          { label: '厢式货车', value: '厢式货车' },
+                          { label: '自卸车', value: '自卸车' },
+                          { label: '集装箱车', value: '集装箱车' },
+                          { label: '冷藏车', value: '冷藏车' },
+                          { label: '罐车', value: '罐车' },
+                        ]} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item name="load_capacity" label="载重能力(吨)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item name="service_scope" label="服务范围"><Input placeholder="例：华东地区" /></Form.Item>
+                    </Col>
+                  </Row>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item name="price_rule" label="价格规则"><Input placeholder="例：120元/吨" /></Form.Item>
+                    </Col>
+                  </Row>
+                  <Form.Item name="description" label="描述">
+                    <Input.TextArea rows={3} placeholder="运力特色、资质、服务优势等" />
+                  </Form.Item>
+                </Form>
+              </Modal>
+            </>
           )}
 
           <Modal
