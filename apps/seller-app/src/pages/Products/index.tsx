@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Alert,
+  AutoComplete,
   Button,
   Card,
   Descriptions,
   Drawer,
   Form,
+  Image,
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Spin,
@@ -35,6 +38,7 @@ import { getErrorMessage } from '@steellink/shared/utils'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { useNavigate } from 'react-router-dom'
+import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
 import { sellerProductService, type SellerProductRecord } from '@/services/productService'
 import { uploadService, type UploadPurpose } from '@/services/uploadService'
 import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
@@ -53,6 +57,8 @@ interface ProductFormValues {
   steelMill: string
   material: string
   spec: string
+  warehouseBindingMode: 'platform' | 'manual' | 'unbound'
+  platformWarehouseId?: number
   warehouseServiceId?: number
   warehouseName: string
   warehouseCode: string
@@ -78,8 +84,6 @@ interface ProductDisplayFormValues {
   imageFiles: UploadFile[]
   qualificationFiles: UploadFile[]
 }
-
-const categoryOptions = ['全部', '热轧板卷', '冷轧板卷', '中厚板', '型材', '管材', '建材']
 
 const goodsTypeMeta: Record<'spot' | 'futures', { color: string; text: string }> = {
   spot: { color: 'blue', text: '现货' },
@@ -156,6 +160,10 @@ function normalizeUploadList(fileList?: string[]) {
   }))
 }
 
+function firstImageURL(product: SellerProductRecord) {
+  return product.image_urls.find(Boolean)
+}
+
 async function resolveUploadedURLs(fileList: UploadFile[] = [], purpose: UploadPurpose) {
   const urls: string[] = []
 
@@ -220,6 +228,7 @@ function toDisplayPayload(values: ProductDisplayFormValues, imageURLs: string[],
 export default function ProductsPage() {
   const navigate = useNavigate()
   const [products, setProducts] = useState<SellerProductRecord[]>([])
+  const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
   const [platformWarehouses, setPlatformWarehouses] = useState<WarehouseServiceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [warehouseLoading, setWarehouseLoading] = useState(false)
@@ -259,8 +268,18 @@ export default function ProductsPage() {
     }
   }
 
+  const loadCategories = async () => {
+    try {
+      const response = await categoryService.list()
+      setCategories(response.data.length > 0 ? response.data : fallbackProductCategories)
+    } catch {
+      setCategories(fallbackProductCategories)
+    }
+  }
+
   useEffect(() => {
     void loadProducts()
+    void loadCategories()
     void loadPlatformWarehouses()
   }, [])
 
@@ -275,6 +294,34 @@ export default function ProductsPage() {
         return matchesSearch && matchesCategory && matchesStatus
       }),
     [categoryFilter, products, searchText, statusFilter],
+  )
+
+  const categorySelectOptions = useMemo(() => {
+    const categoryNames = new Set(categories.map((category) => category.name))
+    products.forEach((product) => {
+      if (product.category) {
+        categoryNames.add(product.category)
+      }
+    })
+    return [
+      { label: '全部品类', value: '全部' },
+      ...Array.from(categoryNames).map((name) => {
+        const category = categories.find((item) => item.name === name)
+        return {
+          label: category?.display_name || name,
+          value: name,
+        }
+      }),
+    ]
+  }, [categories, products])
+
+  const categoryInputOptions = useMemo(
+    () =>
+      categories.map((category) => ({
+        label: category.display_name || category.name,
+        value: category.name,
+      })),
+    [categories],
   )
 
   const productSummary = useMemo(
@@ -302,8 +349,44 @@ export default function ProductsPage() {
     form.resetFields()
     form.setFieldsValue({
       goodsType: 'spot',
+      warehouseBindingMode: 'manual',
+      deliveryDays: 3,
+      quoteValidity: 72,
       imageFiles: [],
       qualificationFiles: [],
+    } as Partial<ProductFormValues>)
+    setIsModalOpen(true)
+  }
+
+  const openEditModal = (product: SellerProductRecord) => {
+    setEditingProduct(product)
+    form.resetFields()
+    form.setFieldsValue({
+      name: product.name,
+      goodsType: product.goods_type,
+      category: product.category,
+      subCategory: product.sub_category,
+      steelMill: product.steel_mill,
+      material: product.material,
+      spec: product.specs,
+      warehouseBindingMode: product.warehouse_service_id ? 'platform' : 'manual',
+      warehouseServiceId: product.warehouse_service_id,
+      platformWarehouseId: product.warehouse_service_id,
+      warehouseName: product.warehouse_name,
+      warehouseCode: product.warehouse_code,
+      province: product.province,
+      city: product.city,
+      district: product.district,
+      address: product.address,
+      bundleNo: product.bundle_no,
+      quantity: product.stock,
+      unitPrice: product.price,
+      minOrderQty: product.min_order_qty,
+      description: product.description,
+      deliveryDays: product.delivery_days || 3,
+      quoteValidity: product.quote_validity || 72,
+      imageFiles: normalizeUploadList(product.image_urls),
+      qualificationFiles: normalizeUploadList(product.qualification_urls),
     } as Partial<ProductFormValues>)
     setIsModalOpen(true)
   }
@@ -313,6 +396,7 @@ export default function ProductsPage() {
     if (!warehouse) return
 
     form.setFieldsValue({
+      warehouseServiceId: warehouse.id,
       warehouseName: warehouse.warehouse_name,
       warehouseCode: `WH-${String(warehouse.id).padStart(6, '0')}`,
       province: warehouse.province,
@@ -352,7 +436,12 @@ export default function ProductsPage() {
     try {
       const imageURLs = await resolveUploadedURLs(values.imageFiles, 'product_image')
       const qualificationURLs = await resolveUploadedURLs(values.qualificationFiles, 'product_qualification')
-      await sellerProductService.create(toPayload(values, imageURLs, qualificationURLs))
+      const payload = toPayload(values, imageURLs, qualificationURLs)
+      if (editingProduct) {
+        await sellerProductService.update(editingProduct.id, payload)
+      } else {
+        await sellerProductService.create(payload)
+      }
       message.success(editingProduct ? '商品已重新提交审核' : '商品已提交审核，请等待平台处理')
       closeModal()
       await loadProducts()
@@ -381,7 +470,45 @@ export default function ProductsPage() {
     }
   }
 
+  const handleDeleteProduct = async (product: SellerProductRecord) => {
+    setSubmitting(true)
+    try {
+      await sellerProductService.remove(product.id)
+      message.success('商品已删除')
+      if (drawerProduct?.id === product.id) {
+        setDrawerProduct(null)
+      }
+      await loadProducts()
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '删除失败，请确认商品没有锁定库存且当前账号有权限'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const columns: ColumnsType<SellerProductRecord> = [
+    {
+      title: '缩略图',
+      key: 'thumbnail',
+      width: 96,
+      render: (_, record) => {
+        const imageURL = firstImageURL(record)
+        return imageURL ? (
+          <Image
+            src={imageURL}
+            alt={record.name}
+            width={64}
+            height={64}
+            className="rounded-md object-cover"
+            preview={false}
+          />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-gray-200 bg-gray-50 text-xs text-gray-400">
+            无图
+          </div>
+        )
+      },
+    },
     {
       title: '商品名称',
       dataIndex: 'name',
@@ -496,18 +623,26 @@ export default function ProductsPage() {
       render: (_, record) => (
         <Space wrap>
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setDrawerProduct(record)}>
-            查看审核
+            查看详情
           </Button>
-          {record.status !== 'pending_review' && record.status !== 'rejected' ? (
-            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openDisplayModal(record)}>
-              补充资料
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditModal(record)}>
+            编辑
+          </Button>
+          <Button type="link" size="small" icon={<ReloadOutlined />} onClick={() => openDisplayModal(record)}>
+            补充资料
+          </Button>
+          <Popconfirm
+            title="确认删除商品？"
+            description="删除后该商品不会再出现在卖家商品列表。"
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true, loading: submitting }}
+            onConfirm={() => void handleDeleteProduct(record)}
+          >
+            <Button type="link" danger size="small">
+              删除
             </Button>
-          ) : null}
-          {record.status === 'rejected' ? (
-            <Button type="link" size="small" icon={<ReloadOutlined />} onClick={() => openDisplayModal(record)}>
-              重新提交
-            </Button>
-          ) : null}
+          </Popconfirm>
         </Space>
       ),
     },
@@ -575,7 +710,7 @@ export default function ProductsPage() {
               className="w-full xl:w-40"
               value={categoryFilter}
               onChange={setCategoryFilter}
-              options={categoryOptions.map((category) => ({ label: category, value: category }))}
+              options={categorySelectOptions}
             />
             <Select
               className="w-full xl:w-40"
@@ -609,12 +744,12 @@ export default function ProductsPage() {
       </Card>
 
       <Modal
-        title={editingProduct ? '补充资料并重新提交审核' : '发布商品并提交审核'}
+        title={editingProduct ? '编辑商品并重新提交审核' : '发布商品并提交审核'}
         open={isModalOpen}
         onOk={() => void handleSubmitForReview()}
         onCancel={closeModal}
         width={720}
-        okText={editingProduct ? '重新提交审核' : '提交审核'}
+        okText={editingProduct ? '保存并提交审核' : '提交审核'}
         confirmLoading={submitting}
       >
         <Form<ProductFormValues>
@@ -633,12 +768,14 @@ export default function ProductsPage() {
               ]}
             />
           </Form.Item>
-          <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择品类' }]}>
-            <Select
-              placeholder="请选择品类"
-              options={categoryOptions
-                .filter((category) => category !== '全部')
-                .map((category) => ({ label: category, value: category }))}
+          <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择或输入品类' }]}>
+            <AutoComplete
+              options={categoryInputOptions}
+              placeholder="请选择品类，不存在时可直接输入新业务品类"
+              filterOption={(inputValue, option) =>
+                String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
+                String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
+              }
             />
           </Form.Item>
           <Space className="w-full" size="large" wrap>
@@ -872,9 +1009,30 @@ export default function ProductsPage() {
         ) : null}
       </Modal>
 
-      <Drawer title="审核详情" width={680} open={Boolean(drawerProduct)} onClose={() => setDrawerProduct(null)} destroyOnClose>
+      <Drawer title="商品详情" width={760} open={Boolean(drawerProduct)} onClose={() => setDrawerProduct(null)} destroyOnClose>
         {drawerProduct ? (
           <Space direction="vertical" size="large" className="w-full">
+            <div>
+              <div className="mb-2 font-medium text-gray-900">商品图片</div>
+              {drawerProduct.image_urls.length > 0 ? (
+                <Image.PreviewGroup>
+                  <Space wrap>
+                    {drawerProduct.image_urls.map((url) => (
+                      <Image
+                        key={url}
+                        src={url}
+                        alt={drawerProduct.name}
+                        width={112}
+                        height={112}
+                        className="rounded-md object-cover"
+                      />
+                    ))}
+                  </Space>
+                </Image.PreviewGroup>
+              ) : (
+                <Text type="secondary">暂无商品图片</Text>
+              )}
+            </div>
             <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="商品名称">{drawerProduct.name}</Descriptions.Item>
               <Descriptions.Item label="SKU">{drawerProduct.sku_id}</Descriptions.Item>
@@ -900,6 +1058,10 @@ export default function ProductsPage() {
                 {[drawerProduct.province, drawerProduct.city, drawerProduct.district].filter(Boolean).join(' / ') || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="仓库地址">{drawerProduct.address || '-'}</Descriptions.Item>
+              <Descriptions.Item label="库存/可售库存">
+                {drawerProduct.stock} 吨 / {drawerProduct.visible_stock} 吨
+              </Descriptions.Item>
+              <Descriptions.Item label="单价">¥{drawerProduct.price}/吨</Descriptions.Item>
               <Descriptions.Item label="交货周期">
                 {drawerProduct.delivery_days ? `${drawerProduct.delivery_days} 天` : '-'}
               </Descriptions.Item>
@@ -922,13 +1084,14 @@ export default function ProductsPage() {
               <Descriptions.Item label="审核结论">{drawerProduct.review_status_text || '-'}</Descriptions.Item>
               <Descriptions.Item label="审核通过时间">{drawerProduct.approved_at || '-'}</Descriptions.Item>
               <Descriptions.Item label="审核说明">{drawerProduct.audit_remark || '平台审核中，暂无反馈。'}</Descriptions.Item>
+              <Descriptions.Item label="商品说明">{drawerProduct.description || '-'}</Descriptions.Item>
             </Descriptions>
 
             <div>
               <div className="mb-2 font-medium text-gray-900">资料清单</div>
               <Space direction="vertical" size="small">
-                <Text>商品主图：{drawerProduct.image_urls.join('、')}</Text>
-                <Text>审核资料：{drawerProduct.qualification_urls.join('、')}</Text>
+                <Text>商品主图：{drawerProduct.image_urls.length > 0 ? drawerProduct.image_urls.join('、') : '暂无'}</Text>
+                <Text>审核资料：{drawerProduct.qualification_urls.length > 0 ? drawerProduct.qualification_urls.join('、') : '暂无'}</Text>
               </Space>
             </div>
 

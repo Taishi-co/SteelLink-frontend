@@ -252,6 +252,10 @@ export const sellerProductService = {
   },
   create: (payload: UpsertProductPayload) =>
     api.post<unknown, ApiResponse<BackendProductInfo>>('/products', payload),
+  update: (id: number, payload: UpsertProductPayload) =>
+    api.put<unknown, ApiResponse<BackendProductInfo>>(`/products/${id}`, payload),
   updateDisplay: (id: number, payload: UpdateProductDisplayPayload) =>
     api.put<unknown, ApiResponse<BackendProductInfo>>(`/products/${id}/display`, payload),
+  remove: (id: number) =>
+    api.delete<unknown, ApiResponse<{ message: string }>>(`/products/${id}`),
 }

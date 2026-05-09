@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
+import { AutoComplete, Button, Card, Col, Descriptions, Empty, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, Spin, Steps, Switch, Tag, Typography, message } from 'antd'
 import {
   AuditOutlined,
   BankOutlined,
@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons'
 import { getBuyerToken } from '@/services/auth'
 import { aiProcurementService } from '@/services/aiProcurementService'
+import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
 import { serviceOfferService } from '@/services/serviceOfferService'
 import type {
   AIProcurementInfo,
@@ -158,6 +159,7 @@ export default function AiProcurementPage() {
   const [selectedProducts, setSelectedProducts] = useState<MatchedProduct[]>([])
   const [mine, setMine] = useState<AIProcurementInfo[]>([])
   const [warehouses, setWarehouses] = useState<WarehouseServiceItem[]>([])
+  const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
   const isLoggedIn = Boolean(getBuyerToken())
 
   const loadMine = useCallback(async () => {
@@ -187,6 +189,12 @@ export default function AiProcurementPage() {
   }, [])
 
   useEffect(() => {
+    categoryService.list()
+      .then((response) => setCategories(response.data.length > 0 ? response.data : fallbackProductCategories))
+      .catch(() => setCategories(fallbackProductCategories))
+  }, [])
+
+  useEffect(() => {
     if (result?.parsed) {
       instructionForm.setFieldsValue(result.parsed)
     }
@@ -205,6 +213,14 @@ export default function AiProcurementPage() {
   }, [orderForm, result?.parsed.delivery_address, selectedProducts])
 
   const currentStep = activeStep ? activeStep - 1 : 0
+  const categoryOptions = useMemo(
+    () =>
+      categories.map((category) => ({
+        label: category.display_name || category.name,
+        value: category.name,
+      })),
+    [categories],
+  )
 
   const updateResult = (patch: Partial<AIProcurementParseResult>) => {
     setResult((prev) => ({
@@ -501,6 +517,7 @@ export default function AiProcurementPage() {
             instructionForm={instructionForm}
             orderForm={orderForm}
             warehouses={warehouses}
+            categoryOptions={categoryOptions}
             onConfirmInstruction={handleConfirmInstruction}
             onToggleProduct={handleToggleProduct}
             onProductQuantityChange={handleProductQuantityChange}
@@ -603,6 +620,7 @@ function StepPage({
   instructionForm,
   orderForm,
   warehouses,
+  categoryOptions,
   onConfirmInstruction,
   onToggleProduct,
   onProductQuantityChange,
@@ -620,6 +638,7 @@ function StepPage({
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
   warehouses: WarehouseServiceItem[]
+  categoryOptions: Array<{ label: string; value: string }>
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
@@ -659,6 +678,7 @@ function StepPage({
           instructionForm,
           orderForm,
           warehouses,
+          categoryOptions,
           onConfirmInstruction,
           onToggleProduct,
           onProductQuantityChange,
@@ -682,6 +702,7 @@ function renderStepContent(props: {
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
   orderForm: ReturnType<typeof Form.useForm<OrderFormPayload>>[0]
   warehouses: WarehouseServiceItem[]
+  categoryOptions: Array<{ label: string; value: string }>
   onConfirmInstruction: () => Promise<void>
   onToggleProduct: (product: MatchedProduct) => void
   onProductQuantityChange: (product: MatchedProduct, quantity: number | null) => void
@@ -690,7 +711,7 @@ function renderStepContent(props: {
   onMatchFinance: (required: boolean) => Promise<void>
   onSubmitReview: () => void
 }) {
-  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm, warehouses } = props
+  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm, warehouses, categoryOptions } = props
 
   if (activeStep === 1) {
     return (
@@ -698,7 +719,18 @@ function renderStepContent(props: {
         <Form form={instructionForm} layout="vertical">
           <Row gutter={16}>
             <Col xs={24} md={12}><Form.Item name="product_name" label="采购物品" rules={[{ required: true }]}><Input /></Form.Item></Col>
-            <Col xs={24} md={12}><Form.Item name="category" label="品类" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择或输入品类' }]}>
+                <AutoComplete
+                  options={categoryOptions}
+                  placeholder="请选择品类，不存在时可直接输入"
+                  filterOption={(inputValue, option) =>
+                    String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
+                    String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
+                  }
+                />
+              </Form.Item>
+            </Col>
             <Col xs={24} md={8}><Form.Item name="quantity" label="采购数量" rules={[{ required: true }]}><InputNumber className="w-full" min={0.01} /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="unit" label="单位" rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="financing_required" label="是否需要融资" valuePropName="checked"><Switch /></Form.Item></Col>
@@ -835,6 +867,29 @@ function renderStepContent(props: {
                   <Descriptions.Item label="推荐物流">{item.logistics_service_name || '-'}</Descriptions.Item>
                   <Descriptions.Item label="运输线路">{item.logistics_route || '-'}</Descriptions.Item>
                   <Descriptions.Item label="预估运费">{formatMoney(item.freight_estimate)}</Descriptions.Item>
+                  <Descriptions.Item label="履约选项" span={4}>
+                    <Space wrap>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          const provider = item.logistics_service_name || '推荐物流服务商'
+                          orderForm.setFieldsValue({
+                            delivery_method: '物流服务商协商',
+                            delivery_note: `${item.product_name} 物流方案与 ${provider} 先协商确认，以最终报价和履约时效为准。`,
+                          })
+                          message.success('已将物流协商方案带入订单信息')
+                        }}
+                      >
+                        采用协商报价
+                      </Button>
+                      {item.logistics_service_id ? (
+                        <Link to={`/logistics-services/${item.logistics_service_id}`}>
+                          <Button size="small" type="link">查看物流详情</Button>
+                        </Link>
+                      ) : null}
+                      <Text type="secondary">推荐物流可直接确认，也可先与服务商协商运价、时效和履约保障。</Text>
+                    </Space>
+                  </Descriptions.Item>
                 </Descriptions>
               ))}
             </Space>
@@ -860,7 +915,7 @@ function renderStepContent(props: {
                 <Col xs={24} md={8}><Form.Item name="contact_name" label="联系人" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="warehouse_name" label="卖家发货仓库" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                <Col xs={24} md={12}><Form.Item name="delivery_method" label="物流方式" rules={[{ required: true }]}><Radio.Group><Radio value="平台协同配送">平台协同配送</Radio><Radio value="自行提货">自行提货</Radio></Radio.Group></Form.Item></Col>
+                <Col xs={24} md={12}><Form.Item name="delivery_method" label="物流方式" rules={[{ required: true }]}><Radio.Group><Radio value="平台协同配送">平台协同配送</Radio><Radio value="物流服务商协商">物流服务商协商</Radio><Radio value="自行提货">自行提货</Radio></Radio.Group></Form.Item></Col>
                 <Col xs={24}><Form.Item name="delivery_address" label="收货地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="payment_method" label="付款方式" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="delivery_note" label="交付说明"><Input /></Form.Item></Col>
