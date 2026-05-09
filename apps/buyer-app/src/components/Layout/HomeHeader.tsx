@@ -18,12 +18,15 @@ const navItems = [
   { key: '/about', label: '平台介绍' },
 ]
 
-const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
-
 export default function HomeHeader() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, isLoggedIn, logout } = useUserStore()
+  const sellerBaseURL = import.meta.env.DEV ? 'http://localhost:5174' : ''
+
+  const switchToSellerCenter = () => {
+    window.location.href = `${sellerBaseURL}/seller/dashboard`
+  }
 
   const handleLogout = () => {
     clearBuyerSession()
@@ -36,7 +39,7 @@ export default function HomeHeader() {
 
   const userMenuItems = [
     { key: 'dashboard', label: '个人工作台', icon: <DashboardOutlined />, onClick: () => navigate('/dashboard') },
-    ...(hasEnterpriseAccess(user) ? [{ key: 'seller', label: '卖家中心', icon: <ShopOutlined />, onClick: () => { window.location.href = sellerDashboardHref } }] : []),
+    ...(hasEnterpriseAccess(user) ? [{ key: 'seller', label: '卖家中心', icon: <ShopOutlined />, onClick: switchToSellerCenter }] : []),
     { key: 'identity', label: `实名认证 (${getIdentityStatusLabel(user?.identityStatus ?? 0)})`, icon: <SafetyCertificateOutlined />, onClick: () => navigate('/dashboard/identity') },
     { key: 'enterprise', label: user?.enterpriseCode ? '企业信息' : '企业入驻', icon: <BankOutlined />, onClick: () => navigate(user?.enterpriseCode ? '/dashboard/enterprise' : '/enterprise') },
     { key: 'orders', label: '我的订单', icon: <OrderedListOutlined />, onClick: () => navigate('/dashboard/orders') },
@@ -74,9 +77,7 @@ export default function HomeHeader() {
                 个人工作台
               </Button>
               {hasEnterpriseAccess(user) && (
-                <a href={sellerDashboardHref}>
-                  <Button icon={<ShopOutlined />}>卖家中心</Button>
-                </a>
+                <Button icon={<ShopOutlined />} onClick={switchToSellerCenter}>卖家中心</Button>
               )}
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
                 <div className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">

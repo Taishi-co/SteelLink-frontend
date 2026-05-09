@@ -1,18 +1,17 @@
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Result, Space, Tag, Typography } from 'antd'
 import { ArrowLeftOutlined, DashboardOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
-import { getSellerUser, isIdentityVerified } from '@/services/auth'
+import { getBuyerCenterHref, getSellerUser, isIdentityVerified } from '@/services/auth'
 
 const { Paragraph, Text, Title } = Typography
-
-const personalWorkspaceHref = import.meta.env.DEV ? 'http://localhost:5173/dashboard' : '/dashboard'
-const identityWorkspaceHref = import.meta.env.DEV ? 'http://localhost:5173/dashboard/identity' : '/dashboard/identity'
-const enterpriseWorkspaceHref = import.meta.env.DEV ? 'http://localhost:5173/dashboard/enterprise' : '/dashboard/enterprise'
 
 export default function IdentityPage() {
   const navigate = useNavigate()
   const user = getSellerUser()
   const verified = isIdentityVerified(user)
+  const personalWorkspaceHref = getBuyerCenterHref('/dashboard')
+  const identityWorkspaceHref = getBuyerCenterHref('/dashboard/identity')
+  const enterpriseWorkspaceHref = getBuyerCenterHref('/dashboard/enterprise')
 
   const goPersonalWorkspace = (href = personalWorkspaceHref) => {
     window.location.href = href

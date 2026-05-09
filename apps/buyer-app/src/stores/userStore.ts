@@ -18,10 +18,6 @@ export const useUserStore = create<UserState>((set) => ({
   token: initialToken,
   isLoggedIn: Boolean(initialUser && initialToken),
   login: (user, token) => {
-    localStorage.setItem('token', token)
-    sessionStorage.setItem('token', token)
-    localStorage.setItem('buyer_user', JSON.stringify(user))
-    sessionStorage.setItem('buyer_user', JSON.stringify(user))
     set({ user, token, isLoggedIn: true })
   },
   logout: () => {

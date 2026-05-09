@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, Card, Form, Input, Tabs, Typography, message } from 'antd'
 import { LockOutlined, MobileOutlined, UserOutlined } from '@ant-design/icons'
@@ -21,7 +21,9 @@ interface RegisterValues {
 export default function LoginPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
-  const redirect = new URLSearchParams(window.location.search).get('redirect')
+  const params = new URLSearchParams(window.location.search)
+  const redirect = params.get('redirect')
+  const switchToken = params.get('switch_token')
 
   const goAfterLogin = () => {
     if (redirect?.startsWith('/seller/')) {
@@ -30,6 +32,42 @@ export default function LoginPage() {
     }
     navigate('/dashboard', { replace: true })
   }
+
+  useEffect(() => {
+    if (!switchToken) {
+      return
+    }
+
+    let cancelled = false
+    setLoading(true)
+    sellerAuthService.consumeSwitchSession(switchToken)
+      .then((response) => {
+        if (cancelled) {
+          return
+        }
+        if (response.code !== 0 || !response.data) {
+          throw new Error(response.message || '切换登录失败')
+        }
+        const { access_token, user } = response.data
+        saveSellerSession(access_token, user)
+        message.success('已切换到卖家中心')
+        goAfterLogin()
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          message.error(getErrorMessage(error, '切换登录失败，请手动登录'))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [switchToken])
 
   const handleLogin = async (values: LoginValues) => {
     setLoading(true)

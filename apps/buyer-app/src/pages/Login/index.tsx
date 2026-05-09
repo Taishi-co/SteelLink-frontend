@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, Form, Input, Button, Typography, Tabs, message } from 'antd'
 import { UserOutlined, LockOutlined, MobileOutlined } from '@ant-design/icons'
@@ -26,6 +26,44 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams()
   const login = useUserStore((state) => state.login)
   const redirectTo = searchParams.get('redirect') || (location.state as { from?: string } | null)?.from || '/'
+  const switchToken = searchParams.get('switch_token')
+
+  useEffect(() => {
+    if (!switchToken) {
+      return
+    }
+
+    let cancelled = false
+    setLoading(true)
+    buyerAuthService.consumeSwitchSession(switchToken)
+      .then((response) => {
+        if (cancelled) {
+          return
+        }
+        if (response.code !== 0 || !response.data) {
+          throw new Error(response.message || '切换登录失败')
+        }
+        const { access_token, user } = response.data
+        saveBuyerSession(access_token, user)
+        login(normalizeBuyerUser(user), access_token)
+        message.success('已切换到买家中心')
+        navigate(redirectTo, { replace: true })
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          message.error(getErrorMessage(error, '切换登录失败，请手动登录'))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [switchToken, login, navigate, redirectTo])
 
   const handleLogin = async (values: LoginValues) => {
     setLoading(true)

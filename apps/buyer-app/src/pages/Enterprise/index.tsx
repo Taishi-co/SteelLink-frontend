@@ -16,8 +16,6 @@ import {
 import type { CreateEnterprisePayload, EnterpriseInfo } from '@/services/certificationService'
 
 const { Title, Text, Paragraph } = Typography
-const sellerDashboardHref = import.meta.env.DEV ? 'http://localhost:5174/seller/dashboard' : '/seller/dashboard'
-
 const enterpriseRoleDocumentMap: Record<string, Array<{ type: string; label: string }>> = {
   buyer: [
     { type: 'business_license', label: '营业执照' },
@@ -65,6 +63,11 @@ export default function EnterprisePage() {
   const navigate = useNavigate()
   const user = useUserStore((s) => s.user)
   const login = useUserStore((s) => s.login)
+  const sellerBaseURL = import.meta.env.DEV ? 'http://localhost:5174' : ''
+
+  const switchToSellerCenter = () => {
+    window.location.href = `${sellerBaseURL}/seller/dashboard`
+  }
 
   const checkEnterprise = useCallback(async (enterpriseCode?: string) => {
     if (!enterpriseCode) {
@@ -257,9 +260,7 @@ export default function EnterprisePage() {
                 ) : enterpriseApproved ? (
                   <>
                     <Button type="primary" onClick={() => navigate('/mall')}>进入商城</Button>
-                    <a href={sellerDashboardHref}>
-                      <Button>进入卖家中心</Button>
-                    </a>
+                    <Button onClick={switchToSellerCenter}>进入卖家中心</Button>
                   </>
                 ) : enterpriseReviewing && needsVerificationMaterial ? (
                   <Button type="primary" onClick={() => {

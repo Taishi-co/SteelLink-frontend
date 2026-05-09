@@ -34,6 +34,10 @@ interface ApiResponse<T> {
   data: T
 }
 
+interface SwitchSessionResponse {
+  switch_token: string
+}
+
 export interface BuyerLoginPayload {
   account: string
   password: string
@@ -46,9 +50,9 @@ export interface BuyerRegisterPayload {
 }
 
 const TOKEN_KEY = 'token'
-const USER_KEY = 'buyer_user'
-const SELLER_USER_KEY = 'seller_user'
-const SELLER_ENTERPRISE_ROLE_KEY = 'seller_enterprise_role'
+const USER_KEY = 'user'
+const LEGACY_TOKEN_KEYS = ['buyer_token', 'seller_token']
+const LEGACY_USER_KEYS = ['buyer_user', 'seller_user']
 export const BUYER_TOKEN_REFRESH_EVENT = 'buyer-token-refreshed'
 let memoryToken: string | null = null
 let memoryUser: User | null = null
@@ -80,6 +84,16 @@ function setStorageItem(key: string, value: string) {
   sessionStorage.setItem(key, value)
 }
 
+function getStorageItem(keys: string[]) {
+  for (const key of keys) {
+    const value = localStorage.getItem(key) || sessionStorage.getItem(key) || getCookie(key)
+    if (value) {
+      return value
+    }
+  }
+  return null
+}
+
 function removeStorageItem(key: string) {
   localStorage.removeItem(key)
   sessionStorage.removeItem(key)
@@ -91,6 +105,10 @@ export const buyerAuthService = {
   register: (payload: BuyerRegisterPayload) =>
     api.post<unknown, ApiResponse<LoginResponse>>('/auth/register', payload),
   me: () => api.get<unknown, ApiResponse<BuyerProfile>>('/users/me'),
+  createSwitchSession: () =>
+    api.post<unknown, ApiResponse<SwitchSessionResponse>>('/auth/switch-session', { target: 'seller' }),
+  consumeSwitchSession: (switchToken: string) =>
+    api.post<unknown, ApiResponse<LoginResponse>>('/auth/switch-session/consume', { switch_token: switchToken, target: 'buyer' }),
 }
 
 function parseJwtPayload(token: string): Record<string, unknown> | null {
@@ -123,31 +141,18 @@ export function saveBuyerSession(token: string, profile: BuyerProfile) {
   memoryUser = normalizeBuyerUser(profile)
   setStorageItem(TOKEN_KEY, token)
   setStorageItem(USER_KEY, JSON.stringify(memoryUser))
-  setStorageItem(SELLER_USER_KEY, JSON.stringify(profile))
   setCookie(TOKEN_KEY, token)
   setCookie(USER_KEY, JSON.stringify(memoryUser))
-  setCookie(SELLER_USER_KEY, JSON.stringify(profile))
-
-  const payload = parseJwtPayload(token)
-  if (payload?.enterprise_role) {
-    setStorageItem(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-    setCookie(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-  } else {
-    removeStorageItem(SELLER_ENTERPRISE_ROLE_KEY)
-    removeCookie(SELLER_ENTERPRISE_ROLE_KEY)
-  }
 }
 
 export function updateBuyerSessionUser(profile: BuyerProfile) {
   memoryUser = normalizeBuyerUser(profile)
   setStorageItem(USER_KEY, JSON.stringify(memoryUser))
-  setStorageItem(SELLER_USER_KEY, JSON.stringify(profile))
   setCookie(USER_KEY, JSON.stringify(memoryUser))
-  setCookie(SELLER_USER_KEY, JSON.stringify(profile))
 }
 
 export function getBuyerUser(): User | null {
-  const raw = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY) || getCookie(USER_KEY)
+  const raw = getStorageItem([USER_KEY, ...LEGACY_USER_KEYS])
   if (!raw) {
     return memoryUser
   }
@@ -162,7 +167,7 @@ export function getBuyerUser(): User | null {
 }
 
 export function getBuyerToken() {
-  const token = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || getCookie(TOKEN_KEY) || memoryToken
+  const token = getStorageItem([TOKEN_KEY, ...LEGACY_TOKEN_KEYS]) || memoryToken
   if (token) {
     setCookie(TOKEN_KEY, token)
   }
@@ -188,14 +193,6 @@ export function saveBuyerToken(token: string) {
     setCookie(USER_KEY, JSON.stringify(updatedUser))
   }
 
-  if (payload?.enterprise_role) {
-    setStorageItem(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-    setCookie(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-  } else {
-    removeStorageItem(SELLER_ENTERPRISE_ROLE_KEY)
-    removeCookie(SELLER_ENTERPRISE_ROLE_KEY)
-  }
-
   window.dispatchEvent(new Event(BUYER_TOKEN_REFRESH_EVENT))
 }
 
@@ -204,12 +201,16 @@ export function clearBuyerSession() {
   memoryUser = null
   removeStorageItem(TOKEN_KEY)
   removeStorageItem(USER_KEY)
-  removeStorageItem(SELLER_USER_KEY)
-  removeStorageItem(SELLER_ENTERPRISE_ROLE_KEY)
   removeCookie(TOKEN_KEY)
   removeCookie(USER_KEY)
-  removeCookie(SELLER_USER_KEY)
-  removeCookie(SELLER_ENTERPRISE_ROLE_KEY)
+  LEGACY_TOKEN_KEYS.forEach((key) => {
+    removeStorageItem(key)
+    removeCookie(key)
+  })
+  LEGACY_USER_KEYS.forEach((key) => {
+    removeStorageItem(key)
+    removeCookie(key)
+  })
 }
 
 export function isEnterpriseToken() {
@@ -225,4 +226,17 @@ export function getBuyerEnterpriseID() {
 
 export function hasEnterpriseAccess(user: User | null) {
   return !!user?.enterpriseCode && user.role === 'enterprise' && isEnterpriseToken()
+}
+
+export function hasSavedSellerSession() {
+  return Boolean(getBuyerToken())
+}
+
+export function getSellerCenterHref(path = '/seller/dashboard') {
+  const targetPath = path.startsWith('/seller') ? path : `/seller${path}`
+  const base = import.meta.env.DEV ? 'http://localhost:5174' : ''
+  if (hasSavedSellerSession()) {
+    return `${base}${targetPath}`
+  }
+  return `${base}/seller/login?redirect=${encodeURIComponent(targetPath)}`
 }

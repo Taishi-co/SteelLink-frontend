@@ -1,18 +1,17 @@
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Descriptions, Result, Space, Tag, Typography } from 'antd'
 import { ArrowLeftOutlined, BankOutlined, DashboardOutlined } from '@ant-design/icons'
-import { clearSellerSession, getSellerUser, hasEnterprise as hasEnterpriseAccess } from '@/services/auth'
+import { clearSellerSession, getBuyerCenterHref, getSellerUser, hasEnterprise as hasEnterpriseAccess } from '@/services/auth'
 
 const { Paragraph, Text, Title } = Typography
-
-const personalWorkspaceHref = import.meta.env.DEV ? 'http://localhost:5173/dashboard' : '/dashboard'
-const enterpriseWorkspaceHref = import.meta.env.DEV ? 'http://localhost:5173/dashboard/enterprise' : '/dashboard/enterprise'
-const servicesWorkspaceHref = import.meta.env.DEV ? 'http://localhost:5173/dashboard/services' : '/dashboard/services'
 
 export default function EnterprisePage() {
   const navigate = useNavigate()
   const user = getSellerUser()
   const enterpriseReady = hasEnterpriseAccess(user)
+  const personalWorkspaceHref = getBuyerCenterHref('/dashboard')
+  const enterpriseWorkspaceHref = getBuyerCenterHref('/dashboard/enterprise')
+  const servicesWorkspaceHref = getBuyerCenterHref('/dashboard/services')
 
   const goPersonalWorkspace = (href = personalWorkspaceHref) => {
     window.location.href = href

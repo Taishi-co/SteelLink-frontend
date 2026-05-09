@@ -20,7 +20,6 @@ type ServiceKey = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance
 
 const logisticsWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5175/logistics/' : '/logistics/'
 const warehouseWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5176/warehouse/' : '/warehouse/'
-
 const serviceConfig: Record<ServiceKey, {
   title: string
   description: string

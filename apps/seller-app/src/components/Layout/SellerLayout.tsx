@@ -20,12 +20,11 @@ import { clearSellerSession, getSellerUser, isIdentityVerified, hasEnterprise, h
 
 const { Content, Header, Sider } = Layout
 const { Text } = Typography
-const buyerHomeHref = import.meta.env.DEV ? 'http://localhost:5173/' : '/'
-
 export default function SellerLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [user, setUser] = useState(getSellerUser())
+  const buyerBaseURL = import.meta.env.DEV ? 'http://localhost:5173' : ''
 
   useEffect(() => {
     let ignore = false
@@ -97,6 +96,10 @@ export default function SellerLayout() {
 
   const defaultPath = ready ? '/dashboard' : '/identity'
 
+  const switchToBuyerCenter = (path = '/') => {
+    window.location.href = `${buyerBaseURL}${path}`
+  }
+
   if (location.pathname === '/') {
     navigate(defaultPath, { replace: true })
   }
@@ -126,9 +129,7 @@ export default function SellerLayout() {
         <Header className="bg-white px-6 flex items-center justify-between shadow-sm h-16">
           <Text className="text-lg font-medium">卖家后台</Text>
           <Space size="middle">
-            <a href={buyerHomeHref}>
-              <Button icon={<HomeOutlined />}>买家首页</Button>
-            </a>
+            <Button icon={<HomeOutlined />} onClick={() => switchToBuyerCenter('/')}>买家首页</Button>
             <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
               <Space className="cursor-pointer">
                 <Avatar icon={<UserOutlined />} />
