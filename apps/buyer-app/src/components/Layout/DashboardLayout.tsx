@@ -18,7 +18,6 @@ import {
   UserOutlined,
   ArrowRightOutlined,
   CloudServerOutlined,
-  TruckOutlined,
 } from '@ant-design/icons'
 import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
 import { useUserStore } from '@/stores'
