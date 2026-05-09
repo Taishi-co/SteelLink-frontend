@@ -82,6 +82,8 @@ export interface OrderInfo {
   shipment_task?: ShipmentTaskInfo
   logistics_bidding?: LogisticsBiddingInfo
   logistics_quotes?: LogisticsQuoteInfo[]
+  remark?: Record<string, unknown>
+  financing_info?: FinancingRequestInfo
 }
 
 export interface ShipmentTaskInfo {
@@ -110,6 +112,19 @@ export interface LogisticsBiddingInfo {
   selected_quote_id: number
   created_at: string
   updated_at: string
+}
+
+export interface FinancingRequestInfo {
+  id: number
+  order_id: number
+  order_no: string
+  finance_service_id: number
+  funding_enterprise_id: number
+  requested_amount: number
+  approved_amount: number
+  term_days: number
+  annual_rate: number
+  status: string
 }
 
 export interface VoucherEvidence {
@@ -258,7 +273,7 @@ export const orderService = {
   confirmReceipt: (id: number, payload: { receipt_voucher: string; captured_at?: string; gps_latitude?: number; gps_longitude?: number }) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/receipts/confirm`, payload).then((response) => response.data),
   createFinancingRequest: (id: number, payload: { finance_service_id: number; requested_amount?: number }) =>
-    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/financing-requests`, payload).then((response) => response.data),
+    api.post<ApiResponse<FinancingRequestInfo>, ApiResponse<FinancingRequestInfo>>(`/orders/${id}/financing-requests`, payload).then((response) => response.data),
   buyerConfirmFinancing: (id: number, payload: { confirmed: boolean; remark?: string }) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/financing-requests/buyer-confirm`, payload).then((response) => response.data),
   buyerSignDebtAndPayFee: (id: number, payload: { fee_voucher_url: string; remark?: string }) =>

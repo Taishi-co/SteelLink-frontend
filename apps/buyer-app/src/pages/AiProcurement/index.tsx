@@ -23,6 +23,7 @@ import type {
   AIProcurementInfo,
   AIProcurementParseResult,
   AIProcurementStageCode,
+  FinancePlan,
   LogisticsOption,
   MatchedProduct,
   OrderFormPayload,
@@ -225,6 +226,7 @@ export default function AiProcurementPage() {
   const [result, setResult] = useState<AIProcurementParseResult | null>(null)
   const [currentProcurement, setCurrentProcurement] = useState<AIProcurementInfo | null>(null)
   const [selectedProducts, setSelectedProducts] = useState<MatchedProduct[]>([])
+  const [selectedFinanceServiceId, setSelectedFinanceServiceId] = useState<number | undefined>()
   const [mine, setMine] = useState<AIProcurementInfo[]>([])
   const [warehouses, setWarehouses] = useState<WarehouseServiceItem[]>([])
   const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
@@ -332,6 +334,7 @@ export default function AiProcurementPage() {
       setResult(parseResult)
       setCurrentProcurement(null)
       setSelectedProducts([])
+      setSelectedFinanceServiceId(undefined)
       navigate('/ai-procurement/1')
       message.success('采购指令解析完成，请确认参数')
     } catch (error) {
@@ -424,7 +427,12 @@ export default function AiProcurementPage() {
       })
       setCurrentProcurement(response.procurement)
       setResult(getResultFromProcurement(response.procurement))
+      setSelectedFinanceServiceId(response.procurement.finance_plans.find((item) => item.selected)?.finance_service_id)
       if (response.procurement.financing_required) {
+        const financeMatched = await aiProcurementService.matchFinance(response.procurement.id, true)
+        setCurrentProcurement(financeMatched)
+        setResult(getResultFromProcurement(financeMatched))
+        setSelectedFinanceServiceId(financeMatched.finance_plans[0]?.finance_service_id)
         navigate('/ai-procurement/5')
       } else {
         navigate('/ai-procurement/6')
@@ -437,16 +445,23 @@ export default function AiProcurementPage() {
     }
   }
 
-  const handleMatchFinance = async (required: boolean) => {
+  const handleMatchFinance = async (required: boolean, financeServiceId?: number) => {
     if (!currentProcurement) {
       message.warning('请先生成订单')
       return
     }
     setBusy(true)
     try {
-      const procurement = await aiProcurementService.matchFinance(currentProcurement.id, required)
+      const procurement = await aiProcurementService.matchFinance(currentProcurement.id, required, financeServiceId)
       setCurrentProcurement(procurement)
       setResult(getResultFromProcurement(procurement))
+      const selectedID = procurement.finance_plans.find((item) => item.selected)?.finance_service_id
+      setSelectedFinanceServiceId(selectedID || procurement.finance_plans[0]?.finance_service_id)
+      if (required && !financeServiceId && procurement.finance_plans.length > 0) {
+        navigate('/ai-procurement/5')
+        message.success('融资产品已召回，请选择心仪产品')
+        return
+      }
       navigate('/ai-procurement/6')
       message.success(required ? '融资方案匹配完成' : '已跳过融资匹配')
     } catch (error) {
@@ -683,6 +698,8 @@ export default function AiProcurementPage() {
             result={result}
             currentProcurement={currentProcurement}
             selectedProducts={selectedProducts}
+            selectedFinanceServiceId={selectedFinanceServiceId}
+            onSelectedFinanceServiceChange={setSelectedFinanceServiceId}
             busy={busy}
             submitting={submitting}
             instructionForm={instructionForm}
@@ -806,6 +823,8 @@ function StepPage({
   result,
   currentProcurement,
   selectedProducts,
+  selectedFinanceServiceId,
+  onSelectedFinanceServiceChange,
   busy,
   submitting,
   instructionForm,
@@ -827,6 +846,8 @@ function StepPage({
   result: AIProcurementParseResult | null
   currentProcurement: AIProcurementInfo | null
   selectedProducts: MatchedProduct[]
+  selectedFinanceServiceId?: number
+  onSelectedFinanceServiceChange: (id?: number) => void
   busy: boolean
   submitting: boolean
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
@@ -841,7 +862,7 @@ function StepPage({
   onNegotiateLogistics: (product: MatchedProduct) => void
   onConfirmProduct: () => Promise<void>
   onGenerateOrder: () => Promise<void>
-  onMatchFinance: (required: boolean) => Promise<void>
+  onMatchFinance: (required: boolean, financeServiceId?: number) => Promise<void>
   onSubmitReview: () => void
 }) {
   const step = procurementSteps[activeStep - 1]
@@ -870,6 +891,8 @@ function StepPage({
           result,
           currentProcurement,
           selectedProducts,
+          selectedFinanceServiceId,
+          onSelectedFinanceServiceChange,
           busy,
           submitting,
           instructionForm,
@@ -897,6 +920,8 @@ function renderStepContent(props: {
   result: AIProcurementParseResult
   currentProcurement: AIProcurementInfo | null
   selectedProducts: MatchedProduct[]
+  selectedFinanceServiceId?: number
+  onSelectedFinanceServiceChange: (id?: number) => void
   busy: boolean
   submitting: boolean
   instructionForm: ReturnType<typeof Form.useForm<ParsedInstruction>>[0]
@@ -911,10 +936,10 @@ function renderStepContent(props: {
   onNegotiateLogistics: (product: MatchedProduct) => void
   onConfirmProduct: () => Promise<void>
   onGenerateOrder: () => Promise<void>
-  onMatchFinance: (required: boolean) => Promise<void>
+  onMatchFinance: (required: boolean, financeServiceId?: number) => Promise<void>
   onSubmitReview: () => void
 }) {
-  const { activeStep, result, currentProcurement, selectedProducts, busy, submitting, instructionForm, orderForm, warehouses, categoryOptions } = props
+  const { activeStep, result, currentProcurement, selectedProducts, selectedFinanceServiceId, busy, submitting, instructionForm, orderForm, warehouses, categoryOptions } = props
 
   if (activeStep === 1) {
     return (
@@ -1166,6 +1191,7 @@ function renderStepContent(props: {
   }
 
   if (activeStep === 5) {
+    const selectedPlan = result.finance_plans.find((item) => item.finance_service_id === selectedFinanceServiceId)
     if (!currentProcurement?.financing_required) {
       return (
         <Card title="融资匹配">
@@ -1178,19 +1204,21 @@ function renderStepContent(props: {
       <Card title="融资匹配">
         {result.finance_plans.length > 0 ? (
           <Space direction="vertical" size="middle" className="w-full">
-            {result.finance_plans.map((item) => (
-              <div key={`${item.provider}-${item.product_name}`} className="rounded border border-gray-100 p-4">
-                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <Text strong>{item.provider} · {item.product_name}</Text>
-                    <div className="mt-1 text-sm text-gray-500">{formatMoney(item.amount)} · {formatRate(item.rate)} · {item.term_days} 天</div>
-                    <div className="mt-1 text-sm text-gray-500">{item.reason}</div>
-                  </div>
-                  <Tag color={item.matched ? 'blue' : 'default'}>{item.matched ? '推荐' : '备选'}</Tag>
-                </div>
-              </div>
-            ))}
-            <Link to="/ai-procurement/6"><Button type="primary">确认融资方案，进入审核</Button></Link>
+            <Radio.Group className="w-full" value={selectedFinanceServiceId} onChange={(event) => props.onSelectedFinanceServiceChange(Number(event.target.value))}>
+              <Space direction="vertical" size="middle" className="w-full">
+                {result.finance_plans.map((item) => (
+                  <FinancePlanOption key={`${item.finance_service_id || item.provider}-${item.product_name}`} item={item} />
+                ))}
+              </Space>
+            </Radio.Group>
+            <Button
+              type="primary"
+              disabled={!selectedPlan?.finance_service_id}
+              loading={busy}
+              onClick={() => void props.onMatchFinance(true, selectedPlan?.finance_service_id)}
+            >
+              确认融资产品，进入审核
+            </Button>
           </Space>
         ) : (
           <Button type="primary" icon={<BankOutlined />} loading={busy} onClick={() => void props.onMatchFinance(true)}>
@@ -1208,22 +1236,13 @@ function renderStepContent(props: {
           {result.order_draft.orders.map((order) => (
             <Descriptions key={order.order_id} bordered column={{ xs: 1, md: 3 }}>
               <Descriptions.Item label="订单号">{order.order_no}</Descriptions.Item>
-              <Descriptions.Item label="卖家">{order.seller_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="卖家">{order.seller_name}</Descriptions.Item>
               <Descriptions.Item label="商品数">{order.product_count}</Descriptions.Item>
               <Descriptions.Item label="数量">{order.quantity} {result.order_draft.unit}</Descriptions.Item>
               <Descriptions.Item label="金额">{formatMoney(order.total_amount)}</Descriptions.Item>
-              <Descriptions.Item label="付款方式">{order.payment_method || result.order_draft.payment_method || '-'}</Descriptions.Item>
+              <Descriptions.Item label="付款方式">{order.payment_method || result.order_draft.payment_method}</Descriptions.Item>
             </Descriptions>
           ))}
-          <Descriptions bordered column={{ xs: 1, md: 2 }}>
-            <Descriptions.Item label="商品">{result.order_draft.product_name || '-'}</Descriptions.Item>
-            <Descriptions.Item label="总数量">{result.order_draft.quantity} {result.order_draft.unit}</Descriptions.Item>
-            <Descriptions.Item label="总金额">{formatMoney(result.order_draft.estimated_amount)}</Descriptions.Item>
-            <Descriptions.Item label="联系人">{result.order_draft.contact_name || '-'}</Descriptions.Item>
-            <Descriptions.Item label="联系电话">{result.order_draft.contact_phone || '-'}</Descriptions.Item>
-            <Descriptions.Item label="交付地址" span={2}>{result.order_draft.delivery_address || '-'}</Descriptions.Item>
-            <Descriptions.Item label="交付说明" span={2}>{result.order_draft.delivery_note || '-'}</Descriptions.Item>
-          </Descriptions>
         </Space>
       ) : (
         <Descriptions bordered column={{ xs: 1, md: 2 }}>
@@ -1242,9 +1261,13 @@ function renderStepContent(props: {
       {result.finance_plans.length > 0 ? (
         <Space direction="vertical" size="middle" className="w-full">
           {result.finance_plans.map((item) => (
-            <div key={`${item.provider}-${item.product_name}`} className="rounded border border-gray-100 p-4">
+            <div key={`${item.finance_service_id || item.provider}-${item.product_name}`} className="rounded border border-gray-100 p-4">
               <Text strong>{item.provider} · {item.product_name}</Text>
               <div className="mt-1 text-sm text-gray-500">{formatMoney(item.amount)} · {formatRate(item.rate)} · {item.term_days} 天</div>
+              <div className="mt-2 flex gap-2">
+                {item.ai_recommended && <Tag color="blue">AI推荐</Tag>}
+                {item.selected && <Tag color="green">已预选</Tag>}
+              </div>
             </div>
           ))}
         </Space>
@@ -1258,6 +1281,26 @@ function renderStepContent(props: {
         </Button>
       </div>
     </Card>
+  )
+}
+
+function FinancePlanOption({ item }: { item: FinancePlan }) {
+  return (
+    <Radio className="w-full" value={item.finance_service_id}>
+      <div className={`ml-2 rounded border p-4 ${item.selected || item.ai_recommended ? 'border-primary-200 bg-primary-50' : 'border-gray-100 bg-white'}`}>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <Text strong>{item.provider} · {item.product_name}</Text>
+            <div className="mt-1 text-sm text-gray-500">{formatMoney(item.amount)} · {formatRate(item.rate)} · {item.term_days} 天</div>
+            <div className="mt-1 text-sm text-gray-500">{item.reason}</div>
+          </div>
+          <Space>
+            {item.ai_recommended && <Tag color="blue">AI推荐</Tag>}
+            {item.matched && <Tag color="green">可申请</Tag>}
+          </Space>
+        </div>
+      </div>
+    </Radio>
   )
 }
 

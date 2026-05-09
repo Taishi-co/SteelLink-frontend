@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Radio, Space, Spin, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
-import { ArrowLeftOutlined, CarOutlined, CheckCircleOutlined, ClockCircleOutlined, EnvironmentOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, BankOutlined, CarOutlined, CheckCircleOutlined, ClockCircleOutlined, EnvironmentOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { getErrorMessage, hasFormErrorFields, timelineColor } from '@steellink/shared/utils'
 import { orderService, type LogisticsQuoteInfo } from '@/services/orderService'
 import { productService } from '@/services/productService'
 import { uploadService } from '@/services/uploadService'
 import { serviceFulfillmentService } from '@/services/serviceFulfillmentService'
+import { serviceOfferService, type FinanceServiceItem } from '@/services/serviceOfferService'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -197,6 +198,32 @@ function formatTimelineTime(value?: string) {
   return value ? new Date(value).toLocaleString() : ''
 }
 
+function formatMoney(value?: number) {
+  if (!value) return '待评估'
+  return `¥${Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`
+}
+
+function formatRate(value?: number) {
+  if (!value) return '按授信评估'
+  return `年化 ${Number(value).toFixed(1)}%`
+}
+
+interface AIFinanceRecommendation {
+  finance_service_id?: number
+  product_name?: string
+  finance_type?: string
+  amount?: number
+  annual_rate?: number
+  term_days?: number
+  ai_recommended?: boolean
+}
+
+function getAIFinanceRecommendation(remark?: Record<string, unknown>): AIFinanceRecommendation | undefined {
+  const value = remark?.ai_finance_recommendation
+  if (!value || typeof value !== 'object') return undefined
+  return value as AIFinanceRecommendation
+}
+
 function getUploadFile(fileList?: UploadFile[]) {
   const file = fileList?.[0]?.originFileObj
   if (!file) {
@@ -224,6 +251,9 @@ export default function OrderDetailPage() {
   const [logisticsModalOpen, setLogisticsModalOpen] = useState(false)
   const [logisticsLoading, setLogisticsLoading] = useState(false)
   const [confirmingLogistics, setConfirmingLogistics] = useState(false)
+  const [financeOpen, setFinanceOpen] = useState(false)
+  const [creatingFinance, setCreatingFinance] = useState(false)
+  const [selectedFinanceServiceId, setSelectedFinanceServiceId] = useState<number | undefined>()
   const [form] = Form.useForm()
   const [deliveryForm] = Form.useForm()
   const [receiptForm] = Form.useForm()
@@ -248,6 +278,17 @@ export default function OrderDetailPage() {
     enabled: Boolean(id),
   })
   const fulfillment = fulfillmentData
+  const aiFinanceRecommendation = getAIFinanceRecommendation(order?.remark)
+  const { data: financeProductsData, isLoading: financeProductsLoading } = useQuery({
+    queryKey: ['approved-finance-services', order?.id],
+    queryFn: async () => (await serviceOfferService.listFinance({ page: 1, page_size: 50, status: 2 })).data.list,
+    enabled: Boolean(order?.id && financeOpen),
+  })
+  const financeProducts = (financeProductsData || []).slice().sort((left, right) => {
+    if (left.id === aiFinanceRecommendation?.finance_service_id) return -1
+    if (right.id === aiFinanceRecommendation?.finance_service_id) return 1
+    return Number(left.annual_rate || 0) - Number(right.annual_rate || 0)
+  })
   const logisticsOrder = fulfillment?.logistics_orders?.[0]
   const latestMovement = fulfillment?.warehouse_movements?.[0]
   const activeGuarantee = fulfillment?.guarantees?.[0]
@@ -266,6 +307,11 @@ export default function OrderDetailPage() {
     .filter(Boolean)
     .join(' ')
   const canCancelOrder = (order?.status === 1 || order?.status === 2 || order?.status === 3) && !order.payment_info?.voucher_url
+
+  const openFinanceModal = () => {
+    setSelectedFinanceServiceId(aiFinanceRecommendation?.finance_service_id)
+    setFinanceOpen(true)
+  }
 
   const showCompleted = (title: string, next: string) => {
     Modal.success({
@@ -385,6 +431,28 @@ export default function OrderDetailPage() {
       message.error(getErrorMessage(error, '签署失败'))
     } finally {
       setSigning(false)
+    }
+  }
+
+  const handleCreateFinancingRequest = async () => {
+    if (!selectedFinanceServiceId) {
+      message.warning('请选择金融服务产品')
+      return
+    }
+    try {
+      setCreatingFinance(true)
+      await orderService.createFinancingRequest(Number(id), {
+        finance_service_id: selectedFinanceServiceId,
+        requested_amount: order?.tax_total_amount || order?.total_amount,
+      })
+      showCompleted('融资申请已提交', '等待资金方完成风控审批。')
+      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+      setFinanceOpen(false)
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '融资申请失败'))
+    } finally {
+      setCreatingFinance(false)
     }
   }
 
@@ -708,8 +776,8 @@ export default function OrderDetailPage() {
                   </Button>
                 )}
                 {order.status === 3 && (
-                  <Button type="default" onClick={() => message.info('请选择金融服务产品后申请托盘融资')}>
-                    申请托盘融资
+                  <Button type="default" icon={<BankOutlined />} onClick={openFinanceModal}>
+                    申请融资
                   </Button>
                 )}
                 {order.status === 22 && (
@@ -799,6 +867,35 @@ export default function OrderDetailPage() {
                   <Input />
                 </Form.Item>
               </Form>
+            </Modal>
+
+            <Modal
+              title="选择融资产品"
+              open={financeOpen}
+              onCancel={() => setFinanceOpen(false)}
+              onOk={handleCreateFinancingRequest}
+              confirmLoading={creatingFinance}
+              okButtonProps={{ disabled: !selectedFinanceServiceId }}
+              width={760}
+            >
+              <Spin spinning={financeProductsLoading}>
+                {financeProducts.length > 0 ? (
+                  <Radio.Group className="w-full" value={selectedFinanceServiceId} onChange={(event) => setSelectedFinanceServiceId(Number(event.target.value))}>
+                    <Space direction="vertical" size="middle" className="w-full">
+                      {financeProducts.map((item) => (
+                        <FinanceProductOption
+                          key={item.id}
+                          item={item}
+                          recommended={item.id === aiFinanceRecommendation?.finance_service_id}
+                          amount={order.tax_total_amount || order.total_amount}
+                        />
+                      ))}
+                    </Space>
+                  </Radio.Group>
+                ) : (
+                  <Empty description="暂无已审核金融产品" />
+                )}
+              </Spin>
             </Modal>
 
             <Modal
@@ -981,5 +1078,28 @@ export default function OrderDetailPage() {
         )}
       </div>
     </div>
+  )
+}
+
+function FinanceProductOption({ item, recommended, amount }: { item: FinanceServiceItem; recommended: boolean; amount: number }) {
+  const amountAllowed = (!item.min_amount || amount >= item.min_amount) && (!item.max_amount || amount <= item.max_amount)
+  return (
+    <Radio className="w-full" value={item.id} disabled={!amountAllowed}>
+      <div className={`ml-2 rounded border p-4 ${recommended ? 'border-primary-200 bg-primary-50' : 'border-gray-100 bg-white'}`}>
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div>
+            <Text strong>{item.name}</Text>
+            <div className="mt-1 text-sm text-gray-500">
+              {item.finance_type || '融资产品'} · {formatMoney(item.min_amount)} - {formatMoney(item.max_amount)} · {formatRate(item.annual_rate)} · {item.term_days || '-'} 天
+            </div>
+            {item.description && <div className="mt-1 text-sm text-gray-500">{item.description}</div>}
+          </div>
+          <Space>
+            {recommended && <Tag color="blue">AI推荐</Tag>}
+            <Tag color={amountAllowed ? 'green' : 'default'}>{amountAllowed ? '额度匹配' : '额度不匹配'}</Tag>
+          </Space>
+        </div>
+      </div>
+    </Radio>
   )
 }
