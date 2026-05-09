@@ -199,7 +199,6 @@ export default function ProductDetailPage() {
                                 '-'
                               )}
                             </Descriptions.Item>
-                            <Descriptions.Item label="捆包号">{product.bundleNo || '-'}</Descriptions.Item>
                           </Descriptions>
                         </div>
                       </Col>
