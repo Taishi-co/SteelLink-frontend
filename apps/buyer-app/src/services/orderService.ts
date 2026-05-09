@@ -79,8 +79,39 @@ export interface OrderInfo {
     address: string
     estimated_time: string
   }
+  shipment_task?: ShipmentTaskInfo
+  logistics_bidding?: LogisticsBiddingInfo
+  logistics_quotes?: LogisticsQuoteInfo[]
   remark?: Record<string, unknown>
   financing_info?: FinancingRequestInfo
+}
+
+export interface ShipmentTaskInfo {
+  id: number
+  order_id: number
+  order_no: string
+  logistics_enterprise_id: number
+  logistics_quote_id: number
+  status: 'pending_pickup' | 'picked_up' | 'delivered' | 'signed'
+  pickup_voucher?: string
+  delivery_voucher?: string
+  signature_voucher?: string
+  picked_up_at?: string
+  delivered_at?: string
+  signed_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface LogisticsBiddingInfo {
+  id: number
+  order_id: number
+  order_no: string
+  status: string
+  freight_payer: string
+  selected_quote_id: number
+  created_at: string
+  updated_at: string
 }
 
 export interface FinancingRequestInfo {
@@ -111,6 +142,21 @@ export interface OrderTimelineItem {
   status: 'completed' | 'current' | 'pending' | 'skipped' | string
   time?: string
   description?: string
+}
+
+export interface LogisticsQuoteInfo {
+  id: number
+  bidding_id: number
+  order_id: number
+  logistics_enterprise_id: number
+  logistics_name: string
+  vehicle_info: string
+  driver_info: string
+  amount: number
+  estimated_pickup_at: string
+  estimated_delivery_at: string
+  remark: string
+  created_at: string
 }
 
 export interface OrderEventInfo {
@@ -234,6 +280,10 @@ export const orderService = {
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/financing-requests/debt-sign`, payload).then((response) => response.data),
   confirmLogisticsQuote: (id: number, payload: { quote_id: number }) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/logistics-confirm`, payload).then((response) => response.data),
+  listLogisticsQuotes: async (id: number) => {
+    const response = await api.get<ApiResponse<{ list: LogisticsQuoteInfo[] }>, ApiResponse<{ list: LogisticsQuoteInfo[] }>>(`/orders/${id}/logistics-quotes`)
+    return response.data.list
+  },
   listEvents: async (id: number) => {
     const response = await api.get<ApiResponse<{ list: OrderEventInfo[] }>, ApiResponse<{ list: OrderEventInfo[] }>>(`/orders/${id}/events`)
     return response.data

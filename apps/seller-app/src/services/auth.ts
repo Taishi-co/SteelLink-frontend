@@ -55,27 +55,13 @@ const LEGACY_TOKEN_KEYS = ['seller_token', 'buyer_token']
 const LEGACY_USER_KEYS = ['seller_user', 'buyer_user']
 const LEGACY_ENTERPRISE_ROLE_KEYS = ['seller_enterprise_role']
 
-function getCookie(name: string) {
-  const prefix = `${name}=`
-  const match = document.cookie
-    .split(';')
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(prefix))
-
-  if (!match) {
-    return null
-  }
-
-  return decodeURIComponent(match.slice(prefix.length))
-}
-
 function setCookie(name: string, value: string) {
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; SameSite=Lax`
 }
 
 function getStorageItem(keys: string[]) {
   for (const key of keys) {
-    const value = getCookie(key) || sessionStorage.getItem(key) || localStorage.getItem(key)
+    const value = localStorage.getItem(key) || sessionStorage.getItem(key)
     if (value) {
       return value
     }

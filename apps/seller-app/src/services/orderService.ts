@@ -72,6 +72,37 @@ export interface SellerOrderInfo {
     address: string
     estimated_time: string
   }
+  logistics_bidding?: {
+    id: number
+    order_id: number
+    order_no: string
+    status: string
+    freight_payer: string
+    selected_quote_id: number
+    buyer_confirmed_quote_id: number
+    seller_confirmed_quote_id: number
+    created_at: string
+    updated_at: string
+  }
+  logistics_quotes?: LogisticsQuoteInfo[]
+  shipment_task?: ShipmentTaskInfo
+}
+
+export interface ShipmentTaskInfo {
+  id: number
+  order_id: number
+  order_no: string
+  logistics_enterprise_id: number
+  logistics_quote_id: number
+  status: 'pending_pickup' | 'picked_up' | 'delivered' | 'signed'
+  pickup_voucher?: string
+  delivery_voucher?: string
+  signature_voucher?: string
+  picked_up_at?: string
+  delivered_at?: string
+  signed_at?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface VoucherEvidence {
@@ -100,6 +131,21 @@ export interface SellerOrderEventInfo {
   from_status: number
   to_status: number
   payload?: Record<string, unknown>
+  created_at: string
+}
+
+export interface LogisticsQuoteInfo {
+  id: number
+  bidding_id: number
+  order_id: number
+  logistics_enterprise_id: number
+  logistics_name: string
+  vehicle_info: string
+  driver_info: string
+  amount: number
+  estimated_pickup_at: string
+  estimated_delivery_at: string
+  remark: string
   created_at: string
 }
 
@@ -136,8 +182,20 @@ export const sellerOrderService = {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/logistics-biddings`, payload || {})
     return response.data
   },
+  async closeLogisticsBidding(id: number) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/logistics-biddings/close`)
+    return response.data
+  },
   async reportLogisticsNoCapacity(id: number, payload?: { no_capacity_reason?: string }) {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/logistics-biddings/no-capacity`, payload || {})
+    return response.data
+  },
+  async listLogisticsQuotes(id: number) {
+    const response = await api.get<unknown, ApiResponse<{ list: LogisticsQuoteInfo[] }>>(`/orders/${id}/logistics-quotes`)
+    return response.data.list
+  },
+  async selectLogisticsQuote(id: number, payload: { quote_id: number }) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/logistics-quotes/select`, payload)
     return response.data
   },
   async confirmLogisticsQuote(id: number, payload: { quote_id: number }) {

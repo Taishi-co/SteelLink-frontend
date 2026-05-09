@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Descriptions, Input, Modal, Select, Space, Spin, Table, Tag, Timeline, Typography, message } from 'antd'
+import { Alert, Button, Card, Descriptions, Input, Modal, Radio, Select, Space, Spin, Steps, Table, Tabs, Tag, Timeline, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { EyeOutlined, ReloadOutlined } from '@ant-design/icons'
+import { EyeOutlined, ReloadOutlined, ClockCircleOutlined, TruckOutlined } from '@ant-design/icons'
 import { getErrorMessage, getErrorStatus, timelineColor } from '@steellink/shared/utils'
-import { sellerOrderService, type SellerOrderInfo } from '@/services/orderService'
+import { sellerOrderService, type SellerOrderInfo, type LogisticsQuoteInfo } from '@/services/orderService'
 import { sellerAuthService, updateSellerUser } from '@/services/auth'
 import { useNavigate } from 'react-router-dom'
 
@@ -38,6 +38,13 @@ const statusMeta: Record<number, { color: string; text: string }> = {
   24: { color: 'volcano', text: '待重新发起物流' },
 }
 
+const shipmentStatusMap: Record<string, string> = {
+  pending_pickup: '待提货',
+  picked_up: '已提货',
+  delivered: '已送达',
+  signed: '已签收',
+}
+
 const statusOptions = [
   { label: '全部状态', value: 'all' },
   { label: '进行中', value: 'active' },
@@ -46,6 +53,8 @@ const statusOptions = [
   { label: '待支付', value: 3 },
   { label: '待确认收款', value: 4 },
   { label: '待提货', value: 5 },
+  { label: '物流竞价中', value: 15 },
+  { label: '待确认物流', value: 16 },
   { label: '配送中', value: 6 },
   { label: '已送达', value: 7 },
   { label: '已完成', value: 8 },
@@ -59,6 +68,7 @@ const summaryStatusItems = [
   { key: 1, label: '待确认', statuses: [1] },
   { key: 4, label: '待确认收款', statuses: [4] },
   { key: 5, label: '待提货', statuses: [5] },
+  { key: 15, label: '物流竞价中', statuses: [15] },
   { key: 8, label: '已完成', statuses: [8] },
 ] as const
 
@@ -111,6 +121,7 @@ function getSellerGuidance(order?: SellerOrderInfo | null) {
     return { type: 'warning' as const, title: '当前状态：待签合同', next: '签署状态：买家未签，卖家未签。请签署合同；双方签署后进入支付节点。' }
   }
   if (order.status === 4) return { type: 'warning' as const, title: '当前状态：买方支付已完成', next: '请确认收款；之后发起物流竞价。' }
+  if (order.status === 5) return { type: 'warning' as const, title: '当前状态：待提货', next: '请发起物流竞价，物流方报价后选择并等待确认。' }
   if (order.status === 15) return { type: 'info' as const, title: '当前状态：物流竞价已发起', next: '等待物流方报价，也可在无运力时反馈平台。' }
   if (order.status === 16) return { type: 'warning' as const, title: '当前状态：物流报价已完成', next: '如合同约定卖方承担运费，请确认物流报价。' }
   if (order.status === 24) return { type: 'warning' as const, title: '当前状态：待重新发起物流', next: '平台已收到无运力反馈，请重新发起物流竞价。' }
@@ -130,6 +141,13 @@ export default function OrdersPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ type: 'payment' | 'outbound'; order: SellerOrderInfo } | null>(null)
   const [confirmInput, setConfirmInput] = useState('')
+  const [logisticsQuotes, setLogisticsQuotes] = useState<LogisticsQuoteInfo[]>([])
+  const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null)
+  const [quoteModalOrder, setQuoteModalOrder] = useState<SellerOrderInfo | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<string>('orders')
+  const [biddingQuoteMap, setBiddingQuoteMap] = useState<Record<number, LogisticsQuoteInfo[]>>({})
+  const [biddingQuoteLoadingMap, setBiddingQuoteLoadingMap] = useState<Record<number, boolean>>({})
 
   const loadOrders = useCallback(async () => {
     setLoading(true)
@@ -190,6 +208,49 @@ export default function OrdersPage() {
       }, {}),
     }
   }, [orders])
+
+  const logisticsBiddingOrders = useMemo(() => {
+    return orders.filter((order) => [15, 16].includes(order.status))
+  }, [orders])
+
+  const loadBiddingQuotes = useCallback(async (orderId: number) => {
+    setBiddingQuoteLoadingMap((prev) => ({ ...prev, [orderId]: true }))
+    try {
+      const quotes = await sellerOrderService.listLogisticsQuotes(orderId)
+      setBiddingQuoteMap((prev) => ({ ...prev, [orderId]: quotes }))
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '获取物流报价失败'))
+    } finally {
+      setBiddingQuoteLoadingMap((prev) => ({ ...prev, [orderId]: false }))
+    }
+  }, [])
+
+  const handleCloseBidding = useCallback(async (order: SellerOrderInfo) => {
+    setActionLoading(true)
+    try {
+      const detail = await sellerOrderService.closeLogisticsBidding(order.id)
+      message.success('物流报价已结束，请查看报价列表并选择')
+      setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+      await loadBiddingQuotes(order.id)
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '结束报价失败'))
+    } finally {
+      setActionLoading(false)
+    }
+  }, [loadBiddingQuotes])
+
+  const handleSelectQuote = useCallback(async (order: SellerOrderInfo, quoteId: number) => {
+    setActionLoading(true)
+    try {
+      const detail = await sellerOrderService.selectLogisticsQuote(order.id, { quote_id: quoteId })
+      message.success('物流报价已选择，请等待买家确认')
+      setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '选择报价失败'))
+    } finally {
+      setActionLoading(false)
+    }
+  }, [])
 
   const setSummaryFilter = (item: (typeof summaryStatusItems)[number]) => {
     setStatusFilter(item.key)
@@ -414,7 +475,7 @@ export default function OrdersPage() {
               确认收款
             </Button>
           )}
-          {(record.status === 4 || record.status === 24) && (
+          {(record.status === 4 || record.status === 5 || record.status === 24) && (
             <Button type="link" size="small" onClick={async () => {
               setActionLoading(true)
               try {
@@ -424,6 +485,34 @@ export default function OrdersPage() {
               } catch (error: unknown) { message.error(getErrorMessage(error, '发起竞价失败')) }
               finally { setActionLoading(false) }
             }}>发起物流竞价</Button>
+          )}
+          {record.status === 15 && (
+            <Button type="link" size="small" onClick={async () => {
+              setActionLoading(true)
+              try {
+                const detail = await sellerOrderService.closeLogisticsBidding(record.id)
+                message.success('物流报价已结束，请查看报价列表并选择')
+                setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+              } catch (error: unknown) { message.error(getErrorMessage(error, '结束报价失败')) }
+              finally { setActionLoading(false) }
+            }}>结束报价</Button>
+          )}
+          {(record.status === 15 || record.status === 16) && (
+            <Button type="link" size="small" onClick={() => {
+              setQuoteModalOrder(record)
+              setSelectedQuoteId(null)
+              setQuoteLoading(true)
+              sellerOrderService.listLogisticsQuotes(record.id)
+                .then((quotes) => {
+                  setLogisticsQuotes(quotes)
+                })
+                .catch((error: unknown) => {
+                  message.error(getErrorMessage(error, '获取报价列表失败'))
+                })
+                .finally(() => {
+                  setQuoteLoading(false)
+                })
+            }}>{record.status === 15 ? '查看物流报价' : '选择物流报价'}</Button>
           )}
           {(record.status === 15 || record.status === 16) && (
             <Button type="link" size="small" danger onClick={async () => {
@@ -474,79 +563,260 @@ export default function OrdersPage() {
 
   return (
     <div className="min-w-0">
-      <Card
-        title="订单管理"
-        extra={
-          <Button icon={<ReloadOutlined />} onClick={() => void loadOrders()}>
-            刷新
-          </Button>
-        }
-      >
-        <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-6">
-          <button
-            type="button"
-            onClick={() => setStatusFilter('all')}
-            className={`rounded-lg border px-4 py-3 text-left transition ${
-              statusFilter === 'all' ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'
-            }`}
-          >
-            <div className="text-xs text-gray-500">全部订单</div>
-            <div className="mt-1 text-2xl font-semibold text-gray-900">{orderSummary.total}</div>
-          </button>
-          {summaryStatusItems.map((item) => {
-            const count = item.statuses.reduce((sum, status) => sum + (orderSummary.statusCounts[status] || 0), 0)
-            const active = statusFilter === item.key
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setSummaryFilter(item)}
-                className={`rounded-lg border px-4 py-3 text-left transition ${
-                  active ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'
-                }`}
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'orders',
+            label: '订单管理',
+            children: (
+              <Card
+                extra={
+                  <Button icon={<ReloadOutlined />} onClick={() => void loadOrders()}>
+                    刷新
+                  </Button>
+                }
               >
-                <div className="text-xs text-gray-500">{item.label}</div>
-                <div className="mt-1 text-2xl font-semibold text-gray-900">{count}</div>
-              </button>
-            )
-          })}
-        </div>
+                <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-6">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('all')}
+                    className={`rounded-lg border px-4 py-3 text-left transition ${
+                      statusFilter === 'all' ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'
+                    }`}
+                  >
+                    <div className="text-xs text-gray-500">全部订单</div>
+                    <div className="mt-1 text-2xl font-semibold text-gray-900">{orderSummary.total}</div>
+                  </button>
+                  {summaryStatusItems.map((item) => {
+                    const count = item.statuses.reduce((sum, status) => sum + (orderSummary.statusCounts[status] || 0), 0)
+                    const active = statusFilter === item.key
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setSummaryFilter(item)}
+                        className={`rounded-lg border px-4 py-3 text-left transition ${
+                          active ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'
+                        }`}
+                      >
+                        <div className="text-xs text-gray-500">{item.label}</div>
+                        <div className="mt-1 text-2xl font-semibold text-gray-900">{count}</div>
+                      </button>
+                    )
+                  })}
+                </div>
 
-        <Alert
-          className="mb-4"
-          type="info"
-          showIcon
-          message={`当前有效订单金额 ${formatCurrency(orderSummary.totalAmount)}`}
-          description="卖家可在这里确认订单、签署合同、确认收款和核销出库；高风险操作仍会弹窗二次确认。"
-        />
+                <Alert
+                  className="mb-4"
+                  type="info"
+                  showIcon
+                  message={`当前有效订单金额 ${formatCurrency(orderSummary.totalAmount)}`}
+                  description="卖家可在这里确认订单、签署合同、确认收款和核销出库；高风险操作仍会弹窗二次确认。"
+                />
 
-        <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center">
-          <Search
-            className="w-full xl:max-w-md"
-            placeholder="搜索订单号 / 买家企业 / 商品名"
-            allowClear
-            onSearch={setSearchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            value={searchText}
-          />
-          <Select
-            className="w-full xl:w-44"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={statusOptions}
-          />
-        </div>
+                <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center">
+                  <Search
+                    className="w-full xl:max-w-md"
+                    placeholder="搜索订单号 / 买家企业 / 商品名"
+                    allowClear
+                    onSearch={setSearchText}
+                    onChange={(event) => setSearchText(event.target.value)}
+                    value={searchText}
+                  />
+                  <Select
+                    className="w-full xl:w-44"
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={statusOptions}
+                  />
+                </div>
 
-        <Table
-          loading={loading}
-          columns={columns}
-          dataSource={filteredOrders}
-          rowKey="id"
-          size="middle"
-          scroll={{ x: 1520 }}
-          pagination={{ pageSize: 10, showSizeChanger: false }}
-        />
-      </Card>
+                <Table
+                  loading={loading}
+                  columns={columns}
+                  dataSource={filteredOrders}
+                  rowKey="id"
+                  size="middle"
+                  scroll={{ x: 1520 }}
+                  pagination={{ pageSize: 10, showSizeChanger: false }}
+                />
+              </Card>
+            ),
+          },
+          {
+            key: 'logistics-bidding',
+            label: (
+              <span>
+                <TruckOutlined style={{ marginRight: 6 }} />
+                物流竞价
+                {logisticsBiddingOrders.length > 0 && (
+                  <Tag color="blue" style={{ marginLeft: 8 }}>{logisticsBiddingOrders.length}</Tag>
+                )}
+              </span>
+            ),
+            children: (
+              <Card
+                extra={
+                  <Button icon={<ReloadOutlined />} onClick={() => void loadOrders()}>
+                    刷新
+                  </Button>
+                }
+              >
+                {logisticsBiddingOrders.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <TruckOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />
+                    <div className="mt-4 text-gray-500">暂无物流竞价订单</div>
+                    <div className="mt-2 text-sm text-gray-400">在订单管理中发起物流竞价后，可在此查看竞价情况和管理报价</div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Alert
+                      type="info"
+                      showIcon
+                      message="物流竞价管理"
+                      description="在此查看所有物流竞价订单的报价情况，结束竞价后可选择物流报价。"
+                    />
+                    {logisticsBiddingOrders.map((order) => {
+                      const bidding = order.logistics_bidding
+                      const quotes = biddingQuoteMap[order.id] || order.logistics_quotes || []
+                      const quotesLoading = biddingQuoteLoadingMap[order.id] || false
+                      const isOpen = order.status === 15
+                      const isPendingConfirm = order.status === 16
+                      const lowestAmount = quotes.length > 0 ? Math.min(...quotes.map((q) => q.amount)) : null
+
+                      return (
+                        <Card
+                          key={order.id}
+                          title={
+                            <Space>
+                              <Tag color={isOpen ? 'processing' : 'gold'}>
+                                {isOpen ? '竞价中' : '待确认物流'}
+                              </Tag>
+                              <Text strong>{order.order_no}</Text>
+                              <Text type="secondary">{order.buyer_name}</Text>
+                            </Space>
+                          }
+                          extra={
+                            <Space>
+                              {isOpen && (
+                                <Button
+                                  type="primary"
+                                  danger
+                                  size="small"
+                                  loading={actionLoading}
+                                  onClick={() => void handleCloseBidding(order)}
+                                >
+                                  结束竞价
+                                </Button>
+                              )}
+                              <Button
+                                size="small"
+                                loading={quotesLoading}
+                                onClick={() => void loadBiddingQuotes(order.id)}
+                              >
+                                {quotes.length > 0 ? '刷新报价' : '加载报价'}
+                              </Button>
+                            </Space>
+                          }
+                          size="small"
+                        >
+                          <Descriptions bordered column={4} size="small">
+                            <Descriptions.Item label="商品">{getPrimaryProduct(order)?.product_name || '-'}</Descriptions.Item>
+                            <Descriptions.Item label="数量">{order.total_quantity} 吨</Descriptions.Item>
+                            <Descriptions.Item label="订单金额">{formatCurrency(order.total_amount)}</Descriptions.Item>
+                            <Descriptions.Item label="运费承担方">{bidding?.freight_payer === 'buyer' ? '买家' : '卖家'}</Descriptions.Item>
+                            <Descriptions.Item label="竞价发起时间">{formatDate(bidding?.created_at)}</Descriptions.Item>
+                            <Descriptions.Item label="报价数量">
+                              <Tag color={quotes.length > 0 ? 'blue' : 'default'}>{quotes.length} 条</Tag>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="最低报价">
+                              {lowestAmount !== null ? (
+                                <Text strong style={{ color: '#cf1322' }}>{formatCurrency(lowestAmount)}</Text>
+                              ) : '暂无报价'}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="竞价状态">
+                              <Tag color={bidding?.status === 'open' ? 'processing' : 'success'}>
+                                {bidding?.status === 'open' ? '竞价中' : bidding?.status === 'selected' ? '已结束' : bidding?.status || '-'}
+                              </Tag>
+                            </Descriptions.Item>
+                          </Descriptions>
+
+                          {quotes.length > 0 ? (
+                            <div style={{ marginTop: 12 }}>
+                              <div className="mb-2 flex items-center justify-between">
+                                <Text strong>物流报价列表</Text>
+                                {isPendingConfirm && <Text type="secondary">请选择一个物流报价</Text>}
+                              </div>
+                              <Table
+                                loading={quotesLoading}
+                                dataSource={quotes}
+                                rowKey="id"
+                                size="small"
+                                pagination={false}
+                                rowSelection={isPendingConfirm ? {
+                                  type: 'radio',
+                                  selectedRowKeys: bidding?.seller_confirmed_quote_id ? [bidding.seller_confirmed_quote_id] : [],
+                                  onChange: (selectedRowKeys) => {
+                                    if (selectedRowKeys.length > 0) {
+                                      void handleSelectQuote(order, selectedRowKeys[0] as number)
+                                    }
+                                  },
+                                } : undefined}
+                                columns={[
+                                  { title: '物流企业', dataIndex: 'logistics_name', key: 'logistics_name', width: 160 },
+                                  {
+                                    title: '报价金额',
+                                    dataIndex: 'amount',
+                                    key: 'amount',
+                                    width: 120,
+                                    render: (v: number) => <Text strong style={{ color: '#cf1322' }}>{formatCurrency(v)}</Text>,
+                                    sorter: (a, b) => a.amount - b.amount,
+                                  },
+                                  { title: '车辆信息', dataIndex: 'vehicle_info', key: 'vehicle_info', width: 140, render: (v: string) => v || '-' },
+                                  { title: '司机信息', dataIndex: 'driver_info', key: 'driver_info', width: 140, render: (v: string) => v || '-' },
+                                  { title: '预计提货', dataIndex: 'estimated_pickup_at', key: 'estimated_pickup_at', width: 160, render: (v: string) => formatDate(v) },
+                                  { title: '预计送达', dataIndex: 'estimated_delivery_at', key: 'estimated_delivery_at', width: 160, render: (v: string) => formatDate(v) },
+                                  { title: '备注', dataIndex: 'remark', key: 'remark', width: 140, ellipsis: true, render: (v: string) => v || '-' },
+                                  {
+                                    title: '操作',
+                                    key: 'action',
+                                    width: 100,
+                                    render: (_: unknown, quote: LogisticsQuoteInfo) => (
+                                      isPendingConfirm ? (
+                                        <Button
+                                          type="link"
+                                          size="small"
+                                          loading={actionLoading}
+                                          onClick={() => void handleSelectQuote(order, quote.id)}
+                                        >
+                                          选择此报价
+                                        </Button>
+                                      ) : null
+                                    ),
+                                  },
+                                ]}
+                              />
+                            </div>
+                          ) : (
+                            <div className="mt-3 text-center py-6">
+                              <ClockCircleOutlined style={{ fontSize: 32, color: '#d9d9d9' }} />
+                              <div className="mt-2 text-gray-400">
+                                {quotesLoading ? '正在加载报价...' : isOpen ? '等待物流方报价中...' : '暂无报价'}
+                              </div>
+                            </div>
+                          )}
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
+              </Card>
+            ),
+          },
+        ]}
+      />
 
       <Modal
         title="订单详情"
@@ -574,6 +844,53 @@ export default function OrdersPage() {
           selectedOrder?.status === 5 && selectedOrder.delivery_info?.pickup_code ? (
             <Button key="outbound" type="primary" onClick={() => handleConfirmOutbound(selectedOrder)}>
               确认出库
+            </Button>
+          ) : null,
+          (selectedOrder?.status === 4 || selectedOrder?.status === 5 || selectedOrder?.status === 24) ? (
+            <Button key="logistics-bidding" type="primary" loading={actionLoading} onClick={async () => {
+              if (!selectedOrder) return
+              setActionLoading(true)
+              try {
+                const detail = await sellerOrderService.createLogisticsBidding(selectedOrder.id, { freight_payer: 'buyer' })
+                showCompleted('物流竞价发起已完成', '等待物流方报价；订单详情和管理端会记录本次发起事件。', detail)
+                setSelectedOrder(detail)
+                setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+              } catch (error: unknown) { message.error(getErrorMessage(error, '发起竞价失败')) }
+              finally { setActionLoading(false) }
+            }}>
+              发起物流竞价
+            </Button>
+          ) : null,
+          selectedOrder?.status === 15 ? (
+            <Button key="close-bidding" type="primary" loading={actionLoading} onClick={async () => {
+              if (!selectedOrder) return
+              setActionLoading(true)
+              try {
+                const detail = await sellerOrderService.closeLogisticsBidding(selectedOrder.id)
+                message.success('物流报价已结束，请查看报价列表并选择')
+                setSelectedOrder(detail)
+                setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+              } catch (error: unknown) { message.error(getErrorMessage(error, '结束报价失败')) }
+              finally { setActionLoading(false) }
+            }}>
+              结束报价
+            </Button>
+          ) : null,
+          (selectedOrder?.status === 15 || selectedOrder?.status === 16) ? (
+            <Button key="view-quotes" onClick={() => {
+              if (!selectedOrder) return
+              setQuoteModalOrder(selectedOrder)
+              setSelectedQuoteId(null)
+              setQuoteLoading(true)
+              sellerOrderService.listLogisticsQuotes(selectedOrder.id).then((quotes) => {
+                setLogisticsQuotes(quotes)
+                setQuoteLoading(false)
+              }).catch(() => {
+                message.error('获取物流报价失败')
+                setQuoteLoading(false)
+              })
+            }}>
+              查看物流报价
             </Button>
           ) : null,
         ]}
@@ -650,6 +967,73 @@ export default function OrdersPage() {
               <Descriptions.Item label="提货地址" span={2}>{selectedOrder.delivery_info?.address || '-'}</Descriptions.Item>
             </Descriptions>
 
+            {selectedOrder.logistics_bidding && (
+              <Card title="物流竞价信息" size="small" style={{ marginTop: 16 }}>
+                <Descriptions bordered column={2} size="small">
+                  <Descriptions.Item label="竞价ID">{selectedOrder.logistics_bidding.id}</Descriptions.Item>
+                  <Descriptions.Item label="竞价状态">
+                    <Tag color={selectedOrder.logistics_bidding.status === 'open' ? 'processing' : 'success'}>
+                      {selectedOrder.logistics_bidding.status === 'open' ? '竞价中' : selectedOrder.logistics_bidding.status === 'selected' ? '已结束' : selectedOrder.logistics_bidding.status}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="运费承担方">
+                    {selectedOrder.logistics_bidding.freight_payer === 'buyer' ? '买家' : '卖家'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="创建时间">{formatDate(selectedOrder.logistics_bidding.created_at)}</Descriptions.Item>
+                </Descriptions>
+                {selectedOrder.logistics_quotes && selectedOrder.logistics_quotes.length > 0 ? (
+                  <div style={{ marginTop: 12 }}>
+                    <Text strong>物流报价列表：</Text>
+                    <div style={{ marginTop: 8 }}>
+                      {selectedOrder.logistics_quotes.map((quote) => (
+                        <Card key={quote.id} size="small" style={{ marginBottom: 8 }}>
+                          <Descriptions bordered column={2} size="small">
+                            <Descriptions.Item label="物流企业">{quote.logistics_name}</Descriptions.Item>
+                            <Descriptions.Item label="报价金额">{formatCurrency(quote.amount)}</Descriptions.Item>
+                            <Descriptions.Item label="车辆信息">{quote.vehicle_info || '-'}</Descriptions.Item>
+                            <Descriptions.Item label="司机信息">{quote.driver_info || '-'}</Descriptions.Item>
+                            <Descriptions.Item label="预计提货时间">{formatDate(quote.estimated_pickup_at)}</Descriptions.Item>
+                            <Descriptions.Item label="预计送达时间">{formatDate(quote.estimated_delivery_at)}</Descriptions.Item>
+                          </Descriptions>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Alert type="info" message="暂无物流报价" style={{ marginTop: 12 }} />
+                )}
+              </Card>
+            )}
+
+            {selectedOrder.shipment_task && (
+              <Card title="物流运输进度" size="small" style={{ marginTop: 16 }}>
+                <Descriptions bordered column={2} size="small">
+                  <Descriptions.Item label="运输状态">
+                    <Tag color={
+                      selectedOrder.shipment_task.status === 'pending_pickup' ? 'default' :
+                      selectedOrder.shipment_task.status === 'picked_up' ? 'processing' :
+                      selectedOrder.shipment_task.status === 'delivered' ? 'cyan' : 'success'
+                    }>
+                      {shipmentStatusMap[selectedOrder.shipment_task.status] || selectedOrder.shipment_task.status}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="提货时间">{selectedOrder.shipment_task.picked_up_at ? formatDate(selectedOrder.shipment_task.picked_up_at) : '-'}</Descriptions.Item>
+                  <Descriptions.Item label="送达时间">{selectedOrder.shipment_task.delivered_at ? formatDate(selectedOrder.shipment_task.delivered_at) : '-'}</Descriptions.Item>
+                  <Descriptions.Item label="签收时间">{selectedOrder.shipment_task.signed_at ? formatDate(selectedOrder.shipment_task.signed_at) : '-'}</Descriptions.Item>
+                </Descriptions>
+                <Steps
+                  style={{ marginTop: 12 }}
+                  current={selectedOrder.shipment_task.status === 'signed' ? 3 : selectedOrder.shipment_task.status === 'delivered' ? 2 : selectedOrder.shipment_task.status === 'picked_up' ? 1 : 0}
+                  items={[
+                    { title: '待提货', description: '等待物流方提货' },
+                    { title: '已提货', description: selectedOrder.shipment_task.picked_up_at ? formatDate(selectedOrder.shipment_task.picked_up_at) : '运输中' },
+                    { title: '已送达', description: selectedOrder.shipment_task.delivered_at ? formatDate(selectedOrder.shipment_task.delivered_at) : '待送达' },
+                    { title: '已签收', description: selectedOrder.shipment_task.signed_at ? formatDate(selectedOrder.shipment_task.signed_at) : '待签收' },
+                  ]}
+                />
+              </Card>
+            )}
+
             <Card title="订单时间线" size="small" style={{ marginTop: 16 }}>
               <Timeline
                 items={(selectedOrder.timeline || []).map((item) => ({
@@ -714,6 +1098,96 @@ export default function OrdersPage() {
                 style={{ width: 200 }}
               />
             </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        title={quoteModalOrder?.status === 15 ? '查看物流报价' : '选择物流报价'}
+        open={!!quoteModalOrder}
+        onCancel={() => { setQuoteModalOrder(null); setLogisticsQuotes([]); setSelectedQuoteId(null) }}
+        onOk={quoteModalOrder?.status === 16 ? () => {
+          if (!quoteModalOrder || !selectedQuoteId) {
+            message.warning('请先选择一个物流报价')
+            return
+          }
+          setActionLoading(true)
+          sellerOrderService.selectLogisticsQuote(quoteModalOrder.id, { quote_id: selectedQuoteId })
+            .then((detail) => {
+              message.success('物流报价已选择，请等待买家确认')
+              setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+              setQuoteModalOrder(null)
+              setLogisticsQuotes([])
+              setSelectedQuoteId(null)
+            })
+            .catch((error: unknown) => {
+              message.error(getErrorMessage(error, '选择报价失败'))
+            })
+            .finally(() => {
+              setActionLoading(false)
+            })
+        } : undefined}
+        okText={quoteModalOrder?.status === 16 ? '确认选择' : undefined}
+        okButtonProps={quoteModalOrder?.status === 16 ? { loading: actionLoading, disabled: !selectedQuoteId } : { style: { display: 'none' } }}
+        cancelText={quoteModalOrder?.status === 16 ? '取消' : '关闭'}
+        width={720}
+        destroyOnHidden
+      >
+        {quoteModalOrder && (
+          <div>
+            <Alert
+              type="info"
+              showIcon
+              message={quoteModalOrder.status === 15 ? '物流报价进行中，以下是已有的报价。你可以结束报价后选择物流。' : '请从以下物流报价中选择一个，选择后将等待买家确认'}
+              style={{ marginBottom: 16 }}
+            />
+            <Descriptions bordered column={2} size="small" style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="订单号">{quoteModalOrder.order_no}</Descriptions.Item>
+              <Descriptions.Item label="买家企业">{quoteModalOrder.buyer_name}</Descriptions.Item>
+              <Descriptions.Item label="商品">{getPrimaryProduct(quoteModalOrder)?.product_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="数量">{quoteModalOrder.total_quantity} 吨</Descriptions.Item>
+            </Descriptions>
+            <Spin spinning={quoteLoading}>
+              {logisticsQuotes.length === 0 ? (
+                <div className="text-center py-8">
+                  <ClockCircleOutlined className="text-4xl text-gray-300 mb-4" />
+                  <div className="text-gray-500">暂无物流报价</div>
+                </div>
+              ) : (
+                <Radio.Group value={selectedQuoteId} onChange={(e) => quoteModalOrder.status === 16 && setSelectedQuoteId(e.target.value)}>
+                  <Space direction="vertical" className="w-full">
+                    {logisticsQuotes.map((quote) => (
+                      <Radio key={quote.id} value={quote.id} className="w-full" disabled={quoteModalOrder.status === 15}>
+                        <Card className="w-full" hoverable={quoteModalOrder.status === 16}>
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{quote.logistics_name}</div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                <span>车辆信息：{quote.vehicle_info || '未填写'}</span>
+                                <span className="mx-2">|</span>
+                                <span>司机信息：{quote.driver_info || '未填写'}</span>
+                              </div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                <span>预计提货：{quote.estimated_pickup_at || '未填写'}</span>
+                                <span className="mx-2">|</span>
+                                <span>预计送达：{quote.estimated_delivery_at || '未填写'}</span>
+                              </div>
+                              {quote.remark && (
+                                <div className="text-sm text-gray-500 mt-1">备注：{quote.remark}</div>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xl font-bold text-blue-600">{formatCurrency(quote.amount)}</div>
+                              <div className="text-xs text-gray-500 mt-1">报价时间：{formatDate(quote.created_at)}</div>
+                            </div>
+                          </div>
+                        </Card>
+                      </Radio>
+                    ))}
+                  </Space>
+                </Radio.Group>
+              )}
+            </Spin>
           </div>
         )}
       </Modal>
