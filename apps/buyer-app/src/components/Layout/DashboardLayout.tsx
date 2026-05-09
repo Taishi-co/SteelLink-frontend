@@ -10,6 +10,8 @@ import {
   DollarOutlined,
   AppstoreOutlined,
   ShopOutlined,
+  HomeOutlined,
+  TruckOutlined,
   LineChartOutlined,
   RiseOutlined,
   LogoutOutlined,
@@ -220,6 +222,38 @@ export default function DashboardLayout() {
                   )}
                 </div>
               </a>
+            )}
+            {approvedServices.has('logistics') && (
+              <Link to="/dashboard/logistics">
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
+                  style={{ background: 'rgba(37,99,235,.14)', border: '1px solid rgba(37,99,235,.25)' }}
+                >
+                  <TruckOutlined className="text-blue-300 text-sm" />
+                  {!collapsed && (
+                    <>
+                      <span className="text-xs text-blue-300 font-semibold flex-1">进入物流管理中心</span>
+                      <ArrowRightOutlined className="text-blue-300 text-[10px]" />
+                    </>
+                  )}
+                </div>
+              </Link>
+            )}
+            {approvedServices.has('warehouse') && (
+              <Link to="/dashboard/warehouse">
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
+                  style={{ background: 'rgba(22,163,74,.14)', border: '1px solid rgba(22,163,74,.25)' }}
+                >
+                  <HomeOutlined className="text-emerald-300 text-sm" />
+                  {!collapsed && (
+                    <>
+                      <span className="text-xs text-emerald-300 font-semibold flex-1">进入仓储管理中心</span>
+                      <ArrowRightOutlined className="text-emerald-300 text-[10px]" />
+                    </>
+                  )}
+                </div>
+              </Link>
             )}
             <Link to="/mall">
               <div
