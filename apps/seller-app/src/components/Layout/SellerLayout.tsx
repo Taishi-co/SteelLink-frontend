@@ -13,6 +13,7 @@ import {
   TeamOutlined,
   TruckOutlined,
   UserOutlined,
+  MailOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { clearSellerSession, getSellerUser, isIdentityVerified, hasEnterprise, hasEnterprisePending, isSellerReady, sellerAuthService, updateSellerUser } from '@/services/auth'
@@ -70,6 +71,7 @@ export default function SellerLayout() {
     items.push({ key: '/warehouses', icon: <BankOutlined />, label: '仓库管理' })
     items.push({ key: '/bidding', icon: <RiseOutlined />, label: '参与竞价' })
     items.push({ key: '/orders', icon: <ShoppingCartOutlined />, label: '订单管理' })
+    items.push({ key: '/notifications', icon: <MailOutlined />, label: '站内信' })
     items.push({ key: '/fulfillment', icon: <TruckOutlined />, label: '履约核销' })
     items.push({ key: '/enterprise', icon: <TeamOutlined />, label: '企业信息' })
     items.push({ key: '/settings', icon: <SettingOutlined />, label: '店铺设置' })

@@ -27,6 +27,7 @@ const BiddingPage = lazy(() => import('@/pages/Bidding'))
 const BiddingModulePage = lazy(() => import('@/pages/BiddingModule'))
 const ProcurementDetailPage = lazy(() => import('@/pages/ProcurementDetail'))
 const PersonalWorkspacePage = lazy(() => import('@/pages/PersonalWorkspace'))
+const NotificationsPage = lazy(() => import('@/pages/Notifications'))
 const DashboardMarket = lazy(() => import('@/pages/Dashboard/Market'))
 const DashboardServices = lazy(() => import('@/pages/Dashboard/Services'))
 const DashboardFinance = lazy(() => import('@/pages/Dashboard/Finance'))
@@ -100,6 +101,7 @@ export function AppRouter() {
           <Route path="bidding" element={<BiddingModulePage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
           <Route path="identity" element={<IdentityPage />} />
           <Route path="enterprise" element={<EnterprisePage />} />
           <Route path="finance" element={<DashboardFinance />} />
