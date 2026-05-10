@@ -24,8 +24,9 @@ import ServicePanelGate from './ServicePanelGate'
 const { Title, Paragraph, Text } = Typography
 
 const orderStatusLabels: Record<number, { label: string; color: string }> = {
-  12: { label: '待仓库确认', color: 'purple' },
-  13: { label: '待卖方确认', color: 'default' },
+  12: { label: '待选择目的地仓储', color: 'geekblue' },
+  13: { label: '待仓库确认', color: 'purple' },
+  14: { label: '待卖方确认', color: 'default' },
   5: { label: '待提货', color: 'blue' },
   6: { label: '配送中', color: 'processing' },
   7: { label: '已送达', color: 'cyan' },
@@ -106,9 +107,9 @@ export default function WarehousePage() {
   const [rejectOrderRef, setRejectOrderRef] = useState<typeof orders[0] | null>(null)
   const { data: warehouseData, isError: warehouseError, isLoading: warehouseLoading } = useQuery({
     queryKey: ['dashboard-warehouse-services'],
-    queryFn: () => serviceOfferService.listWarehouses({ page_size: 100 }),
+    queryFn: () => serviceOfferService.listMyWarehouses(),
   })
-  const warehouses = warehouseData?.data.list ?? []
+  const warehouses = warehouseData?.data ?? []
   const activeWarehouse = warehouses[0]
   const { data: movementData, isError: movementError, isLoading: movementLoading } = useQuery({
     queryKey: ['dashboard-warehouse-movements'],
@@ -179,7 +180,7 @@ export default function WarehousePage() {
   })
 
   const orders = orderData ?? []
-  const pendingOrders = orders.filter(o => o.status === 12)
+  const pendingOrders = orders.filter(o => o.status === 13)
 
   const handleViewOrderDetail = (order: typeof orders[0]) => {
     setSelectedOrder(order)
@@ -240,7 +241,7 @@ export default function WarehousePage() {
       render: (_: unknown, record: typeof orders[0]) => (
         <Space>
           <Button size="small" onClick={() => handleViewOrderDetail(record)} icon={<EyeOutlined />}>详情</Button>
-          {record.status === 12 && (
+          {record.status === 13 && (
             <>
               <Button
                 size="small"
@@ -527,7 +528,7 @@ export default function WarehousePage() {
                 <div>{selectedOrder.created_at}</div>
               </div>
 
-              {selectedOrder.status === 12 && (
+              {selectedOrder.status === 13 && (
                 <div className="flex gap-3 mt-4">
                   <Button
                     type="primary"

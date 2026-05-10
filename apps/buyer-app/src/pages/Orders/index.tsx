@@ -19,17 +19,18 @@ const statusMap: Record<number, { label: string; color: string }> = {
   9: { label: '已取消', color: 'red' },
   10: { label: '已冻结', color: 'volcano' },
   11: { label: '异常', color: 'magenta' },
-  12: { label: '待仓库确认', color: 'purple' },
-  13: { label: '待卖方确认', color: 'orange' },
-  14: { label: '待买方确认', color: 'blue' },
-  15: { label: '物流竞价中', color: 'cyan' },
-  16: { label: '待确认物流', color: 'gold' },
-  17: { label: '运输中', color: 'processing' },
-  18: { label: '已收货', color: 'green' },
-  19: { label: '已对账', color: 'success' },
-  20: { label: '已归档', color: 'default' },
-  21: { label: '融资审批中', color: 'purple' },
-  22: { label: '待签署融资合同', color: 'gold' },
+  12: { label: '待选择目的地仓储', color: 'geekblue' },
+  13: { label: '待仓库确认', color: 'purple' },
+  14: { label: '待卖方确认', color: 'orange' },
+  15: { label: '待买方确认', color: 'blue' },
+  16: { label: '物流竞价中', color: 'cyan' },
+  17: { label: '待确认物流', color: 'gold' },
+  18: { label: '运输中', color: 'processing' },
+  19: { label: '已收货', color: 'green' },
+  20: { label: '已对账', color: 'success' },
+  21: { label: '已归档', color: 'default' },
+  22: { label: '融资审批中', color: 'purple' },
+  23: { label: '待签署融资合同', color: 'gold' },
 }
 
 function getStatusAction(order: { status: number; payment_info?: { voucher_url?: string }; delivery_info?: { pickup_code?: string } }) {
@@ -40,8 +41,8 @@ function getStatusAction(order: { status: number; payment_info?: { voucher_url?:
   if (order.status === 21) return '资金方风控审批中'
   if (order.status === 22) return '请签署融资合同'
   if (order.status === 4) return '支付完成，等待物流'
-  if (order.status === 15) return '物流竞价中'
-  if (order.status === 16) return '请确认物流资源'
+  if (order.status === 15) return '待买方确认订单'
+  if (order.status === 16) return '物流竞价中'
   if (order.status === 5) return '待提货/运输'
   if (order.status === 17) return '运输中'
   if (order.status === 7 || order.status === 6) return '待买家确认收货'
