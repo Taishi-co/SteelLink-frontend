@@ -5,6 +5,7 @@ export type UploadPurpose =
   | 'payment_voucher'
   | 'title_voucher'
   | 'receipt_voucher'
+  | 'fee_voucher'
   | 'product_image'
   | 'product_qualification'
   | 'identity_card'

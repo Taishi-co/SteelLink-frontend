@@ -254,6 +254,10 @@ export default function OrderDetailPage() {
   const [financeOpen, setFinanceOpen] = useState(false)
   const [creatingFinance, setCreatingFinance] = useState(false)
   const [selectedFinanceServiceId, setSelectedFinanceServiceId] = useState<number | undefined>()
+  const [confirmingFinancing, setConfirmingFinancing] = useState(false)
+  const [signingDebt, setSigningDebt] = useState(false)
+  const [feeVoucherFileList, setFeeVoucherFileList] = useState<UploadFile[]>([])
+  const [debtSigningOpen, setDebtSigningOpen] = useState(false)
   const [form] = Form.useForm()
   const [deliveryForm] = Form.useForm()
   const [receiptForm] = Form.useForm()
@@ -453,6 +457,51 @@ export default function OrderDetailPage() {
       message.error(getErrorMessage(error, '融资申请失败'))
     } finally {
       setCreatingFinance(false)
+    }
+  }
+
+  const handleBuyerConfirmFinancing = async (confirmed: boolean) => {
+    try {
+      setConfirmingFinancing(true)
+      await orderService.buyerConfirmFinancing(Number(id), {
+        confirmed,
+        remark: confirmed ? '买方确认融资方案' : '买方放弃融资，选择直接支付',
+      })
+      showCompleted(
+        confirmed ? '融资方案确认已完成' : '已放弃融资',
+        confirmed ? '等待资金方生成债务质押合同。' : '订单已恢复为待支付，可直接上传支付凭证。',
+      )
+      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, confirmed ? '确认融资方案失败' : '放弃融资失败'))
+    } finally {
+      setConfirmingFinancing(false)
+    }
+  }
+
+  const handleSignDebtAndPayFee = async () => {
+    try {
+      const feeFile = feeVoucherFileList[0]
+      if (!feeFile?.originFileObj) {
+        message.warning('请上传手续费支付凭证')
+        return
+      }
+      setSigningDebt(true)
+      const uploaded = await uploadService.upload(feeFile.originFileObj, 'fee_voucher')
+      await orderService.buyerSignDebtAndPayFee(Number(id), {
+        fee_voucher_url: uploaded.url,
+      })
+      showCompleted('融资合同签署已完成', '等待资金方放款。')
+      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+      setDebtSigningOpen(false)
+      setFeeVoucherFileList([])
+    } catch (error: unknown) {
+      if (hasFormErrorFields(error)) return
+      message.error(getErrorMessage(error, '签署融资合同失败'))
+    } finally {
+      setSigningDebt(false)
     }
   }
 
@@ -780,8 +829,26 @@ export default function OrderDetailPage() {
                     申请融资
                   </Button>
                 )}
+                {order.status === 21 && order.financing_info?.status === 'risk_approved' && (
+                  <>
+                    <Button type="primary" loading={confirmingFinancing} onClick={() => handleBuyerConfirmFinancing(true)}>
+                      确认融资方案
+                    </Button>
+                    <Button loading={confirmingFinancing} onClick={() => {
+                      Modal.confirm({
+                        title: '放弃融资？',
+                        content: '放弃后将恢复为待支付状态，可直接上传支付凭证完成付款。',
+                        okText: '确认放弃',
+                        cancelText: '取消',
+                        onOk: () => handleBuyerConfirmFinancing(false),
+                      })
+                    }}>
+                      放弃融资，直接支付
+                    </Button>
+                  </>
+                )}
                 {order.status === 22 && (
-                  <Button type="primary" onClick={() => message.info('请上传手续费支付凭证以完成融资合同签署')}>
+                  <Button type="primary" onClick={() => setDebtSigningOpen(true)}>
                     签署融资合同并支付手续费
                   </Button>
                 )}
@@ -1071,6 +1138,41 @@ export default function OrderDetailPage() {
                       </Radio.Group>
                     )}
                   </Spin>
+                </div>
+              )}
+            </Modal>
+            <Modal
+              title="签署融资合同并支付手续费"
+              open={debtSigningOpen}
+              onCancel={() => { setDebtSigningOpen(false); setFeeVoucherFileList([]) }}
+              onOk={handleSignDebtAndPayFee}
+              okText="确认签署并支付"
+              okButtonProps={{ loading: signingDebt }}
+              cancelText="取消"
+              width={520}
+              destroyOnHidden
+            >
+              {order?.financing_info && (
+                <div>
+                  <Descriptions bordered column={1} size="small" style={{ marginBottom: 16 }}>
+                    <Descriptions.Item label="授信金额">¥{order.financing_info.approved_amount?.toLocaleString()}</Descriptions.Item>
+                    <Descriptions.Item label="融资期限">{order.financing_info.term_days} 天</Descriptions.Item>
+                    <Descriptions.Item label="年化利率">{order.financing_info.annual_rate}%</Descriptions.Item>
+                    <Descriptions.Item label="手续费">¥{order.financing_info.service_fee?.toLocaleString()}</Descriptions.Item>
+                    {order.financing_info.debt_contract_no && (
+                      <Descriptions.Item label="合同编号">{order.financing_info.debt_contract_no}</Descriptions.Item>
+                    )}
+                  </Descriptions>
+                  <Alert type="info" showIcon message="请先支付手续费，上传支付凭证后完成签署。" style={{ marginBottom: 16 }} />
+                  <Upload
+                    maxCount={1}
+                    fileList={feeVoucherFileList}
+                    onChange={({ fileList }) => setFeeVoucherFileList(fileList)}
+                    beforeUpload={() => false}
+                    accept="image/*,.pdf"
+                  >
+                    <Button icon={<UploadOutlined />}>上传手续费支付凭证</Button>
+                  </Upload>
                 </div>
               )}
             </Modal>

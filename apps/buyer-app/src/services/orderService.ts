@@ -124,7 +124,10 @@ export interface FinancingRequestInfo {
   approved_amount: number
   term_days: number
   annual_rate: number
+  service_fee: number
   status: string
+  debt_contract_no?: string
+  debt_contract_url?: string
 }
 
 export interface VoucherEvidence {
