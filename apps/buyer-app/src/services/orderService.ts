@@ -4,6 +4,7 @@ import type { ApiResponse } from '@/types'
 export interface CreateOrderPayload {
   product_id: number
   quantity: number
+  dest_warehouse_service_id?: number
 }
 
 export interface OrderItem {
@@ -76,6 +77,15 @@ export interface OrderInfo {
     warehouse_city?: string
     warehouse_district?: string
     warehouse_address?: string
+    dest_warehouse_id?: number
+    dest_warehouse_service_id?: number
+    dest_warehouse_enterprise_id?: number
+    dest_warehouse_name?: string
+    dest_warehouse_code?: string
+    dest_warehouse_province?: string
+    dest_warehouse_city?: string
+    dest_warehouse_district?: string
+    dest_warehouse_address?: string
     address: string
     estimated_time: string
   }
@@ -254,6 +264,8 @@ export const orderService = {
   ) => api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/payments/direct`, payload).then((response) => response.data),
   reselectWarehouse: (id: number, payload: { warehouse_service_id: number; confirm_note?: string }) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/warehouse-selection`, payload).then((response) => response.data),
+  selectDestWarehouse: (id: number, payload: { dest_warehouse_service_id: number; dest_confirm_note?: string }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/dest-warehouse`, payload).then((response) => response.data),
   buyerConfirm: (id: number, payload?: { confirm_note?: string }) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/buyer-confirm`, payload || {}).then((response) => response.data),
   setDeliveryInfo: (

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Radio, Space, Spin, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
+import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Radio, Select, Space, Spin, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
 import { ArrowLeftOutlined, BankOutlined, CarOutlined, CheckCircleOutlined, ClockCircleOutlined, EnvironmentOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { getErrorMessage, hasFormErrorFields, timelineColor } from '@steellink/shared/utils'
@@ -9,7 +9,7 @@ import { orderService, type LogisticsQuoteInfo } from '@/services/orderService'
 import { productService } from '@/services/productService'
 import { uploadService } from '@/services/uploadService'
 import { serviceFulfillmentService } from '@/services/serviceFulfillmentService'
-import { serviceOfferService, type FinanceServiceItem } from '@/services/serviceOfferService'
+import { serviceOfferService, type FinanceServiceItem, type WarehouseServiceItem } from '@/services/serviceOfferService'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -26,19 +26,21 @@ const statusMap: Record<number, { label: string; color: string }> = {
   9: { label: '已取消', color: 'red' },
   10: { label: '已冻结', color: 'volcano' },
   11: { label: '异常', color: 'magenta' },
-  12: { label: '待仓库确认', color: 'purple' },
-  13: { label: '待卖方确认', color: 'orange' },
-  14: { label: '待买方确认', color: 'blue' },
-  15: { label: '物流竞价中', color: 'cyan' },
-  16: { label: '待确认物流', color: 'gold' },
-  17: { label: '运输中', color: 'processing' },
-  18: { label: '已收货', color: 'green' },
-  19: { label: '已对账', color: 'success' },
-  20: { label: '已归档', color: 'default' },
-  21: { label: '融资审批中', color: 'purple' },
-  22: { label: '待签署融资合同', color: 'gold' },
-  23: { label: '待重新选仓', color: 'volcano' },
-  24: { label: '待重新发起物流', color: 'volcano' },
+  12: { label: '待选择目的地仓储', color: 'geekblue' },
+  13: { label: '待仓库确认', color: 'purple' },
+  14: { label: '待卖方确认', color: 'orange' },
+  15: { label: '待买方确认', color: 'blue' },
+  16: { label: '物流竞价中', color: 'cyan' },
+  17: { label: '待确认物流', color: 'gold' },
+  18: { label: '运输中', color: 'processing' },
+  19: { label: '已收货', color: 'green' },
+  20: { label: '已对账', color: 'success' },
+  21: { label: '已归档', color: 'default' },
+  22: { label: '融资审批中', color: 'purple' },
+  23: { label: '待签署融资合同', color: 'gold' },
+  24: { label: '待重新选仓', color: 'volcano' },
+  25: { label: '待重新发起物流', color: 'volcano' },
+  26: { label: '待选择仓库', color: 'geekblue' },
 }
 
 const shipmentStatusText: Record<string, string> = {
@@ -50,6 +52,7 @@ const shipmentStatusText: Record<string, string> = {
 
 const orderSteps = [
   { title: '订单创建' },
+  { title: '选择目的地仓储' },
   { title: '仓库确认' },
   { title: '卖方确认' },
   { title: '买方确认' },
@@ -92,16 +95,17 @@ function formatContractStatus(contractInfo?: { buyer_signed: boolean; seller_sig
 
 function getCurrentStep(status: number) {
   if (status === 0 || status === 1) return 0
-  if (status === 12 || status === 23) return 1
-  if (status === 13) return 2
+  if (status === 12) return 1
+  if (status === 13 || status === 23 || status === 25) return 2
   if (status === 14) return 3
-  if (status === 2) return 4
-  if (status === 3 || status === 21 || status === 22) return 5
-  if (status === 4) return 5
-  if (status === 15 || status === 16 || status === 24) return 6
-  if (status === 5 || status === 6 || status === 17 || status === 7) return 7
-  if (status === 18 || status === 19) return 8
-  if (status === 8 || status === 20) return 9
+  if (status === 15) return 4
+  if (status === 2) return 5
+  if (status === 3 || status === 21 || status === 22) return 6
+  if (status === 4) return 6
+  if (status === 16 || status === 17 || status === 24) return 7
+  if (status === 5 || status === 6 || status === 18 || status === 7) return 8
+  if (status === 19 || status === 20) return 9
+  if (status === 8 || status === 20) return 10
   return 0
 }
 
@@ -110,15 +114,21 @@ function getStatusNotice(status: number, _hasPaymentVoucher: boolean, _hasDelive
     return { type: 'warning' as const, title: '当前状态：订单已提交', message: '下一步：等待卖家确认。' }
   }
   if (status === 12) {
+    return { type: 'info' as const, title: '当前状态：待选择目的地仓储', message: '请选择物流送达的目的地仓库，选择后进入仓库确认环节。' }
+  }
+  if (status === 13) {
     return { type: 'warning' as const, title: '当前状态：待仓库确认', message: '下一步：等待仓储方确认仓库条件。' }
+  }
+  if (status === 25) {
+    return { type: 'warning' as const, title: '当前状态：待选择仓库', message: '下一步：请选择收货仓库，由仓储方确认后继续订单流程。' }
   }
   if (status === 23) {
     return { type: 'warning' as const, title: '当前状态：待重新选仓', message: '下一步：请重新选择仓储方，平台管理端已收到异常反馈。' }
   }
-  if (status === 13) {
+  if (status === 14) {
     return { type: 'warning' as const, title: '当前状态：仓储确认已完成', message: '下一步：等待卖方确认条款。' }
   }
-  if (status === 14) {
+  if (status === 15) {
     return { type: 'warning' as const, title: '当前状态：卖方确认已完成', message: '下一步：请确认订单最终版本。' }
   }
   if (status === 2) {
@@ -145,10 +155,10 @@ function getStatusNotice(status: number, _hasPaymentVoucher: boolean, _hasDelive
   if (status === 4) {
     return { type: 'success' as const, title: '当前状态：支付/监管已完成', message: '下一步：等待卖方发起物流竞价。' }
   }
-  if (status === 15) {
+  if (status === 16) {
     return { type: 'info' as const, title: '当前状态：物流竞价已发起', message: '下一步：等待物流方报价。' }
   }
-  if (status === 16) {
+  if (status === 17) {
     return { type: 'warning' as const, title: '当前状态：物流报价已完成', message: '下一步：请按合同约定确认物流资源。' }
   }
   if (status === 24) {
@@ -246,6 +256,9 @@ export default function OrderDetailPage() {
   const [signing, setSigning] = useState(false)
   const [warehouseOpen, setWarehouseOpen] = useState(false)
   const [savingWarehouse, setSavingWarehouse] = useState(false)
+  const [destWarehouseOpen, setDestWarehouseOpen] = useState(false)
+  const [savingDestWarehouse, setSavingDestWarehouse] = useState(false)
+  const [destWarehouseForm] = Form.useForm()
   const [logisticsQuotes, setLogisticsQuotes] = useState<LogisticsQuoteInfo[]>([])
   const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null)
   const [logisticsModalOpen, setLogisticsModalOpen] = useState(false)
@@ -284,6 +297,11 @@ export default function OrderDetailPage() {
     queryFn: async () => (await serviceOfferService.listFinance({ page: 1, page_size: 50, status: 2 })).data.list,
     enabled: Boolean(order?.id && financeOpen),
   })
+  const { data: myWarehousesData } = useQuery({
+    queryKey: ['my-warehouse-services'],
+    queryFn: () => serviceOfferService.listMyWarehouses(),
+  })
+  const myWarehouses = myWarehousesData?.data ?? []
   const financeProducts = (financeProductsData || []).slice().sort((left, right) => {
     if (left.id === aiFinanceRecommendation?.finance_service_id) return -1
     if (right.id === aiFinanceRecommendation?.finance_service_id) return 1
@@ -306,7 +324,7 @@ export default function OrderDetailPage() {
   ]
     .filter(Boolean)
     .join(' ')
-  const canCancelOrder = (order?.status === 1 || order?.status === 2 || order?.status === 3) && !order.payment_info?.voucher_url
+  const canCancelOrder = (order?.status === 1 || order?.status === 2 || order?.status === 3 || order?.status === 12 || order?.status === 23 || order?.status === 25) && !order?.payment_info?.voucher_url
 
   const openFinanceModal = () => {
     setSelectedFinanceServiceId(aiFinanceRecommendation?.finance_service_id)
@@ -373,6 +391,27 @@ export default function OrderDetailPage() {
       message.error(getErrorMessage(error, '重新选仓失败'))
     } finally {
       setSavingWarehouse(false)
+    }
+  }
+
+  const handleSelectDestWarehouse = async () => {
+    try {
+      const values = await destWarehouseForm.validateFields()
+      setSavingDestWarehouse(true)
+      await orderService.selectDestWarehouse(Number(id), {
+        dest_warehouse_service_id: Number(values.dest_warehouse_service_id),
+        dest_confirm_note: values.dest_confirm_note,
+      })
+      showCompleted('目的地仓库已选择', '请等待仓储方确认。')
+      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+      destWarehouseForm.resetFields()
+      setDestWarehouseOpen(false)
+    } catch (error: unknown) {
+      if (hasFormErrorFields(error)) return
+      message.error(getErrorMessage(error, '选择目的地仓库失败'))
+    } finally {
+      setSavingDestWarehouse(false)
     }
   }
 
@@ -751,7 +790,7 @@ export default function OrderDetailPage() {
             <Card className="mt-6">
               <Title level={5}>订单操作</Title>
               <Space wrap>
-                {order.status === 14 && (
+                {(order.status === 14 || order.status === 15) && (
                   <Button type="primary" onClick={async () => {
                     try {
                       await orderService.buyerConfirm(Number(id), { confirm_note: '买方确认订单' })
@@ -770,9 +809,14 @@ export default function OrderDetailPage() {
                     上传支付/货权凭证
                   </Button>
                 )}
-                {order.status === 23 && (
+                {(order.status === 23 || order.status === 25) && (
                   <Button type="primary" icon={<EnvironmentOutlined />} onClick={() => setWarehouseOpen(true)}>
-                    重新选择仓储方
+                    {order.status === 25 ? '选择仓储方' : '重新选择仓储方'}
+                  </Button>
+                )}
+                {order.status === 12 && (
+                  <Button type="primary" icon={<EnvironmentOutlined />} onClick={() => setDestWarehouseOpen(true)}>
+                    选择目的地仓库
                   </Button>
                 )}
                 {order.status === 3 && (
@@ -785,8 +829,8 @@ export default function OrderDetailPage() {
                     签署融资合同并支付手续费
                   </Button>
                 )}
-                {(order.status === 15 || order.status === 16) && (
-                  <Button type={order.status === 16 ? 'primary' : 'default'} onClick={() => {
+                {order.status === 16 && (
+                  <Button type="default" onClick={() => {
                     setLogisticsModalOpen(true)
                     setSelectedQuoteId(null)
                     setLogisticsLoading(true)
@@ -801,7 +845,7 @@ export default function OrderDetailPage() {
                         setLogisticsLoading(false)
                       })
                   }}>
-                    {order.status === 15 ? '查看物流报价' : '确认物流资源'}
+                    查看物流报价
                   </Button>
                 )}
                 {canCancelOrder && (
@@ -922,6 +966,41 @@ export default function OrderDetailPage() {
             </Modal>
 
             <Modal
+              title="选择目的地仓库"
+              open={destWarehouseOpen}
+              onCancel={() => setDestWarehouseOpen(false)}
+              onOk={handleSelectDestWarehouse}
+              confirmLoading={savingDestWarehouse}
+            >
+              <Form form={destWarehouseForm} layout="vertical">
+                <Alert
+                  showIcon
+                  type="info"
+                  className="mb-4"
+                  message="请选择物流送达的目的地仓库"
+                  description={`提货仓库：${order?.delivery_info?.warehouse_name || '未设置'}（${order?.delivery_info?.warehouse_code || '无编码'}）`}
+                />
+                <Form.Item name="dest_warehouse_service_id" label="目的地仓储" rules={[{ required: true, message: '请选择目的地仓储' }]}>
+                  <Select
+                    placeholder="请选择已登记的仓储"
+                    showSearch
+                    optionFilterProp="children"
+                    loading={!myWarehousesData}
+                  >
+                    {myWarehouses.map((w: WarehouseServiceItem) => (
+                      <Select.Option key={w.id} value={w.id}>
+                        {w.warehouse_name}（ID: {w.id}）
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+                <Form.Item name="dest_confirm_note" label="备注">
+                  <Input placeholder="可选备注" />
+                </Form.Item>
+              </Form>
+            </Modal>
+
+            <Modal
               title="录入提货信息"
               open={deliveryOpen}
               onCancel={() => setDeliveryOpen(false)}
@@ -986,10 +1065,10 @@ export default function OrderDetailPage() {
             </Modal>
 
             <Modal
-              title={order?.status === 15 ? '查看物流报价' : '确认物流资源'}
+              title={order?.status === 16 ? '查看物流报价' : '确认物流资源'}
               open={logisticsModalOpen}
               onCancel={() => { setLogisticsModalOpen(false); setLogisticsQuotes([]); setSelectedQuoteId(null) }}
-              onOk={order?.status === 16 ? () => {
+              onOk={order?.status === 17 ? () => {
                 if (!selectedQuoteId) {
                   message.warning('请先选择一个物流报价')
                   return
@@ -1010,9 +1089,9 @@ export default function OrderDetailPage() {
                     setConfirmingLogistics(false)
                   })
               } : undefined}
-              okText={order?.status === 16 ? '确认选择' : undefined}
-              okButtonProps={order?.status === 16 ? { loading: confirmingLogistics, disabled: !selectedQuoteId } : { style: { display: 'none' } }}
-              cancelText={order?.status === 16 ? '取消' : '关闭'}
+              okText={order?.status === 17 ? '确认选择' : undefined}
+              okButtonProps={order?.status === 17 ? { loading: confirmingLogistics, disabled: !selectedQuoteId } : { style: { display: 'none' } }}
+              cancelText={order?.status === 17 ? '取消' : '关闭'}
               width={720}
               destroyOnHidden
             >
@@ -1021,7 +1100,7 @@ export default function OrderDetailPage() {
                   <Alert
                     type="info"
                     showIcon
-                    message={order.status === 15 ? '物流报价进行中，以下是已有的报价。卖家结束报价后会选择物流，然后需要你确认。' : '请确认卖家选定的物流报价'}
+                    message={order.status === 16 ? '物流报价进行中，以下是已有的报价。卖家结束报价后会选择物流，然后需要你确认。' : '请确认卖家选定的物流报价'}
                     style={{ marginBottom: 16 }}
                   />
                   <Descriptions bordered column={2} size="small" style={{ marginBottom: 16 }}>
@@ -1037,11 +1116,11 @@ export default function OrderDetailPage() {
                         <div className="text-gray-500">暂无物流报价</div>
                       </div>
                     ) : (
-                      <Radio.Group value={selectedQuoteId} onChange={(e) => order.status === 16 && setSelectedQuoteId(e.target.value)}>
+                      <Radio.Group value={selectedQuoteId} onChange={(e) => order.status === 17 && setSelectedQuoteId(e.target.value)}>
                         <Space direction="vertical" className="w-full">
                           {logisticsQuotes.map((quote) => (
-                            <Radio key={quote.id} value={quote.id} className="w-full" disabled={order.status === 15}>
-                              <Card className="w-full" hoverable={order.status === 16}>
+                            <Radio key={quote.id} value={quote.id} className="w-full" disabled={order.status === 16}>
+                              <Card className="w-full" hoverable={order.status === 17}>
                                 <div className="flex justify-between items-start">
                                   <div className="flex-1">
                                     <div className="font-medium text-gray-900">{quote.logistics_name}</div>

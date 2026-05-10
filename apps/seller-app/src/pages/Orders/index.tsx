@@ -23,19 +23,20 @@ const statusMeta: Record<number, { color: string; text: string }> = {
   9: { color: 'red', text: '已取消' },
   10: { color: 'volcano', text: '已冻结' },
   11: { color: 'magenta', text: '异常' },
-  12: { color: 'purple', text: '待仓库确认' },
-  13: { color: 'orange', text: '待卖方确认' },
-  14: { color: 'blue', text: '待买方确认' },
-  15: { color: 'cyan', text: '物流竞价中' },
-  16: { color: 'gold', text: '待确认物流' },
-  17: { color: 'processing', text: '运输中' },
-  18: { color: 'green', text: '已收货' },
-  19: { color: 'success', text: '已对账' },
-  20: { color: 'default', text: '已归档' },
-  21: { color: 'purple', text: '融资审批中' },
-  22: { color: 'gold', text: '待签署融资合同' },
-  23: { color: 'volcano', text: '待重新选仓' },
-  24: { color: 'volcano', text: '待重新发起物流' },
+  12: { color: 'geekblue', text: '待选择目的地仓储' },
+  13: { color: 'purple', text: '待仓库确认' },
+  14: { color: 'orange', text: '待卖方确认' },
+  15: { color: 'blue', text: '待买方确认' },
+  16: { color: 'cyan', text: '物流竞价中' },
+  17: { color: 'gold', text: '待确认物流' },
+  18: { color: 'processing', text: '运输中' },
+  19: { color: 'green', text: '已收货' },
+  20: { color: 'success', text: '已对账' },
+  21: { color: 'default', text: '已归档' },
+  22: { color: 'purple', text: '融资审批中' },
+  23: { color: 'gold', text: '待签署融资合同' },
+  24: { color: 'volcano', text: '待重新选仓' },
+  25: { color: 'volcano', text: '待重新发起物流' },
 }
 
 const shipmentStatusMap: Record<string, string> = {
@@ -61,7 +62,7 @@ const statusOptions = [
   { label: '已取消', value: 9 },
 ]
 
-const activeOrderStatuses = [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 17, 21, 22]
+const activeOrderStatuses = [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 17, 18, 22, 23]
 
 const summaryStatusItems = [
   { key: 'active', label: '进行中', statuses: activeOrderStatuses },
@@ -107,7 +108,8 @@ function getPrimaryProduct(order: SellerOrderInfo) {
 
 function getSellerGuidance(order?: SellerOrderInfo | null) {
   if (!order) return { type: 'info' as const, title: '当前状态：订单详情', next: '请查看订单信息。' }
-  if (order.status === 13) return { type: 'warning' as const, title: '当前状态：待卖方确认', next: '核对条款后确认订单，随后等待买方确认。' }
+  if (order.status === 14) return { type: 'warning' as const, title: '当前状态：待卖方确认', next: '核对条款后确认订单，随后等待买方确认。' }
+  if (order.status === 15) return { type: 'info' as const, title: '当前状态：待买方最终确认', next: '买方正在确认订单条款，等待买方最终确认后进入签署合同节点。' }
   if (order.status === 2) {
     if (order.contract_info?.buyer_signed && order.contract_info?.seller_signed) {
       return { type: 'success' as const, title: '当前状态：双方签署已完成', next: '签署状态：买家已签，卖家已签。已进入支付节点。' }
@@ -122,11 +124,11 @@ function getSellerGuidance(order?: SellerOrderInfo | null) {
   }
   if (order.status === 4) return { type: 'warning' as const, title: '当前状态：买方支付已完成', next: '请确认收款；之后发起物流竞价。' }
   if (order.status === 5) return { type: 'warning' as const, title: '当前状态：待提货', next: '请发起物流竞价，物流方报价后选择并等待确认。' }
-  if (order.status === 15) return { type: 'info' as const, title: '当前状态：物流竞价已发起', next: '等待物流方报价，也可在无运力时反馈平台。' }
-  if (order.status === 16) return { type: 'warning' as const, title: '当前状态：物流报价已完成', next: '如合同约定卖方承担运费，请确认物流报价。' }
-  if (order.status === 24) return { type: 'warning' as const, title: '当前状态：待重新发起物流', next: '平台已收到无运力反馈，请重新发起物流竞价。' }
-  if (order.status === 18) return { type: 'success' as const, title: '当前状态：买方收货已完成', next: '请完成对账确认。' }
-  if (order.status === 19) return { type: 'success' as const, title: '当前状态：对账已完成', next: '等待归档或回工作台查看订单。' }
+  if (order.status === 16) return { type: 'info' as const, title: '当前状态：物流竞价已发起', next: '等待物流方报价，也可在无运力时反馈平台。' }
+  if (order.status === 17) return { type: 'warning' as const, title: '当前状态：物流报价已完成', next: '如合同约定卖方承担运费，请确认物流报价。' }
+  if (order.status === 25) return { type: 'warning' as const, title: '当前状态：待重新发起物流', next: '平台已收到无运力反馈，请重新发起物流竞价。' }
+  if (order.status === 19) return { type: 'success' as const, title: '当前状态：买方收货已完成', next: '请完成对账确认。' }
+  if (order.status === 20) return { type: 'success' as const, title: '当前状态：对账已完成', next: '等待归档或回工作台查看订单。' }
   return { type: 'info' as const, title: `当前状态：${formatStatus(order.status).text}`, next: '请按订单详情中的可用操作继续处理。' }
 }
 
@@ -210,7 +212,7 @@ export default function OrdersPage() {
   }, [orders])
 
   const logisticsBiddingOrders = useMemo(() => {
-    return orders.filter((order) => [15, 16].includes(order.status))
+    return orders.filter((order) => [16, 17].includes(order.status))
   }, [orders])
 
   const loadBiddingQuotes = useCallback(async (orderId: number) => {
@@ -454,7 +456,7 @@ export default function OrdersPage() {
               确认订单
             </Button>
           )}
-          {record.status === 13 && (
+          {record.status === 14 && (
             <Button type="link" size="small" onClick={async () => {
               setActionLoading(true)
               try {
@@ -475,7 +477,7 @@ export default function OrdersPage() {
               确认收款
             </Button>
           )}
-          {(record.status === 4 || record.status === 5 || record.status === 24) && (
+          {(record.status === 4 || record.status === 5 || record.status === 25) && (
             <Button type="link" size="small" onClick={async () => {
               setActionLoading(true)
               try {
@@ -486,7 +488,7 @@ export default function OrdersPage() {
               finally { setActionLoading(false) }
             }}>发起物流竞价</Button>
           )}
-          {record.status === 15 && (
+          {record.status === 16 && (
             <Button type="link" size="small" onClick={async () => {
               setActionLoading(true)
               try {
@@ -497,7 +499,7 @@ export default function OrdersPage() {
               finally { setActionLoading(false) }
             }}>结束报价</Button>
           )}
-          {(record.status === 15 || record.status === 16) && (
+          {(record.status === 16 || record.status === 17) && (
             <Button type="link" size="small" onClick={() => {
               setQuoteModalOrder(record)
               setSelectedQuoteId(null)
@@ -512,9 +514,9 @@ export default function OrdersPage() {
                 .finally(() => {
                   setQuoteLoading(false)
                 })
-            }}>{record.status === 15 ? '查看物流报价' : '选择物流报价'}</Button>
+            }}>{record.status === 16 ? '查看物流报价' : '选择物流报价'}</Button>
           )}
-          {(record.status === 15 || record.status === 16) && (
+          {(record.status === 16 || record.status === 17) && (
             <Button type="link" size="small" danger onClick={async () => {
               setActionLoading(true)
               try {
@@ -530,7 +532,7 @@ export default function OrdersPage() {
               确认出库
             </Button>
           )}
-          {record.status === 18 && (
+          {record.status === 19 && (
             <Button type="link" size="small" onClick={async () => {
               setActionLoading(true)
               try {
@@ -541,7 +543,7 @@ export default function OrdersPage() {
               finally { setActionLoading(false) }
             }}>对账确认</Button>
           )}
-          {record.status === 19 && (
+          {record.status === 20 && (
             <Button type="link" size="small" onClick={async () => {
               setActionLoading(true)
               try {
@@ -682,8 +684,8 @@ export default function OrdersPage() {
                       const bidding = order.logistics_bidding
                       const quotes = biddingQuoteMap[order.id] || order.logistics_quotes || []
                       const quotesLoading = biddingQuoteLoadingMap[order.id] || false
-                      const isOpen = order.status === 15
-                      const isPendingConfirm = order.status === 16
+                      const isOpen = order.status === 16
+                      const isPendingConfirm = order.status === 17
                       const lowestAmount = quotes.length > 0 ? Math.min(...quotes.map((q) => q.amount)) : null
 
                       return (
@@ -846,7 +848,7 @@ export default function OrdersPage() {
               确认出库
             </Button>
           ) : null,
-          (selectedOrder?.status === 4 || selectedOrder?.status === 5 || selectedOrder?.status === 24) ? (
+          (selectedOrder?.status === 4 || selectedOrder?.status === 5 || selectedOrder?.status === 25) ? (
             <Button key="logistics-bidding" type="primary" loading={actionLoading} onClick={async () => {
               if (!selectedOrder) return
               setActionLoading(true)
@@ -861,7 +863,7 @@ export default function OrdersPage() {
               发起物流竞价
             </Button>
           ) : null,
-          selectedOrder?.status === 15 ? (
+          selectedOrder?.status === 16 ? (
             <Button key="close-bidding" type="primary" loading={actionLoading} onClick={async () => {
               if (!selectedOrder) return
               setActionLoading(true)
@@ -876,7 +878,7 @@ export default function OrdersPage() {
               结束报价
             </Button>
           ) : null,
-          (selectedOrder?.status === 15 || selectedOrder?.status === 16) ? (
+          (selectedOrder?.status === 16 || selectedOrder?.status === 17) ? (
             <Button key="view-quotes" onClick={() => {
               if (!selectedOrder) return
               setQuoteModalOrder(selectedOrder)
@@ -1103,10 +1105,10 @@ export default function OrdersPage() {
       </Modal>
 
       <Modal
-        title={quoteModalOrder?.status === 15 ? '查看物流报价' : '选择物流报价'}
+        title={quoteModalOrder?.status === 16 ? '查看物流报价' : '选择物流报价'}
         open={!!quoteModalOrder}
         onCancel={() => { setQuoteModalOrder(null); setLogisticsQuotes([]); setSelectedQuoteId(null) }}
-        onOk={quoteModalOrder?.status === 16 ? () => {
+        onOk={quoteModalOrder?.status === 17 ? () => {
           if (!quoteModalOrder || !selectedQuoteId) {
             message.warning('请先选择一个物流报价')
             return
@@ -1127,9 +1129,9 @@ export default function OrdersPage() {
               setActionLoading(false)
             })
         } : undefined}
-        okText={quoteModalOrder?.status === 16 ? '确认选择' : undefined}
-        okButtonProps={quoteModalOrder?.status === 16 ? { loading: actionLoading, disabled: !selectedQuoteId } : { style: { display: 'none' } }}
-        cancelText={quoteModalOrder?.status === 16 ? '取消' : '关闭'}
+        okText={quoteModalOrder?.status === 17 ? '确认选择' : undefined}
+        okButtonProps={quoteModalOrder?.status === 17 ? { loading: actionLoading, disabled: !selectedQuoteId } : { style: { display: 'none' } }}
+        cancelText={quoteModalOrder?.status === 17 ? '取消' : '关闭'}
         width={720}
         destroyOnHidden
       >
@@ -1138,7 +1140,7 @@ export default function OrdersPage() {
             <Alert
               type="info"
               showIcon
-              message={quoteModalOrder.status === 15 ? '物流报价进行中，以下是已有的报价。你可以结束报价后选择物流。' : '请从以下物流报价中选择一个，选择后将等待买家确认'}
+              message={quoteModalOrder.status === 16 ? '物流报价进行中，以下是已有的报价。你可以结束报价后选择物流。' : '请从以下物流报价中选择一个，选择后将等待买家确认'}
               style={{ marginBottom: 16 }}
             />
             <Descriptions bordered column={2} size="small" style={{ marginBottom: 16 }}>
@@ -1157,8 +1159,8 @@ export default function OrdersPage() {
                 <Radio.Group value={selectedQuoteId} onChange={(e) => quoteModalOrder.status === 16 && setSelectedQuoteId(e.target.value)}>
                   <Space direction="vertical" className="w-full">
                     {logisticsQuotes.map((quote) => (
-                      <Radio key={quote.id} value={quote.id} className="w-full" disabled={quoteModalOrder.status === 15}>
-                        <Card className="w-full" hoverable={quoteModalOrder.status === 16}>
+                      <Radio key={quote.id} value={quote.id} className="w-full" disabled={quoteModalOrder.status === 16}>
+                        <Card className="w-full" hoverable={quoteModalOrder.status === 17}>
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <div className="font-medium text-gray-900">{quote.logistics_name}</div>

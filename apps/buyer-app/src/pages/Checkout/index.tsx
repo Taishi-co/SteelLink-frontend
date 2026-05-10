@@ -11,6 +11,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { serviceOfferService } from '@/services/serviceOfferService'
 import { serviceFulfillmentService } from '@/services/serviceFulfillmentService'
+import { orderService } from '@/services/orderService'
 
 const { Title, Paragraph, Text } = Typography
 const { Option } = Select
@@ -34,8 +35,8 @@ const mockCheckoutItems: CheckoutItem[] = [
     specs: '材质：SPHC | 厚度：3.0mm | 宽度：1250mm',
     price: 3850,
     quantity: 100,
-    warehouseId: 101,
-    warehouse: '唐山仓库A区',
+    warehouseId: 1,
+    warehouse: 'SL-DEMO-唐山钢材监管仓',
     mill: '河钢集团',
     bundleNos: ['HB-2026-0420-0001', 'HB-2026-0420-0002', 'HB-2026-0420-0003'],
   },
@@ -59,8 +60,10 @@ export default function CheckoutPage() {
 
   const totalQuantity = mockCheckoutItems.reduce((sum, item) => sum + item.quantity, 0)
   const totalPrice = mockCheckoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const pickupWarehouse = warehouses.find((warehouse) => warehouse.id === mockCheckoutItems[0]?.warehouseId) || warehouses[0]
+  const pickupWarehouse = warehouses.find((warehouse) => warehouse.id === mockCheckoutItems[0]?.warehouseId)
   const hasWarehouseBinding = Boolean(pickupWarehouse)
+  const availableDestWarehouses = warehouses.filter((w) => w.id !== pickupWarehouse?.id)
+  const canSelectDestWarehouse = availableDestWarehouses.length > 0
   const recommendedLogistics = useMemo(() => {
     if (!pickupWarehouse) {
       return logisticsServices
@@ -94,7 +97,7 @@ export default function CheckoutPage() {
 
   const handleSubmit = async () => {
     try {
-      await form.validateFields()
+      const values = await form.validateFields()
       setLoading(true)
 
       Modal.confirm({
@@ -111,12 +114,22 @@ export default function CheckoutPage() {
         ),
         okText: '确认下单',
         cancelText: '取消',
-        onOk: () => {
-          setTimeout(() => {
-            setLoading(false)
+        onOk: async () => {
+          try {
+            const payload = {
+              product_id: mockCheckoutItems[0]?.id || 1,
+              quantity: mockCheckoutItems[0]?.quantity || 1,
+              dest_warehouse_service_id: values.destWarehouse || undefined,
+            }
+            await orderService.create(payload)
             message.success('订单创建成功，请完成合同签署和支付')
             navigate('/orders')
-          }, 600)
+          } catch (err: unknown) {
+            const error = err as { message?: string }
+            message.error(error?.message || '创建订单失败')
+          } finally {
+            setLoading(false)
+          }
         },
         onCancel: () => {
           setLoading(false)
@@ -191,6 +204,14 @@ export default function CheckoutPage() {
                     ? `${pickupWarehouse.warehouse_name}（WH-${String(pickupWarehouse.id).padStart(6, '0')}） · ${pickupWarehouse.address}`
                     : '后端仓库关系完善前，未绑定仓库的商品无法自动生成提货点和推荐线路。'}
                 />
+                {!canSelectDestWarehouse && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    message="暂无其他可用目的地仓库"
+                    description="当前系统只有一个已审核通过的仓储资源，无法选择不同的目的地仓库。请先添加更多仓储资源。"
+                  />
+                )}
                 {hasWarehouseBinding && pickupWarehouse ? (
                   <Descriptions bordered column={2} size="small">
                     <Descriptions.Item label="提货仓库">{pickupWarehouse.warehouse_name}</Descriptions.Item>
@@ -267,6 +288,36 @@ export default function CheckoutPage() {
                             <div>
                               <div className="font-medium">{warehouse.warehouse_name}</div>
                               <div className="text-gray-500 text-xs">{warehouse.address}</div>
+                            </div>
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={16}>
+                  <Col span={24}>
+                    <Form.Item
+                      name="destWarehouse"
+                      label="目的地仓库（可选）"
+                      extra="可在订单创建后，在订单详情页选择目的地仓库"
+                    >
+                      <Select
+                        size="large"
+                        placeholder={canSelectDestWarehouse ? "请选择物流送达的目的地仓库（可选）" : "暂无其他可用仓库"}
+                        disabled={!canSelectDestWarehouse}
+                        allowClear
+                      >
+                        {availableDestWarehouses.map((warehouse) => (
+                          <Option key={warehouse.id} value={warehouse.id}>
+                            <div>
+                              <div className="font-medium">{warehouse.warehouse_name}</div>
+                              <div className="text-gray-500 text-xs">
+                                企业ID: {warehouse.enterprise_id} | {warehouse.address}
+                              </div>
+                              <div className="text-gray-400 text-xs mt-1">
+                                可用库容: {Number(warehouse.available_capacity || 0).toLocaleString()} 吨
+                              </div>
                             </div>
                           </Option>
                         ))}
