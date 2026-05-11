@@ -1,5 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Col, Form, Input, InputNumber, Layout, List, Modal, Row, Select, Space, Spin, Steps, Table, Tag, Typography, Upload, message } from 'antd'
+import {
+  Badge,
+  Button,
+  Card,
+  Col,
+  Form,
+  Input,
+  InputNumber,
+  Layout,
+  List,
+  Modal,
+  Row,
+  Select,
+  Space,
+  Spin,
+  Steps,
+  Table,
+  Tag,
+  Typography,
+  Upload,
+  message,
+} from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload'
 import {
@@ -22,32 +43,40 @@ import {
 import { logisticsOrderService, logisticsFulfillmentService } from '@/services/orderService'
 import type { OrderInfo, LogisticsOrder, ShipmentTaskInfo } from '@/services/orderService'
 import { logisticsResourceService } from '@/services/logisticsResourceService'
-import type { LogisticsResource, LogisticsResourcePayload } from '@/services/logisticsResourceService'
+import type {
+  LogisticsResource,
+  LogisticsResourcePayload,
+} from '@/services/logisticsResourceService'
 import { uploadService } from '@/services/uploadService'
-import { hasLogisticsCapability } from '@/services/auth'
+import { getLogisticsToken, hasLogisticsCapability, saveLogisticsToken } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography
 
 const statusMap: Record<number, { label: string; color: string }> = {
   0: { label: '待确认', color: 'default' },
-  12: { label: '待仓库确认', color: 'orange' },
-  13: { label: '待卖方确认', color: 'blue' },
-  14: { label: '待买方确认', color: 'blue' },
+  12: { label: '待选择目的地仓储', color: 'geekblue' },
+  13: { label: '待仓库确认', color: 'orange' },
+  14: { label: '待卖方确认', color: 'blue' },
+  15: { label: '待买方确认', color: 'blue' },
   2: { label: '待签合同', color: 'cyan' },
   3: { label: '待付款', color: 'gold' },
   4: { label: '待确认收款', color: 'purple' },
   5: { label: '待提货', color: 'geekblue' },
-  15: { label: '物流竞价中', color: 'processing' },
-  16: { label: '待确认物流', color: 'blue' },
-  17: { label: '运输中', color: 'cyan' },
+  16: { label: '物流竞价中', color: 'processing' },
+  17: { label: '待确认物流', color: 'blue' },
+  18: { label: '运输中', color: 'cyan' },
   6: { label: '已发货', color: 'cyan' },
   7: { label: '已到货', color: 'green' },
-  18: { label: '已收货', color: 'green' },
+  19: { label: '已收货', color: 'green' },
   8: { label: '已完成', color: 'success' },
-  19: { label: '已对账', color: 'success' },
-  20: { label: '已归档', color: 'default' },
-  24: { label: '待重新发起物流', color: 'volcano' },
+  20: { label: '已对账', color: 'success' },
+  21: { label: '已归档', color: 'default' },
+  22: { label: '融资审批中', color: 'purple' },
+  23: { label: '待签署融资合同', color: 'magenta' },
+  24: { label: '待重新选仓', color: 'volcano' },
+  25: { label: '待重新发起物流', color: 'volcano' },
+  26: { label: '待选择仓库', color: 'geekblue' },
 }
 
 const resourceStatusMap: Record<number, { label: string; color: string }> = {
@@ -55,6 +84,23 @@ const resourceStatusMap: Record<number, { label: string; color: string }> = {
   2: { label: '已通过', color: 'success' },
   3: { label: '已驳回', color: 'error' },
   4: { label: '已下线', color: 'default' },
+}
+
+const logisticsOrderStatusMap: Record<string, { label: string; color: string }> = {
+  task_created: { label: '运输任务已创建', color: 'default' },
+  pickup_scheduled: { label: '提货已预约', color: 'processing' },
+  arrival_signed_in: { label: '已到场签到', color: 'blue' },
+  outbound_confirmed: { label: '已出库确认', color: 'cyan' },
+  loading_confirmed: { label: '已装货确认', color: 'cyan' },
+  in_transit: { label: '运输中', color: 'geekblue' },
+  arrival_confirmed: { label: '已到货确认', color: 'green' },
+  receipt_signed: { label: '已验收签收', color: 'green' },
+  inbound_completed: { label: '已入库完成', color: 'success' },
+  completed: { label: '履约完成', color: 'success' },
+  pending: { label: '待接单', color: 'default' },
+  accepted: { label: '已接单', color: 'processing' },
+  delivered: { label: '已送达', color: 'green' },
+  cancelled: { label: '已取消', color: 'error' },
 }
 
 type TabKey = 'dashboard' | 'bidding' | 'logistics-orders' | 'resources' | 'all'
@@ -70,11 +116,14 @@ function App() {
   const [editingResource, setEditingResource] = useState<LogisticsResource | null>(null)
   const [resourceForm] = Form.useForm<LogisticsResourcePayload>()
   const [loading, setLoading] = useState(false)
-  const [quoteModal, setQuoteModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
+  const [quoteModal, setQuoteModal] = useState<{ visible: boolean; orderId: number | null }>({
+    visible: false,
+    orderId: null,
+  })
   const [quotePrice, setQuotePrice] = useState<number>(0)
   const [quoteDays, setQuoteDays] = useState<number>(3)
   const [quoteRemark, setQuoteRemark] = useState('')
-  
+
   // 履约相关状态
   const [fulfillmentModal, setFulfillmentModal] = useState<{
     visible: boolean
@@ -84,6 +133,19 @@ function App() {
   const [fulfillmentLoading, setFulfillmentLoading] = useState(false)
   const [fulfillmentFileList, setFulfillmentFileList] = useState<UploadFile[]>([])
   const [fulfillmentRemark, setFulfillmentRemark] = useState('')
+  const [tokenReady, setTokenReady] = useState(false)
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const token = urlParams.get('token')
+    if (token) {
+      saveLogisticsToken(token)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    setTokenReady(true)
+  }, [])
+
+  const hasLogisticsSession = tokenReady && Boolean(getLogisticsToken())
 
   const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
     Modal.success({
@@ -207,6 +269,18 @@ function App() {
   }
 
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const token = urlParams.get('token')
+    if (token) {
+      saveLogisticsToken(token)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    setTokenReady(true)
+  }, [])
+
+  useEffect(() => {
+    if (!tokenReady) return
+    if (!hasLogisticsSession) return
     if (activeTab === 'dashboard') {
       fetchBidding()
       fetchLogisticsOrders()
@@ -216,7 +290,7 @@ function App() {
     else if (activeTab === 'all') fetchAll()
     else if (activeTab === 'logistics-orders') fetchLogisticsOrders()
     else if (activeTab === 'resources') fetchResources()
-  }, [activeTab])
+  }, [activeTab, hasLogisticsSession, tokenReady])
 
   const handleSubmitQuote = async () => {
     if (!quoteModal.orderId) return
@@ -256,7 +330,11 @@ function App() {
   const handleUpdateOrderStatus = async (id: number, status: string) => {
     try {
       await logisticsFulfillmentService.updateOrderStatus(id, { status })
-      showCompleted('物流状态更新已完成', status === 'delivered' ? '等待买方确认收货。' : '继续推进运输履约。', 'logistics-orders')
+      showCompleted(
+        '物流状态更新已完成',
+        status === 'delivered' ? '等待买方确认收货。' : '继续推进运输履约。',
+        'logistics-orders'
+      )
       fetchLogisticsOrders()
     } catch {
       message.error('操作失败')
@@ -290,18 +368,29 @@ function App() {
     }
     setFulfillmentLoading(true)
     try {
-      const file = fulfillmentFileList[0].originFileObj || fulfillmentFileList[0] as unknown as File
-      const purpose = fulfillmentModal.action === 'pickup' ? 'shipment_pickup' : fulfillmentModal.action === 'deliver' ? 'shipment_delivery' : 'shipment_signature'
+      const file =
+        fulfillmentFileList[0].originFileObj || (fulfillmentFileList[0] as unknown as File)
+      const purpose =
+        fulfillmentModal.action === 'pickup'
+          ? 'shipment_pickup'
+          : fulfillmentModal.action === 'deliver'
+            ? 'shipment_delivery'
+            : 'shipment_signature'
       const uploadResult = await uploadService.upload(file as File, purpose)
-      await logisticsOrderService.shipmentProgress(fulfillmentModal.orderId, fulfillmentModal.action, {
-        voucher_url: uploadResult.url,
-        remark: fulfillmentRemark,
-      })
-      const nextStep = fulfillmentModal.action === 'pickup' 
-        ? '继续运输并在送达时更新状态。' 
-        : fulfillmentModal.action === 'deliver' 
-        ? '等待买方确认收货。' 
-        : '履约完成！'
+      await logisticsOrderService.shipmentProgress(
+        fulfillmentModal.orderId,
+        fulfillmentModal.action,
+        {
+          voucher_url: uploadResult.url,
+          remark: fulfillmentRemark,
+        }
+      )
+      const nextStep =
+        fulfillmentModal.action === 'pickup'
+          ? '继续运输并在送达时更新状态。'
+          : fulfillmentModal.action === 'deliver'
+            ? '等待买方确认收货。'
+            : '履约完成！'
       showCompleted('运输状态更新已完成', nextStep, 'all')
       setFulfillmentModal({ visible: false, orderId: null, action: null })
       fetchAll()
@@ -314,7 +403,10 @@ function App() {
 
   const getShipmentStepInfo = (shipmentTask?: ShipmentTaskInfo) => {
     if (!shipmentTask) {
-      return { currentStep: 0, steps: ['等待确认报价', '等待确认报价', '等待确认报价', '等待确认报价'] }
+      return {
+        currentStep: 0,
+        steps: ['等待确认报价', '等待确认报价', '等待确认报价', '等待确认报价'],
+      }
     }
     const steps = ['待提货', '已提货', '已送达', '已签收']
     let currentStep = 0
@@ -356,7 +448,9 @@ function App() {
         if (!b) return '--'
         return (
           <Space direction="vertical" size={0}>
-            <Text type="secondary" style={{ fontSize: 12 }}>{b.pickup_address || '待确认'} → {b.destination_address || '待确认'}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {b.pickup_address || '待确认'} → {b.destination_address || '待确认'}
+            </Text>
             {b.quotes && b.quotes.length > 0 && <Tag color="blue">{b.quotes.length} 个报价</Tag>}
           </Space>
         )
@@ -384,16 +478,37 @@ function App() {
     { title: '起始', dataIndex: 'origin', key: 'origin', width: 120 },
     { title: '目的地', dataIndex: 'destination', key: 'destination', width: 120 },
     { title: '货物', dataIndex: 'cargo_name', key: 'cargo_name', width: 100 },
-    { title: '重量', dataIndex: 'weight', key: 'weight', width: 80, render: (v: number) => `${v} 吨` },
+    {
+      title: '重量',
+      dataIndex: 'weight',
+      key: 'weight',
+      width: 80,
+      render: (v: number) => `${v} 吨`,
+    },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 100,
       render: (v: string) => {
-        const colorMap: Record<string, string> = { pending: 'default', accepted: 'processing', in_transit: 'cyan', delivered: 'success', cancelled: 'error' }
-        const labelMap: Record<string, string> = { pending: '待接单', accepted: '已接单', in_transit: '运输中', delivered: '已送达', cancelled: '已取消' }
-        return <Tag color={colorMap[v] || 'default'}>{labelMap[v] || v}</Tag>
+        const meta = logisticsOrderStatusMap[v] || { label: v, color: 'default' }
+        return <Tag color={meta.color}>{meta.label}</Tag>
+      },
+    },
+    {
+      title: '责任主体',
+      dataIndex: 'current_responsible_party',
+      key: 'current_responsible_party',
+      width: 120,
+      render: (v?: string) => {
+        const labelMap: Record<string, string> = {
+          buyer: '买方',
+          warehouse: '仓储方',
+          logistics: '物流方',
+          seller: '卖方协同',
+          unknown: '待确认',
+        }
+        return labelMap[v || 'unknown'] || v || '-'
       },
     },
     {
@@ -401,14 +516,100 @@ function App() {
       key: 'action',
       width: 120,
       render: (_: unknown, record: LogisticsOrder) => {
-        if (record.status === 'pending') {
-          return <Button type="primary" size="small" onClick={() => handleAcceptOrder(record.id)}>接单</Button>
+        if (record.status === 'task_created' || record.status === 'pending') {
+          return (
+            <Button type="primary" size="small" onClick={() => handleAcceptOrder(record.id)}>
+              接单
+            </Button>
+          )
         }
-        if (record.status === 'accepted') {
-          return <Button type="primary" size="small" onClick={() => handleUpdateOrderStatus(record.id, 'in_transit')}>发车</Button>
+        if (record.status === 'pickup_scheduled' || record.status === 'accepted') {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleUpdateOrderStatus(record.id, 'arrival_signed_in')}
+            >
+              签到
+            </Button>
+          )
+        }
+        if (record.status === 'arrival_signed_in') {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleUpdateOrderStatus(record.id, 'outbound_confirmed')}
+            >
+              出库确认
+            </Button>
+          )
+        }
+        if (record.status === 'outbound_confirmed') {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleUpdateOrderStatus(record.id, 'loading_confirmed')}
+            >
+              装货确认
+            </Button>
+          )
+        }
+        if (record.status === 'loading_confirmed') {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleUpdateOrderStatus(record.id, 'in_transit')}
+            >
+              发车
+            </Button>
+          )
         }
         if (record.status === 'in_transit') {
-          return <Button type="primary" size="small" onClick={() => handleUpdateOrderStatus(record.id, 'delivered')}>送达</Button>
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleUpdateOrderStatus(record.id, 'arrival_confirmed')}
+            >
+              到货确认
+            </Button>
+          )
+        }
+        if (record.status === 'arrival_confirmed') {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleUpdateOrderStatus(record.id, 'receipt_signed')}
+            >
+              签收确认
+            </Button>
+          )
+        }
+        if (record.status === 'receipt_signed') {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleUpdateOrderStatus(record.id, 'inbound_completed')}
+            >
+              入库完成
+            </Button>
+          )
+        }
+        if (record.status === 'inbound_completed') {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleUpdateOrderStatus(record.id, 'completed')}
+            >
+              履约完成
+            </Button>
+          )
         }
         return null
       },
@@ -459,35 +660,57 @@ function App() {
       key: 'logistics_action',
       width: 150,
       render: (_: unknown, record: OrderInfo) => {
-        if (record.status === 16 && record.logistics_bidding?.selected_quote_id) {
+        if (record.status === 17 && record.logistics_bidding?.selected_quote_id) {
           return (
-            <Button type="primary" size="small" onClick={() => handleConfirmLogisticsQuote(record.id, record.logistics_bidding!.selected_quote_id!)}>
+            <Button
+              type="primary"
+              size="small"
+              onClick={() =>
+                handleConfirmLogisticsQuote(record.id, record.logistics_bidding!.selected_quote_id!)
+              }
+            >
               确认报价
             </Button>
           )
         }
-        {(record.status === 6 || record.status === 17 || record.status === 7) && record.shipment_task && (
-          <Space direction="vertical" size="small">
-            {record.shipment_task.status === 'pending_pickup' && (
-              <Button type="primary" size="small" icon={<CarOutlined />} onClick={() => openFulfillmentModal(record.id, 'pickup')}>
-                确认提货
-              </Button>
-            )}
-            {record.shipment_task.status === 'picked_up' && (
-              <Button type="primary" size="small" icon={<FileTextOutlined />} onClick={() => openFulfillmentModal(record.id, 'deliver')}>
-                确认送达
-              </Button>
-            )}
-            {record.shipment_task.status === 'delivered' && (
-              <Button type="primary" size="small" icon={<CheckCircleOutlined />} onClick={() => openFulfillmentModal(record.id, 'signature')}>
-                上传签收
-              </Button>
-            )}
-            {record.shipment_task.status === 'signed' && (
-              <Tag color="success">履约完成</Tag>
-            )}
-          </Space>
-        )}
+        {
+          ;(record.status === 6 || record.status === 18 || record.status === 7) &&
+            record.shipment_task && (
+              <Space direction="vertical" size="small">
+                {record.shipment_task.status === 'pending_pickup' && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<CarOutlined />}
+                    onClick={() => openFulfillmentModal(record.id, 'pickup')}
+                  >
+                    确认提货
+                  </Button>
+                )}
+                {record.shipment_task.status === 'picked_up' && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<FileTextOutlined />}
+                    onClick={() => openFulfillmentModal(record.id, 'deliver')}
+                  >
+                    确认送达
+                  </Button>
+                )}
+                {record.shipment_task.status === 'delivered' && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    onClick={() => openFulfillmentModal(record.id, 'signature')}
+                  >
+                    上传签收
+                  </Button>
+                )}
+                {record.shipment_task.status === 'signed' && <Tag color="success">履约完成</Tag>}
+              </Space>
+            )
+        }
         return null
       },
     },
@@ -503,11 +726,49 @@ function App() {
 
   if (!hasLogisticsCapability()) {
     return (
-      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Layout
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <Card style={{ maxWidth: 480, textAlign: 'center' }}>
           <SafetyCertificateOutlined style={{ fontSize: 48, color: '#faad14', marginBottom: 16 }} />
           <Title level={4}>需要物流服务商权限</Title>
-          <Paragraph type="secondary">当前账户未开通物流服务商能力，请联系平台管理员申请开通。</Paragraph>
+          <Paragraph type="secondary">
+            当前账户未开通物流服务商能力，请联系平台管理员申请开通。
+          </Paragraph>
+        </Card>
+      </Layout>
+    )
+  }
+
+  if (!tokenReady) {
+    return (
+      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin size="large" />
+      </Layout>
+    )
+  }
+
+  if (!hasLogisticsSession) {
+    return (
+      <Layout
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Card style={{ maxWidth: 480, textAlign: 'center' }}>
+          <SafetyCertificateOutlined style={{ fontSize: 48, color: '#1677ff', marginBottom: 16 }} />
+          <Title level={4}>未获取到登录会话</Title>
+          <Paragraph type="secondary">
+            当前页面没有拿到可用 token，所以不会继续请求物流数据。请从已登录的业务端进入，或先在同 host 下完成登录。
+          </Paragraph>
         </Card>
       </Layout>
     )
@@ -516,7 +777,15 @@ function App() {
   return (
     <Layout className="service-shell">
       <Sider width={232} theme="light">
-        <div style={{ height: 64, display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: '1px solid #edf0f5' }}>
+        <div
+          style={{
+            height: 64,
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 24px',
+            borderBottom: '1px solid #edf0f5',
+          }}
+        >
           <Space>
             <RocketOutlined style={{ color: '#1677ff' }} />
             <Text strong>SteelLink 物流</Text>
@@ -528,7 +797,13 @@ function App() {
             dataSource={menuItems}
             renderItem={(item) => (
               <List.Item
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#e8f3ff' : 'transparent' }}
+                style={{
+                  border: 0,
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  background: activeTab === item.key ? '#e8f3ff' : 'transparent',
+                }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
@@ -546,13 +821,37 @@ function App() {
         </div>
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Header
+          style={{
+            background: '#fff',
+            height: 64,
+            padding: '0 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <Text strong>物流方工作台</Text>
           <Space>
-            <Button icon={<EnvironmentOutlined />} onClick={() => { if (activeTab === 'dashboard') { fetchBidding(); fetchLogisticsOrders(); fetchResources(); fetchAll(); } else if (activeTab === 'bidding') fetchBidding(); else if (activeTab === 'logistics-orders') fetchLogisticsOrders(); else if (activeTab === 'resources') fetchResources(); else fetchAll(); }}>
+            <Button
+              icon={<EnvironmentOutlined />}
+              onClick={() => {
+                if (activeTab === 'dashboard') {
+                  fetchBidding()
+                  fetchLogisticsOrders()
+                  fetchResources()
+                  fetchAll()
+                } else if (activeTab === 'bidding') fetchBidding()
+                else if (activeTab === 'logistics-orders') fetchLogisticsOrders()
+                else if (activeTab === 'resources') fetchResources()
+                else fetchAll()
+              }}
+            >
               刷新
             </Button>
-            <Button icon={<HomeOutlined />} href="/">买家首页</Button>
+            <Button icon={<HomeOutlined />} href="/">
+              买家首页
+            </Button>
           </Space>
         </Header>
         <Content className="service-content" style={{ padding: 24 }}>
@@ -560,16 +859,32 @@ function App() {
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
                 <Col xs={24} sm={12} lg={6}>
-                  <Card><Typography.Text type="secondary">待报价竞价</Typography.Text><br /><Title level={3}>{biddingOrders.length}</Title></Card>
+                  <Card>
+                    <Typography.Text type="secondary">待报价竞价</Typography.Text>
+                    <br />
+                    <Title level={3}>{biddingOrders.length}</Title>
+                  </Card>
                 </Col>
                 <Col xs={24} sm={12} lg={6}>
-                  <Card><Typography.Text type="secondary">物流履约单</Typography.Text><br /><Title level={3}>{logisticsOrders.length}</Title></Card>
+                  <Card>
+                    <Typography.Text type="secondary">物流履约单</Typography.Text>
+                    <br />
+                    <Title level={3}>{logisticsOrders.length}</Title>
+                  </Card>
                 </Col>
                 <Col xs={24} sm={12} lg={6}>
-                  <Card><Typography.Text type="secondary">运力资源</Typography.Text><br /><Title level={3}>{resources.length}</Title></Card>
+                  <Card>
+                    <Typography.Text type="secondary">运力资源</Typography.Text>
+                    <br />
+                    <Title level={3}>{resources.length}</Title>
+                  </Card>
                 </Col>
                 <Col xs={24} sm={12} lg={6}>
-                  <Card><Typography.Text type="secondary">全部订单</Typography.Text><br /><Title level={3}>{allOrders.length}</Title></Card>
+                  <Card>
+                    <Typography.Text type="secondary">全部订单</Typography.Text>
+                    <br />
+                    <Title level={3}>{allOrders.length}</Title>
+                  </Card>
                 </Col>
               </Row>
               <Row gutter={[16, 16]}>
@@ -577,16 +892,44 @@ function App() {
                   <Card title="物流管理中心" extra={<Tag color="blue">独立服务商工作台</Tag>}>
                     <List
                       dataSource={[
-                        { title: '待报价物流竞价', description: `${biddingOrders.length} 单等待报价`, icon: <DollarCircleOutlined />, tab: 'bidding' as TabKey },
-                        { title: '待接单物流订单', description: `${logisticsOrders.filter((item) => item.status === 'pending').length} 单等待接单`, icon: <ClockCircleOutlined />, tab: 'logistics-orders' as TabKey },
-                        { title: '在途履约', description: `${logisticsOrders.filter((item) => item.status === 'accepted' || item.status === 'in_transit').length} 单正在运输`, icon: <CarOutlined />, tab: 'logistics-orders' as TabKey },
-                        { title: '已审核运力', description: `${resources.filter((item) => item.status === 2).length} 条线路可参与匹配`, icon: <CheckCircleOutlined />, tab: 'resources' as TabKey },
+                        {
+                          title: '待报价物流竞价',
+                          description: `${biddingOrders.length} 单等待报价`,
+                          icon: <DollarCircleOutlined />,
+                          tab: 'bidding' as TabKey,
+                        },
+                        {
+                          title: '待接单物流订单',
+                          description: `${logisticsOrders.filter((item) => item.status === 'pending').length} 单等待接单`,
+                          icon: <ClockCircleOutlined />,
+                          tab: 'logistics-orders' as TabKey,
+                        },
+                        {
+                          title: '在途履约',
+                          description: `${logisticsOrders.filter((item) => item.status === 'accepted' || item.status === 'in_transit').length} 单正在运输`,
+                          icon: <CarOutlined />,
+                          tab: 'logistics-orders' as TabKey,
+                        },
+                        {
+                          title: '已审核运力',
+                          description: `${resources.filter((item) => item.status === 2).length} 条线路可参与匹配`,
+                          icon: <CheckCircleOutlined />,
+                          tab: 'resources' as TabKey,
+                        },
                       ]}
                       renderItem={(item) => (
                         <List.Item
-                          actions={[<Button key="open" type="link" onClick={() => setActiveTab(item.tab)}>处理</Button>]}
+                          actions={[
+                            <Button key="open" type="link" onClick={() => setActiveTab(item.tab)}>
+                              处理
+                            </Button>,
+                          ]}
                         >
-                          <List.Item.Meta avatar={item.icon} title={item.title} description={item.description} />
+                          <List.Item.Meta
+                            avatar={item.icon}
+                            title={item.title}
+                            description={item.description}
+                          />
                         </List.Item>
                       )}
                     />
@@ -595,10 +938,31 @@ function App() {
                 <Col xs={24} xl={9}>
                   <Card title="快捷操作">
                     <Space direction="vertical" style={{ width: '100%' }}>
-                      <Button block type="primary" icon={<DollarCircleOutlined />} onClick={() => setActiveTab('bidding')}>进入物流竞价</Button>
-                      <Button block icon={<CarOutlined />} onClick={() => setActiveTab('logistics-orders')}>查看物流订单</Button>
-                      <Button block icon={<AppstoreOutlined />} onClick={() => setActiveTab('resources')}>管理运力资源</Button>
-                      <Button block icon={<DatabaseOutlined />} onClick={() => setActiveTab('all')}>查看全部订单</Button>
+                      <Button
+                        block
+                        type="primary"
+                        icon={<DollarCircleOutlined />}
+                        onClick={() => setActiveTab('bidding')}
+                      >
+                        进入物流竞价
+                      </Button>
+                      <Button
+                        block
+                        icon={<CarOutlined />}
+                        onClick={() => setActiveTab('logistics-orders')}
+                      >
+                        查看物流订单
+                      </Button>
+                      <Button
+                        block
+                        icon={<AppstoreOutlined />}
+                        onClick={() => setActiveTab('resources')}
+                      >
+                        管理运力资源
+                      </Button>
+                      <Button block icon={<DatabaseOutlined />} onClick={() => setActiveTab('all')}>
+                        查看全部订单
+                      </Button>
                     </Space>
                   </Card>
                 </Col>
@@ -610,18 +974,37 @@ function App() {
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
                 <Col xs={24} sm={8}>
-                  <Card><Typography.Text type="secondary">待报价订单</Typography.Text><br /><Title level={3}>{biddingOrders.length}</Title></Card>
+                  <Card>
+                    <Typography.Text type="secondary">待报价订单</Typography.Text>
+                    <br />
+                    <Title level={3}>{biddingOrders.length}</Title>
+                  </Card>
                 </Col>
                 <Col xs={24} sm={8}>
-                  <Card><Typography.Text type="secondary">在途车辆</Typography.Text><br /><Title level={3}>--</Title></Card>
+                  <Card>
+                    <Typography.Text type="secondary">在途车辆</Typography.Text>
+                    <br />
+                    <Title level={3}>--</Title>
+                  </Card>
                 </Col>
                 <Col xs={24} sm={8}>
-                  <Card><Typography.Text type="secondary">待结算金额</Typography.Text><br /><Title level={3}>--</Title></Card>
+                  <Card>
+                    <Typography.Text type="secondary">待结算金额</Typography.Text>
+                    <br />
+                    <Title level={3}>--</Title>
+                  </Card>
                 </Col>
               </Row>
               <Card title="物流竞价订单" extra={<Tag color="processing">状态 15</Tag>}>
                 <Spin spinning={loading}>
-                  <Table columns={biddingColumns} dataSource={biddingOrders} rowKey="id" pagination={false} scroll={{ x: 940 }} locale={{ emptyText: '暂无竞价订单' }} />
+                  <Table
+                    columns={biddingColumns}
+                    dataSource={biddingOrders}
+                    rowKey="id"
+                    pagination={false}
+                    scroll={{ x: 940 }}
+                    locale={{ emptyText: '暂无竞价订单' }}
+                  />
                 </Spin>
               </Card>
             </>
@@ -630,7 +1013,14 @@ function App() {
           {activeTab === 'logistics-orders' && (
             <Card title="物流订单管理" extra={<Tag color="blue">物流履约</Tag>}>
               <Spin spinning={loading}>
-                <Table columns={logisticsOrderColumns} dataSource={logisticsOrders} rowKey="id" pagination={false} scroll={{ x: 800 }} locale={{ emptyText: '暂无物流订单' }} />
+                <Table
+                  columns={logisticsOrderColumns}
+                  dataSource={logisticsOrders}
+                  rowKey="id"
+                  pagination={false}
+                  scroll={{ x: 800 }}
+                  locale={{ emptyText: '暂无物流订单' }}
+                />
               </Spin>
             </Card>
           )}
@@ -638,7 +1028,14 @@ function App() {
           {activeTab === 'all' && (
             <Card title="全部订单">
               <Spin spinning={loading}>
-                <Table columns={allOrderColumns} dataSource={allOrders} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 940 }} locale={{ emptyText: '暂无订单' }} />
+                <Table
+                  columns={allOrderColumns}
+                  dataSource={allOrders}
+                  rowKey="id"
+                  pagination={{ pageSize: 10 }}
+                  scroll={{ x: 940 }}
+                  locale={{ emptyText: '暂无订单' }}
+                />
               </Spin>
             </Card>
           )}
@@ -647,18 +1044,34 @@ function App() {
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
                 <Col xs={24} sm={8}>
-                  <Card><Typography.Text type="secondary">运力资源总数</Typography.Text><br /><Title level={3}>{resources.length}</Title></Card>
+                  <Card>
+                    <Typography.Text type="secondary">运力资源总数</Typography.Text>
+                    <br />
+                    <Title level={3}>{resources.length}</Title>
+                  </Card>
                 </Col>
                 <Col xs={24} sm={8}>
-                  <Card><Typography.Text type="secondary">已通过</Typography.Text><br /><Title level={3}>{resources.filter(r => r.status === 2).length}</Title></Card>
+                  <Card>
+                    <Typography.Text type="secondary">已通过</Typography.Text>
+                    <br />
+                    <Title level={3}>{resources.filter((r) => r.status === 2).length}</Title>
+                  </Card>
                 </Col>
                 <Col xs={24} sm={8}>
-                  <Card><Typography.Text type="secondary">待审核</Typography.Text><br /><Title level={3}>{resources.filter(r => r.status === 1).length}</Title></Card>
+                  <Card>
+                    <Typography.Text type="secondary">待审核</Typography.Text>
+                    <br />
+                    <Title level={3}>{resources.filter((r) => r.status === 1).length}</Title>
+                  </Card>
                 </Col>
               </Row>
               <Card
                 title="运力资源管理"
-                extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreateResource}>新建运力资源</Button>}
+                extra={
+                  <Button type="primary" icon={<PlusOutlined />} onClick={openCreateResource}>
+                    新建运力资源
+                  </Button>
+                }
               >
                 <Spin spinning={resourceLoading}>
                   <Table
@@ -666,17 +1079,45 @@ function App() {
                       { title: '线路名称', dataIndex: 'name', key: 'name', width: 160 },
                       { title: '起始地', dataIndex: 'route_start', key: 'route_start', width: 120 },
                       { title: '目的地', dataIndex: 'route_end', key: 'route_end', width: 120 },
-                      { title: '车型', dataIndex: 'vehicle_type', key: 'vehicle_type', width: 100, render: (v: string) => v || '--' },
-                      { title: '载重(吨)', dataIndex: 'load_capacity', key: 'load_capacity', width: 90, render: (v: number) => v ? `${v}` : '--' },
-                      { title: '车队', dataIndex: 'fleet_name', key: 'fleet_name', width: 120, render: (v: string) => v || '--' },
-                      { title: '价格规则', dataIndex: 'price_rule', key: 'price_rule', width: 140, ellipsis: true, render: (v: string) => v || '--' },
+                      {
+                        title: '车型',
+                        dataIndex: 'vehicle_type',
+                        key: 'vehicle_type',
+                        width: 100,
+                        render: (v: string) => v || '--',
+                      },
+                      {
+                        title: '载重(吨)',
+                        dataIndex: 'load_capacity',
+                        key: 'load_capacity',
+                        width: 90,
+                        render: (v: number) => (v ? `${v}` : '--'),
+                      },
+                      {
+                        title: '车队',
+                        dataIndex: 'fleet_name',
+                        key: 'fleet_name',
+                        width: 120,
+                        render: (v: string) => v || '--',
+                      },
+                      {
+                        title: '价格规则',
+                        dataIndex: 'price_rule',
+                        key: 'price_rule',
+                        width: 140,
+                        ellipsis: true,
+                        render: (v: string) => v || '--',
+                      },
                       {
                         title: '审核状态',
                         dataIndex: 'status',
                         key: 'status',
                         width: 100,
                         render: (s: number) => {
-                          const meta = resourceStatusMap[s] || { label: `状态${s}`, color: 'default' }
+                          const meta = resourceStatusMap[s] || {
+                            label: `状态${s}`,
+                            color: 'default',
+                          }
                           return <Tag color={meta.color}>{meta.label}</Tag>
                         },
                       },
@@ -688,15 +1129,38 @@ function App() {
                         ellipsis: true,
                         render: (v: string) => v || '--',
                       },
-                      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 140, render: (v: string) => v?.slice(0, 10) },
+                      {
+                        title: '创建时间',
+                        dataIndex: 'created_at',
+                        key: 'created_at',
+                        width: 140,
+                        render: (v: string) => v?.slice(0, 10),
+                      },
                       {
                         title: '操作',
                         key: 'action',
                         width: 140,
                         render: (_: unknown, record: LogisticsResource) => (
                           <Space>
-                            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditResource(record)} disabled={record.status === 4}>编辑</Button>
-                            <Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={() => handleResourceOffline(record)} disabled={record.status === 4}>下线</Button>
+                            <Button
+                              type="link"
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => openEditResource(record)}
+                              disabled={record.status === 4}
+                            >
+                              编辑
+                            </Button>
+                            <Button
+                              type="link"
+                              danger
+                              size="small"
+                              icon={<DeleteOutlined />}
+                              onClick={() => handleResourceOffline(record)}
+                              disabled={record.status === 4}
+                            >
+                              下线
+                            </Button>
                           </Space>
                         ),
                       },
@@ -722,22 +1186,36 @@ function App() {
                 <Form form={resourceForm} layout="vertical">
                   <Row gutter={16}>
                     <Col span={12}>
-                      <Form.Item name="name" label="线路名称" rules={[{ required: true, message: '请输入线路名称' }]}>
+                      <Form.Item
+                        name="name"
+                        label="线路名称"
+                        rules={[{ required: true, message: '请输入线路名称' }]}
+                      >
                         <Input placeholder="例：上海-杭州干线" />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
-                      <Form.Item name="fleet_name" label="车队名称"><Input placeholder="例：华东一号车队" /></Form.Item>
+                      <Form.Item name="fleet_name" label="车队名称">
+                        <Input placeholder="例：华东一号车队" />
+                      </Form.Item>
                     </Col>
                   </Row>
                   <Row gutter={16}>
                     <Col span={12}>
-                      <Form.Item name="route_start" label="起始地" rules={[{ required: true, message: '请输入起始地' }]}>
+                      <Form.Item
+                        name="route_start"
+                        label="起始地"
+                        rules={[{ required: true, message: '请输入起始地' }]}
+                      >
                         <Input placeholder="例：上海市" />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
-                      <Form.Item name="route_end" label="目的地" rules={[{ required: true, message: '请输入目的地' }]}>
+                      <Form.Item
+                        name="route_end"
+                        label="目的地"
+                        rules={[{ required: true, message: '请输入目的地' }]}
+                      >
                         <Input placeholder="例：杭州市" />
                       </Form.Item>
                     </Col>
@@ -745,26 +1223,35 @@ function App() {
                   <Row gutter={16}>
                     <Col span={8}>
                       <Form.Item name="vehicle_type" label="车型">
-                        <Select placeholder="选择车型" options={[
-                          { label: '平板车', value: '平板车' },
-                          { label: '厢式货车', value: '厢式货车' },
-                          { label: '自卸车', value: '自卸车' },
-                          { label: '集装箱车', value: '集装箱车' },
-                          { label: '冷藏车', value: '冷藏车' },
-                          { label: '罐车', value: '罐车' },
-                        ]} />
+                        <Select
+                          placeholder="选择车型"
+                          options={[
+                            { label: '平板车', value: '平板车' },
+                            { label: '厢式货车', value: '厢式货车' },
+                            { label: '自卸车', value: '自卸车' },
+                            { label: '集装箱车', value: '集装箱车' },
+                            { label: '冷藏车', value: '冷藏车' },
+                            { label: '罐车', value: '罐车' },
+                          ]}
+                        />
                       </Form.Item>
                     </Col>
                     <Col span={8}>
-                      <Form.Item name="load_capacity" label="载重能力(吨)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
+                      <Form.Item name="load_capacity" label="载重能力(吨)">
+                        <InputNumber style={{ width: '100%' }} min={0} />
+                      </Form.Item>
                     </Col>
                     <Col span={8}>
-                      <Form.Item name="service_scope" label="服务范围"><Input placeholder="例：华东地区" /></Form.Item>
+                      <Form.Item name="service_scope" label="服务范围">
+                        <Input placeholder="例：华东地区" />
+                      </Form.Item>
                     </Col>
                   </Row>
                   <Row gutter={16}>
                     <Col span={12}>
-                      <Form.Item name="price_rule" label="价格规则"><Input placeholder="例：120元/吨" /></Form.Item>
+                      <Form.Item name="price_rule" label="价格规则">
+                        <Input placeholder="例：120元/吨" />
+                      </Form.Item>
                     </Col>
                   </Row>
                   <Form.Item name="description" label="描述">
@@ -779,7 +1266,12 @@ function App() {
             title="提交物流报价"
             open={quoteModal.visible}
             onOk={handleSubmitQuote}
-            onCancel={() => { setQuoteModal({ visible: false, orderId: null }); setQuotePrice(0); setQuoteDays(3); setQuoteRemark('') }}
+            onCancel={() => {
+              setQuoteModal({ visible: false, orderId: null })
+              setQuotePrice(0)
+              setQuoteDays(3)
+              setQuoteRemark('')
+            }}
             okText="提交报价"
           >
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -817,11 +1309,11 @@ function App() {
           {/* 履约模态框 */}
           <Modal
             title={
-              fulfillmentModal.action === 'pickup' 
-                ? '确认提货' 
-                : fulfillmentModal.action === 'deliver' 
-                ? '确认送达' 
-                : '上传签收凭证'
+              fulfillmentModal.action === 'pickup'
+                ? '确认提货'
+                : fulfillmentModal.action === 'deliver'
+                  ? '确认送达'
+                  : '上传签收凭证'
             }
             open={fulfillmentModal.visible}
             onOk={handleFulfillmentSubmit}

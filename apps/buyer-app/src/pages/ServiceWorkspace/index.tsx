@@ -1,7 +1,19 @@
 import { useMemo, useState } from 'react'
 import type React from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Alert, Button, Card, Col, Descriptions, Empty, Row, Space, Tag, Upload, message } from 'antd'
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Empty,
+  Row,
+  Space,
+  Tag,
+  Upload,
+  message,
+} from 'antd'
 import {
   BankOutlined,
   CheckCircleOutlined,
@@ -13,28 +25,50 @@ import {
   HomeOutlined,
 } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { certificationService, EnterpriseServiceApplicationPayload, EnterpriseServicePermission } from '@/services/certificationService'
+import {
+  certificationService,
+  EnterpriseServiceApplicationPayload,
+  EnterpriseServicePermission,
+} from '@/services/certificationService'
+import { getSellerCenterHref, getBuyerToken } from '@/services/auth'
 import { uploadService } from '@/services/uploadService'
 
 type ServiceKey = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
 
-const logisticsWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5175/logistics/' : '/logistics/'
-const warehouseWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5176/warehouse/' : '/warehouse/'
-const serviceConfig: Record<ServiceKey, {
-  title: string
-  description: string
-  enterpriseRole: string
-  icon: React.ReactNode
-  actions: Array<{ label: string; href: string }>
-}> = {
+function getWorkbenchHref(port: number, path: string) {
+  if (!import.meta.env.DEV) {
+    return path
+  }
+  const protocol = window.location.protocol || 'http:'
+  const hostname = window.location.hostname || 'localhost'
+  const sharedToken = getBuyerToken()
+  const tokenParam = sharedToken ? `?token=${encodeURIComponent(sharedToken)}` : ''
+  return `${protocol}//${hostname}:${port}${path}${tokenParam}`
+}
+
+const SHARED_PERMISSIONS_KEY = 'enterprise_service_permissions'
+
+function setSharedPermissionsCookie(value: string) {
+  document.cookie = `${SHARED_PERMISSIONS_KEY}=${encodeURIComponent(value)}; path=/; SameSite=Lax`
+}
+const serviceConfig: Record<
+  ServiceKey,
+  {
+    title: string
+    description: string
+    enterpriseRole: string
+    icon: React.ReactNode
+    actions: Array<{ label: string; href: string }>
+  }
+> = {
   sales: {
     title: '销售交易能力',
     description: '发布商品、参与竞价报价、管理销售订单与履约。',
     enterpriseRole: '供应商',
     icon: <ShopOutlined />,
     actions: [
-      { label: '进入卖家中心', href: '/seller/dashboard' },
-      { label: '商品管理', href: '/seller/products' },
+      { label: '进入卖家中心', href: getSellerCenterHref('/seller/dashboard') },
+      { label: '商品管理', href: getSellerCenterHref('/seller/products') },
     ],
   },
   procurement: {
@@ -53,7 +87,7 @@ const serviceConfig: Record<ServiceKey, {
     enterpriseRole: '物流方',
     icon: <TruckOutlined />,
     actions: [
-      { label: '进入物流管理中心', href: logisticsWorkbenchHref },
+      { label: '进入物流管理中心', href: getWorkbenchHref(5175, '/logistics/') },
       { label: '物流资源管理', href: '/dashboard/logistics-resources' },
     ],
   },
@@ -63,7 +97,7 @@ const serviceConfig: Record<ServiceKey, {
     enterpriseRole: '仓储方',
     icon: <HomeOutlined />,
     actions: [
-      { label: '进入仓储管理中心', href: warehouseWorkbenchHref },
+      { label: '进入仓储管理中心', href: getWorkbenchHref(5176, '/warehouse/') },
       { label: '仓储资源管理', href: '/dashboard/warehouse-resources' },
     ],
   },
@@ -72,7 +106,7 @@ const serviceConfig: Record<ServiceKey, {
     description: '资金方发布金融产品，并处理融资风控、债务合同、分佣放款和货权质押。',
     enterpriseRole: '资金方',
     icon: <BankOutlined />,
-    actions: [{ label: '进入资金方工作台', href: import.meta.env.DEV ? 'http://127.0.0.1:5177/finance/' : '/finance/' }],
+    actions: [{ label: '进入资金方工作台', href: getWorkbenchHref(5177, '/finance/') }],
   },
 }
 
@@ -101,15 +135,24 @@ export default function ServiceWorkspace() {
   })
 
   const overview = data?.data
-  const permission = overview?.permissions?.find((item) => item.service === service) as EnterpriseServicePermission | undefined
+  if (overview?.permissions) {
+    const serialized = JSON.stringify(overview.permissions)
+    localStorage.setItem(SHARED_PERMISSIONS_KEY, serialized)
+    sessionStorage.setItem(SHARED_PERMISSIONS_KEY, serialized)
+    setSharedPermissionsCookie(serialized)
+  }
+  const permission = overview?.permissions?.find((item) => item.service === service) as
+    | EnterpriseServicePermission
+    | undefined
   const status = permission?.status ?? 0
   const requiredDocuments = useMemo(
     () => overview?.required_documents?.[service] ?? [],
-    [overview?.required_documents, service],
+    [overview?.required_documents, service]
   )
 
   const { mutate: applyService, isPending } = useMutation({
-    mutationFn: (payload: EnterpriseServiceApplicationPayload) => certificationService.applyService(payload),
+    mutationFn: (payload: EnterpriseServiceApplicationPayload) =>
+      certificationService.applyService(payload),
     onSuccess: () => {
       message.success('能力申请已提交')
       setDocumentUrls({})
@@ -119,7 +162,7 @@ export default function ServiceWorkspace() {
 
   const uploadedCount = useMemo(
     () => requiredDocuments.filter((doc) => documentUrls[doc]).length,
-    [documentUrls, requiredDocuments],
+    [documentUrls, requiredDocuments]
   )
 
   const handleUpload = async (file: File, documentType: string) => {
@@ -162,7 +205,11 @@ export default function ServiceWorkspace() {
             <div>
               <Space>
                 <h2 className="text-xl font-semibold m-0">{config.title}</h2>
-                {status ? <Tag color={statusMeta[status]?.color}>{statusMeta[status]?.text}</Tag> : <Tag>未申请</Tag>}
+                {status ? (
+                  <Tag color={statusMeta[status]?.color}>{statusMeta[status]?.text}</Tag>
+                ) : (
+                  <Tag>未申请</Tag>
+                )}
               </Space>
               <p className="text-gray-500 mt-2 mb-0">{config.description}</p>
             </div>
@@ -191,9 +238,13 @@ export default function ServiceWorkspace() {
               <Descriptions.Item label="所需材料">
                 {requiredDocuments.length ? (
                   <Space direction="vertical">
-                    {requiredDocuments.map((doc) => <Tag key={doc}>{doc}</Tag>)}
+                    {requiredDocuments.map((doc) => (
+                      <Tag key={doc}>{doc}</Tag>
+                    ))}
                   </Space>
-                ) : '-'}
+                ) : (
+                  '-'
+                )}
               </Descriptions.Item>
             </Descriptions>
           </Card>
@@ -205,7 +256,9 @@ export default function ServiceWorkspace() {
               <Space direction="vertical" className="w-full">
                 {config.actions.map((action) => (
                   <a key={action.href} href={action.href}>
-                    <Button type="primary" block icon={<CheckCircleOutlined />}>{action.label}</Button>
+                    <Button type="primary" block icon={<CheckCircleOutlined />}>
+                      {action.label}
+                    </Button>
                   </a>
                 ))}
               </Space>
@@ -243,7 +296,12 @@ export default function ServiceWorkspace() {
                         </Upload>
                       </div>
                       {uploaded && (
-                        <a className="text-xs mt-2 inline-block" href={documentUrls[doc]} target="_blank" rel="noreferrer">
+                        <a
+                          className="text-xs mt-2 inline-block"
+                          href={documentUrls[doc]}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
                           查看附件
                         </a>
                       )}
@@ -290,9 +348,15 @@ export function ServiceOverview() {
                   <div>
                     <Space>
                       <strong>{serviceConfig[key].title}</strong>
-                      {status ? <Tag color={statusMeta[status]?.color}>{statusMeta[status]?.text}</Tag> : <Tag>未申请</Tag>}
+                      {status ? (
+                        <Tag color={statusMeta[status]?.color}>{statusMeta[status]?.text}</Tag>
+                      ) : (
+                        <Tag>未申请</Tag>
+                      )}
                     </Space>
-                    <p className="text-gray-500 text-sm mt-2 min-h-[44px]">{serviceConfig[key].description}</p>
+                    <p className="text-gray-500 text-sm mt-2 min-h-[44px]">
+                      {serviceConfig[key].description}
+                    </p>
                     <Link to={`/dashboard/services/${key}`}>
                       <Button size="small" type={status === 2 ? 'primary' : 'default'}>
                         {status === 2 ? '进入能力' : '申请/查看'}
@@ -305,7 +369,9 @@ export function ServiceOverview() {
           )
         })}
       </Row>
-      {!permissions.length && !isLoading && <Empty className="mt-6" description="暂无已开通能力，可选择能力提交申请" />}
+      {!permissions.length && !isLoading && (
+        <Empty className="mt-6" description="暂无已开通能力，可选择能力提交申请" />
+      )}
     </Card>
   )
 }

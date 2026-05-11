@@ -20,7 +20,7 @@ import {
   CloudServerOutlined,
   MailOutlined,
 } from '@ant-design/icons'
-import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
+import { clearBuyerSession, getBuyerToken, hasEnterpriseAccess } from '@/services/auth'
 import { useUserStore } from '@/stores'
 import { getIdentityStatusLabel, certificationService } from '@/services/certificationService'
 import type { EnterpriseServicePermission } from '@/services/certificationService'
@@ -39,12 +39,37 @@ const allNavItems: NavItem[] = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '个人工作台' },
   { key: '/dashboard/notifications', icon: <MailOutlined />, label: '站内信' },
   { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
-  { key: '/dashboard/bidding', icon: <RiseOutlined />, label: '竞价管理', services: ['procurement'] },
-  { key: '/dashboard/orders', icon: <UnorderedListOutlined />, label: '我的订单', services: ['procurement', 'sales'] },
+  {
+    key: '/dashboard/bidding',
+    icon: <RiseOutlined />,
+    label: '竞价管理',
+    services: ['procurement'],
+  },
+  {
+    key: '/dashboard/orders',
+    icon: <UnorderedListOutlined />,
+    label: '我的订单',
+    services: ['procurement', 'sales'],
+  },
   { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资', services: ['finance'] },
-  { key: '/dashboard/warehouse', icon: <CloudServerOutlined />, label: '仓储管理', services: ['warehouse'] },
-  { key: '/dashboard/logistics', icon: <TruckOutlined />, label: '物流管理', services: ['logistics'] },
-  { key: '/dashboard/services', icon: <AppstoreOutlined />, label: '服务入口', roles: ['enterprise'] },
+  {
+    key: '/dashboard/warehouse',
+    icon: <CloudServerOutlined />,
+    label: '仓储管理',
+    services: ['warehouse'],
+  },
+  {
+    key: '/dashboard/logistics',
+    icon: <TruckOutlined />,
+    label: '物流管理',
+    services: ['logistics'],
+  },
+  {
+    key: '/dashboard/services',
+    icon: <AppstoreOutlined />,
+    label: '服务入口',
+    roles: ['enterprise'],
+  },
 ]
 
 const accountItems = [
@@ -52,9 +77,20 @@ const accountItems = [
   { key: '/dashboard/enterprise', icon: <BankOutlined />, label: '企业信息' },
 ]
 
-const financeWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5177/finance/' : '/finance/'
-const logisticsWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5175/logistics/' : '/logistics/'
-const warehouseWorkbenchHref = import.meta.env.DEV ? 'http://127.0.0.1:5176/warehouse/' : '/warehouse/'
+const SHARED_PERMISSIONS_KEY = 'enterprise_service_permissions'
+
+function setSharedPermissionsCookie(value: string) {
+  document.cookie = `${SHARED_PERMISSIONS_KEY}=${encodeURIComponent(value)}; path=/; SameSite=Lax`
+}
+
+function getCrossAppBaseURL(port: number) {
+  if (!import.meta.env.DEV) {
+    return ''
+  }
+  const protocol = window.location.protocol || 'http:'
+  const hostname = window.location.hostname || 'localhost'
+  return `${protocol}//${hostname}:${port}`
+}
 
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
@@ -62,26 +98,34 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useUserStore()
-  const sellerBaseURL = import.meta.env.DEV ? 'http://localhost:5174' : ''
+  const sellerBaseURL = getCrossAppBaseURL(5174)
+  const sharedToken = getBuyerToken()
+  const tokenParam = sharedToken ? `?token=${encodeURIComponent(sharedToken)}` : ''
+  const financeWorkbenchHref = `${getCrossAppBaseURL(5177)}/finance/${tokenParam}`
+  const logisticsWorkbenchHref = `${getCrossAppBaseURL(5175)}/logistics/${tokenParam}`
+  const warehouseWorkbenchHref = `${getCrossAppBaseURL(5176)}/warehouse/${tokenParam}`
 
   useEffect(() => {
     if (!hasEnterpriseAccess(user)) {
       setServicePermissions([])
       return
     }
-    certificationService.getMyServices().then((res) => {
-      if (res.code === 0 && res.data?.permissions) {
-        setServicePermissions(res.data.permissions)
-      }
-    }).catch(() => {})
+    certificationService
+      .getMyServices()
+      .then((res) => {
+        if (res.code === 0 && res.data?.permissions) {
+          setServicePermissions(res.data.permissions)
+          const serialized = JSON.stringify(res.data.permissions)
+          localStorage.setItem(SHARED_PERMISSIONS_KEY, serialized)
+          sessionStorage.setItem(SHARED_PERMISSIONS_KEY, serialized)
+          setSharedPermissionsCookie(serialized)
+        }
+      })
+      .catch(() => {})
   }, [user])
 
   const approvedServices = useMemo(() => {
-    return new Set<string>(
-      servicePermissions
-        .filter((p) => p.status === 2)
-        .map((p) => p.service)
-    )
+    return new Set<string>(servicePermissions.filter((p) => p.status === 2).map((p) => p.service))
   }, [servicePermissions])
 
   const fallbackServices = useMemo(() => {
@@ -142,11 +186,13 @@ export default function DashboardLayout() {
   }
 
   const getSelectedKey = () => {
-    const exact = navItems.find(item => location.pathname === item.key)
+    const exact = navItems.find((item) => location.pathname === item.key)
     if (exact) return [exact.key]
-    const prefix = navItems.find(item => item.key !== '/dashboard' && location.pathname.startsWith(item.key))
+    const prefix = navItems.find(
+      (item) => item.key !== '/dashboard' && location.pathname.startsWith(item.key)
+    )
     if (prefix) return [prefix.key]
-    const accountMatch = accountItems.find(item => location.pathname.startsWith(item.key))
+    const accountMatch = accountItems.find((item) => location.pathname.startsWith(item.key))
     if (accountMatch) return [accountMatch.key]
     if (location.pathname === '/dashboard') return ['/dashboard']
     return ['/dashboard']
@@ -167,7 +213,10 @@ export default function DashboardLayout() {
             <div className="flex items-center gap-2.5">
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: 'linear-gradient(135deg, #4f8ef7, #1e4fc2)', boxShadow: '0 2px 8px rgba(30,79,194,.4)' }}
+                style={{
+                  background: 'linear-gradient(135deg, #4f8ef7, #1e4fc2)',
+                  boxShadow: '0 2px 8px rgba(30,79,194,.4)',
+                }}
               >
                 <DashboardOutlined className="text-white text-sm" />
               </div>
@@ -186,7 +235,17 @@ export default function DashboardLayout() {
               <div className="text-white/85 text-xs font-medium truncate">{user.companyName}</div>
               <div className="flex items-center gap-1.5 mt-1.5">
                 <span className="text-[9px] bg-emerald-500/18 text-emerald-400 px-1.5 py-0.5 rounded font-semibold">
-                  {user.enterpriseRole === 'buyer' ? '采购方' : user.enterpriseRole === 'seller' ? '供应商' : user.enterpriseRole === 'logistics' ? '物流商' : user.enterpriseRole === 'warehouse' ? '仓储商' : user.enterpriseRole === 'fund' ? '资金方' : '企业'}
+                  {user.enterpriseRole === 'buyer'
+                    ? '采购方'
+                    : user.enterpriseRole === 'seller'
+                      ? '供应商'
+                      : user.enterpriseRole === 'logistics'
+                        ? '物流商'
+                        : user.enterpriseRole === 'warehouse'
+                          ? '仓储商'
+                          : user.enterpriseRole === 'fund'
+                            ? '资金方'
+                            : '企业'}
                 </span>
                 <span className="text-[9px] text-white/30">{identityLabel}</span>
               </div>
@@ -196,7 +255,9 @@ export default function DashboardLayout() {
           {!collapsed && !user?.enterpriseCode && (
             <div className="mx-3 mt-3 mb-1 bg-white/5 rounded-lg px-3 py-2.5">
               <div className="text-white/35 text-[10px] mb-1">个人账户</div>
-              <div className="text-white/85 text-xs font-medium">{user?.username || user?.mobile || '用户'}</div>
+              <div className="text-white/85 text-xs font-medium">
+                {user?.username || user?.mobile || '用户'}
+              </div>
               <div className="flex items-center gap-1.5 mt-1.5">
                 <span className="text-[9px] text-white/30">{identityLabel}</span>
               </div>
@@ -212,7 +273,7 @@ export default function DashboardLayout() {
               mode="inline"
               selectedKeys={getSelectedKey()}
               onClick={({ key }) => navigate(key)}
-              items={navItems.map(item => ({
+              items={navItems.map((item) => ({
                 key: item.key,
                 icon: item.icon,
                 label: item.label,
@@ -228,7 +289,7 @@ export default function DashboardLayout() {
               mode="inline"
               selectedKeys={getSelectedKey()}
               onClick={({ key }) => navigate(key)}
-              items={accountItems.map(item => ({
+              items={accountItems.map((item) => ({
                 key: item.key,
                 icon: item.icon,
                 label: item.label,
@@ -241,13 +302,18 @@ export default function DashboardLayout() {
             {hasEnterpriseAccess(user) && (
               <div
                 className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
-                style={{ background: 'rgba(16,185,129,.14)', border: '1px solid rgba(16,185,129,.25)' }}
+                style={{
+                  background: 'rgba(16,185,129,.14)',
+                  border: '1px solid rgba(16,185,129,.25)',
+                }}
                 onClick={switchToSellerCenter}
               >
                 <ShopOutlined className="text-emerald-400 text-sm" />
                 {!collapsed && (
                   <>
-                    <span className="text-xs text-emerald-400 font-semibold flex-1">进入卖家中心</span>
+                    <span className="text-xs text-emerald-400 font-semibold flex-1">
+                      进入卖家中心
+                    </span>
                     <ArrowRightOutlined className="text-emerald-400 text-[10px]" />
                   </>
                 )}
@@ -257,12 +323,17 @@ export default function DashboardLayout() {
               <a href={financeWorkbenchHref}>
                 <div
                   className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
-                  style={{ background: 'rgba(124,58,237,.14)', border: '1px solid rgba(124,58,237,.25)' }}
+                  style={{
+                    background: 'rgba(124,58,237,.14)',
+                    border: '1px solid rgba(124,58,237,.25)',
+                  }}
                 >
                   <BankOutlined className="text-violet-400 text-sm" />
                   {!collapsed && (
                     <>
-                      <span className="text-xs text-violet-300 font-semibold flex-1">进入资金方工作台</span>
+                      <span className="text-xs text-violet-300 font-semibold flex-1">
+                        进入资金方工作台
+                      </span>
                       <ArrowRightOutlined className="text-violet-300 text-[10px]" />
                     </>
                   )}
@@ -273,12 +344,17 @@ export default function DashboardLayout() {
               <a href={logisticsWorkbenchHref}>
                 <div
                   className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
-                  style={{ background: 'rgba(37,99,235,.14)', border: '1px solid rgba(37,99,235,.25)' }}
+                  style={{
+                    background: 'rgba(37,99,235,.14)',
+                    border: '1px solid rgba(37,99,235,.25)',
+                  }}
                 >
                   <TruckOutlined className="text-blue-300 text-sm" />
                   {!collapsed && (
                     <>
-                      <span className="text-xs text-blue-300 font-semibold flex-1">进入物流管理中心</span>
+                      <span className="text-xs text-blue-300 font-semibold flex-1">
+                        进入物流管理中心
+                      </span>
                       <ArrowRightOutlined className="text-blue-300 text-[10px]" />
                     </>
                   )}
@@ -289,12 +365,17 @@ export default function DashboardLayout() {
               <a href={warehouseWorkbenchHref}>
                 <div
                   className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
-                  style={{ background: 'rgba(22,163,74,.14)', border: '1px solid rgba(22,163,74,.25)' }}
+                  style={{
+                    background: 'rgba(22,163,74,.14)',
+                    border: '1px solid rgba(22,163,74,.25)',
+                  }}
                 >
                   <HomeOutlined className="text-emerald-300 text-sm" />
                   {!collapsed && (
                     <>
-                      <span className="text-xs text-emerald-300 font-semibold flex-1">进入仓储管理中心</span>
+                      <span className="text-xs text-emerald-300 font-semibold flex-1">
+                        进入仓储管理中心
+                      </span>
                       <ArrowRightOutlined className="text-emerald-300 text-[10px]" />
                     </>
                   )}
@@ -304,7 +385,10 @@ export default function DashboardLayout() {
             <Link to="/mall">
               <div
                 className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer"
-                style={{ background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.25)' }}
+                style={{
+                  background: 'rgba(99,102,241,.15)',
+                  border: '1px solid rgba(99,102,241,.25)',
+                }}
               >
                 <ShoppingOutlined className="text-indigo-400 text-sm" />
                 {!collapsed && (
@@ -322,7 +406,9 @@ export default function DashboardLayout() {
               <Avatar size={28} icon={<UserOutlined />} className="bg-indigo-500 shrink-0" />
               {!collapsed && (
                 <div className="flex-1 min-w-0">
-                  <div className="text-white/82 text-xs font-medium truncate">{user?.realName || user?.username || '用户'}</div>
+                  <div className="text-white/82 text-xs font-medium truncate">
+                    {user?.realName || user?.username || '用户'}
+                  </div>
                   <div className="text-white/30 text-[10px] truncate">{user?.mobile || ''}</div>
                 </div>
               )}

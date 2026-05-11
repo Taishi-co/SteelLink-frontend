@@ -73,12 +73,16 @@ export interface WarehouseMovement {
 
 export const warehouseOrderService = {
   async listPending() {
-    const response = await api.get<unknown, ApiResponse<{ list: OrderInfo[] }>>('/orders?status=12&role=warehouse')
+    const response = await api.get<unknown, ApiResponse<{ list: OrderInfo[] }>>(
+      '/orders?status=13&role=warehouse'
+    )
     return response.data.list
   },
 
   async listAll() {
-    const response = await api.get<unknown, ApiResponse<{ list: OrderInfo[] }>>('/orders?role=warehouse')
+    const response = await api.get<unknown, ApiResponse<{ list: OrderInfo[] }>>(
+      '/orders?role=warehouse'
+    )
     return response.data.list
   },
 
@@ -88,19 +92,26 @@ export const warehouseOrderService = {
   },
 
   async warehouseConfirm(id: number, payload?: { confirmed: boolean; condition_note?: string }) {
-    const response = await api.post<unknown, ApiResponse<OrderInfo>>(`/orders/${id}/warehouse-confirm`, payload || {})
+    const response = await api.post<unknown, ApiResponse<OrderInfo>>(
+      `/orders/${id}/warehouse-confirm`,
+      payload || {}
+    )
     return response.data
   },
 
   async listEvents(id: number) {
-    const response = await api.get<unknown, ApiResponse<{ list: OrderEventInfo[] }>>(`/orders/${id}/events`)
+    const response = await api.get<unknown, ApiResponse<{ list: OrderEventInfo[] }>>(
+      `/orders/${id}/events`
+    )
     return response.data.list
   },
 }
 
 export const warehouseMovementService = {
   async list() {
-    const response = await api.get<unknown, ApiResponse<{ list: WarehouseMovement[] }>>('/warehouse-movements')
+    const response = await api.get<unknown, ApiResponse<{ list: WarehouseMovement[] }>>(
+      '/warehouse-movements'
+    )
     return response.data.list
   },
 
@@ -115,12 +126,18 @@ export const warehouseMovementService = {
     scheduled_at?: string
     remark?: string
   }) {
-    const response = await api.post<unknown, ApiResponse<WarehouseMovement>>('/warehouse-movements', payload)
+    const response = await api.post<unknown, ApiResponse<WarehouseMovement>>(
+      '/warehouse-movements',
+      payload
+    )
     return response.data
   },
 
   async updateStatus(id: number, payload: { status: string; remark?: string }) {
-    const response = await api.put<unknown, ApiResponse<WarehouseMovement>>(`/warehouse-movements/${id}/status`, payload)
+    const response = await api.put<unknown, ApiResponse<WarehouseMovement>>(
+      `/warehouse-movements/${id}/status`,
+      payload
+    )
     return response.data
   },
 }

@@ -38,6 +38,7 @@ export interface LogisticsLoginPayload {
 
 const TOKEN_KEY = 'logistics_token'
 const USER_KEY = 'logistics_user'
+const SHARED_PERMISSIONS_KEY = 'enterprise_service_permissions'
 
 function setCookie(name: string, value: string) {
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; SameSite=Lax`
@@ -55,6 +56,19 @@ function getCookie(name: string) {
 
 function getSharedToken() {
   return localStorage.getItem('token') || sessionStorage.getItem('token') || getCookie('token')
+}
+
+function getSharedPermissions() {
+  const raw =
+    localStorage.getItem(SHARED_PERMISSIONS_KEY) ||
+    sessionStorage.getItem(SHARED_PERMISSIONS_KEY) ||
+    getCookie(SHARED_PERMISSIONS_KEY)
+  if (!raw) return []
+  try {
+    return JSON.parse(raw) as Array<{ service?: string; status?: number }>
+  } catch {
+    return []
+  }
 }
 
 function removeCookie(name: string) {
@@ -95,11 +109,17 @@ export function saveLogisticsSession(token: string, profile: LogisticsProfile) {
 }
 
 export function getLogisticsToken() {
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || getCookie(TOKEN_KEY) || getSharedToken()
+  return (
+    localStorage.getItem(TOKEN_KEY) ||
+    sessionStorage.getItem(TOKEN_KEY) ||
+    getCookie(TOKEN_KEY) ||
+    getSharedToken()
+  )
 }
 
 export function getLogisticsUser(): LogisticsProfile | null {
-  const raw = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY) || getCookie(USER_KEY)
+  const raw =
+    localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY) || getCookie(USER_KEY)
   if (!raw) return null
   try {
     return JSON.parse(raw) as LogisticsProfile
@@ -122,6 +142,25 @@ export function clearLogisticsSession() {
 
 export function hasLogisticsCapability(): boolean {
   const payload = parseJwtPayload(getLogisticsToken() || '')
-  const caps = payload?.service_capabilities as string[] | undefined
-  return !!caps && caps.includes('logistics')
+  const payloadCaps = payload?.service_capabilities as string[] | undefined
+  const payloadRole = payload?.role as string | undefined
+  const payloadEnterpriseRole = payload?.enterprise_role as string | undefined
+  const user = getLogisticsUser()
+  const userCaps = user?.service_capabilities
+  const sharedPermissions = getSharedPermissions()
+
+  if (payloadCaps?.includes('logistics') || userCaps?.includes('logistics')) {
+    return true
+  }
+
+  if (sharedPermissions.some((item) => item.service === 'logistics' && item.status === 2)) {
+    return true
+  }
+
+  return (
+    payloadRole === 'logistics' ||
+    payloadEnterpriseRole === 'logistics' ||
+    user?.role === 'logistics' ||
+    user?.enterprise_role === 'logistics'
+  )
 }
