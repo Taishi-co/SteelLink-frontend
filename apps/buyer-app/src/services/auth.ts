@@ -232,9 +232,18 @@ export function hasSavedSellerSession() {
   return Boolean(getBuyerToken())
 }
 
+function getCrossAppBaseURL(port: number) {
+  if (!import.meta.env.DEV) {
+    return ''
+  }
+  const protocol = window.location.protocol || 'http:'
+  const hostname = window.location.hostname || 'localhost'
+  return `${protocol}//${hostname}:${port}`
+}
+
 export function getSellerCenterHref(path = '/seller/dashboard') {
   const targetPath = path.startsWith('/seller') ? path : `/seller${path}`
-  const base = import.meta.env.DEV ? 'http://localhost:5174' : ''
+  const base = getCrossAppBaseURL(5174)
   if (hasSavedSellerSession()) {
     return `${base}${targetPath}`
   }

@@ -39,12 +39,35 @@ export interface LogisticsOrderInfo {
   vehicle_type: string
   estimated_price: number
   final_price: number
-  status: 'pending' | 'accepted' | 'in_transit' | 'delivered' | 'completed' | string
+  status:
+    | 'task_created'
+    | 'pickup_scheduled'
+    | 'arrival_signed_in'
+    | 'outbound_confirmed'
+    | 'loading_confirmed'
+    | 'in_transit'
+    | 'arrival_confirmed'
+    | 'receipt_signed'
+    | 'inbound_completed'
+    | 'completed'
+    | 'pending'
+    | 'accepted'
+    | 'delivered'
+    | string
+  current_responsible_party?: 'buyer' | 'seller' | 'warehouse' | 'logistics' | 'unknown' | string
+  handover_note?: string
   driver_name: string
   driver_phone: string
   plate_number: string
   guarantee_type: string
   accepted_at?: string
+  pickup_appointment_at?: string
+  arrival_signed_in_at?: string
+  outbound_confirmed_at?: string
+  loading_confirmed_at?: string
+  arrival_confirmed_at?: string
+  receipt_signed_at?: string
+  inbound_completed_at?: string
   created_at: string
   updated_at: string
   tracking_events?: TrackingEventInfo[]
@@ -158,11 +181,17 @@ export interface WarehouseProductInfo {
 
 export const serviceFulfillmentService = {
   listWarehouseMovements: (params?: Record<string, unknown>) =>
-    api.get<unknown, ApiResponse<PageResponse<WarehouseMovementInfo>>>('/warehouse-movements', { params }),
+    api.get<unknown, ApiResponse<PageResponse<WarehouseMovementInfo>>>('/warehouse-movements', {
+      params,
+    }),
   listWarehouseProducts: (warehouseId: number) =>
-    api.get<unknown, ApiResponse<{ list: WarehouseProductInfo[] }>>(`/warehouses/${warehouseId}/products`),
+    api.get<unknown, ApiResponse<{ list: WarehouseProductInfo[] }>>(
+      `/warehouses/${warehouseId}/products`
+    ),
   listLogisticsOrders: (params?: Record<string, unknown>) =>
-    api.get<unknown, ApiResponse<PageResponse<LogisticsOrderInfo>>>('/logistics/orders', { params }),
+    api.get<unknown, ApiResponse<PageResponse<LogisticsOrderInfo>>>('/logistics/orders', {
+      params,
+    }),
   estimateLogistics: (payload: LogisticsEstimatePayload) =>
     api.post<unknown, ApiResponse<LogisticsEstimateResult>>('/logistics/estimate', payload),
   createLogisticsOrder: (payload: CreateLogisticsOrderPayload) =>
