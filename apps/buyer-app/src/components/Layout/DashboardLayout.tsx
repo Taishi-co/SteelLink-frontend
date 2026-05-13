@@ -20,7 +20,7 @@ import {
   CloudServerOutlined,
   MailOutlined,
 } from '@ant-design/icons'
-import { clearBuyerSession, getBuyerToken, hasEnterpriseAccess } from '@/services/auth'
+import { clearBuyerSession, getBuyerToken, hasEnterpriseAccess, buyerAuthService } from '@/services/auth'
 import { useUserStore } from '@/stores'
 import { getIdentityStatusLabel, certificationService } from '@/services/certificationService'
 import type { EnterpriseServicePermission } from '@/services/certificationService'
@@ -181,8 +181,17 @@ export default function DashboardLayout() {
 
   const identityLabel = getIdentityStatusLabel(user?.identityStatus ?? 0)
 
-  const switchToSellerCenter = () => {
-    window.location.href = `${sellerBaseURL}/seller/dashboard`
+  const switchToSellerCenter = async () => {
+    try {
+      const res = await buyerAuthService.createSwitchSession()
+      if (res.code === 0 && res.data?.switch_token) {
+        window.location.href = `${sellerBaseURL}/seller/login?switch_token=${encodeURIComponent(res.data.switch_token)}&redirect=/seller/dashboard`
+      } else {
+        window.location.href = `${sellerBaseURL}/seller/dashboard`
+      }
+    } catch {
+      window.location.href = `${sellerBaseURL}/seller/dashboard`
+    }
   }
 
   const getSelectedKey = () => {

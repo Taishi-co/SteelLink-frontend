@@ -395,12 +395,20 @@ function App() {
       },
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (s: number) => {
-        const meta = statusMap[s] || { label: `状态${s}`, color: 'default' }
+      title: '融资进度',
+      key: 'financing_status',
+      width: 140,
+      render: (_: unknown, record: OrderInfo) => {
+        const fs = record.financing_info?.status
+        const map: Record<string, { label: string; color: string }> = {
+          buyer_confirmed: { label: '待生成合同', color: 'orange' },
+          contract_generated: { label: '待买方签署', color: 'blue' },
+          buyer_signed_fee_paid: { label: '待放款', color: 'purple' },
+          disbursed: { label: '已放款', color: 'green' },
+          pledged: { label: '已质押', color: 'cyan' },
+          released: { label: '已释放', color: 'default' },
+        }
+        const meta = map[fs || ''] || { label: fs || '--', color: 'default' }
         return <Tag color={meta.color}>{meta.label}</Tag>
       },
     },
@@ -408,18 +416,21 @@ function App() {
       title: '操作',
       key: 'action',
       width: 200,
-      render: (_: unknown, record: OrderInfo) => (
-        <Space>
-          <Button size="small" icon={<FileSearchOutlined />} onClick={() => setDebtModal({ visible: true, orderId: record.id })}>
-            生成债务合同
-          </Button>
-          <Button type="primary" size="small" icon={<DollarCircleOutlined />} onClick={() => {
-            setDisburseModal({ visible: true, orderId: record.id })
-          }}>
-            放款
-          </Button>
-        </Space>
-      ),
+      render: (_: unknown, record: OrderInfo) => {
+        const fs = record.financing_info?.status
+        return (
+          <Space>
+            <Button size="small" icon={<FileSearchOutlined />} onClick={() => setDebtModal({ visible: true, orderId: record.id })} disabled={fs !== 'buyer_confirmed'}>
+              生成债务合同
+            </Button>
+            <Button type="primary" size="small" icon={<DollarCircleOutlined />} onClick={() => {
+              setDisburseModal({ visible: true, orderId: record.id })
+            }} disabled={fs !== 'buyer_signed_fee_paid'}>
+              放款
+            </Button>
+          </Space>
+        )
+      },
     },
   ]
 

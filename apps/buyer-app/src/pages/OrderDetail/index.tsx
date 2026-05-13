@@ -220,16 +220,16 @@ function formatContractStatus(contractInfo?: { buyer_signed: boolean; seller_sig
 function getCurrentStep(status: number) {
   if (status === 0 || status === 1) return 0
   if (status === 12) return 1
-  if (status === 13 || status === 23 || status === 25) return 2
+  if (status === 13 || status === 24 || status === 25) return 2
   if (status === 14) return 3
   if (status === 15) return 4
   if (status === 2) return 5
-  if (status === 3 || status === 21 || status === 22) return 6
+  if (status === 3 || status === 22 || status === 23) return 6
   if (status === 4) return 6
-  if (status === 16 || status === 17 || status === 24) return 7
+  if (status === 16 || status === 17 || status === 27) return 7
   if (status === 5 || status === 6 || status === 18 || status === 7) return 8
   if (status === 19 || status === 20) return 9
-  if (status === 8 || status === 20) return 10
+  if (status === 8 || status === 21) return 10
   return 0
 }
 
@@ -344,7 +344,7 @@ function getStatusNotice(
       message: '下一步：请选择收货仓库，由仓储方确认后继续订单流程。',
     }
   }
-  if (status === 23) {
+  if (status === 24) {
     return {
       type: 'warning' as const,
       title: '当前状态：待重新选仓',
@@ -409,9 +409,16 @@ function getStatusNotice(
   }
   if (status === 22) {
     return {
+      type: 'info' as const,
+      title: '当前状态：资金方风控审批中',
+      message: '请耐心等待资金方完成风控审批，审批通过后可签署融资合同。',
+    }
+  }
+  if (status === 23) {
+    return {
       type: 'warning' as const,
-      title: '当前状态：风控审批已完成',
-      message: '下一步：请签署债务合同并支付手续费。',
+      title: '当前状态：风控审批已通过',
+      message: '下一步：请签署融资合同并支付手续费。',
     }
   }
   if (status === 4) {
@@ -663,7 +670,7 @@ export default function OrderDetailPage() {
       order?.status === 2 ||
       order?.status === 3 ||
       order?.status === 12 ||
-      order?.status === 23 ||
+      order?.status === 24 ||
       order?.status === 25) &&
     !order?.payment_info?.voucher_url
 
@@ -1452,7 +1459,7 @@ export default function OrderDetailPage() {
                     上传支付/货权凭证
                   </Button>
                 )}
-                {(order.status === 23 || order.status === 25) && (
+                {(order.status === 24 || order.status === 25) && (
                   <Button
                     type="primary"
                     icon={<EnvironmentOutlined />}
@@ -1475,7 +1482,7 @@ export default function OrderDetailPage() {
                     申请融资
                   </Button>
                 )}
-                {order.status === 21 && order.financing_info?.status === 'risk_approved' && (
+                {order.status === 22 && order.financing_info?.status === 'risk_approved' && (
                   <>
                     <Button type="primary" loading={confirmingFinancing} onClick={() => handleBuyerConfirmFinancing(true)}>
                       确认融资方案
@@ -1493,13 +1500,16 @@ export default function OrderDetailPage() {
                     </Button>
                   </>
                 )}
-                {order.status === 22 && (
+                {order.status === 23 && order.financing_info?.status === 'contract_generated' && (
                   <Button
                     type="primary"
-                    onClick={() => message.info('请上传手续费支付凭证以完成融资合同签署')}
+                    onClick={() => setDebtSigningOpen(true)}
                   >
                     签署融资合同并支付手续费
                   </Button>
+                )}
+                {order.status === 23 && order.financing_info?.status === 'buyer_confirmed' && (
+                  <Tag color="processing">等待资金方生成融资合同</Tag>
                 )}
                 {order.status === 16 && (
                   <Button
