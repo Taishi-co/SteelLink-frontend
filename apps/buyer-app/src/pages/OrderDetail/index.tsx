@@ -1211,7 +1211,7 @@ export default function OrderDetailPage() {
                     {pickupWarehouseName || '待确认提货点'}
                   </Descriptions.Item>
                   <Descriptions.Item label="物流委托">
-                    {logisticsOrder?.logistics_no || '待发起物流委托'}
+                    {logisticsOrder?.logistics_no || order.shipment_task?.id ? `#${order.shipment_task?.id}` : '待发起物流委托'}
                   </Descriptions.Item>
                   <Descriptions.Item label="估算价格">
                     {logisticsOrder
@@ -1247,7 +1247,7 @@ export default function OrderDetailPage() {
                     {logisticsOrder?.handover_note || '暂无'}
                   </Descriptions.Item>
                 </Descriptions>
-                {logisticsOrder && (
+                {logisticsOrder ? (
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                     {fulfillmentStepDefinitions.map((step, index) => {
                       const currentStep = getFulfillmentCurrentStep(logisticsOrder.status)
@@ -1299,8 +1299,7 @@ export default function OrderDetailPage() {
                       )
                     })}
                   </div>
-                )}
-                {order.shipment_task && (
+                ) : order.shipment_task ? (
                   <Steps
                     current={
                       order.shipment_task.status === 'signed'
@@ -1343,8 +1342,7 @@ export default function OrderDetailPage() {
                       },
                     ]}
                   />
-                )}
-                {!order.shipment_task && !logisticsOrder && (
+                ) : (
                   <Steps
                     current={latestMovement?.status === 'completed' ? 1 : 0}
                     items={[
@@ -1395,6 +1393,101 @@ export default function OrderDetailPage() {
                 ) : null}
               </Space>
             </Card>
+
+            {order.financing_info && (
+              <Card title="融资信息" className="mt-6">
+                <Space direction="vertical" size="middle" className="w-full">
+                  <Descriptions bordered column={2}>
+                    <Descriptions.Item label="融资状态">
+                      {order.financing_info.status === 'pending' && '待审批'}
+                      {order.financing_info.status === 'risk_approved' && '风控通过'}
+                      {order.financing_info.status === 'buyer_confirmed' && '买方已确认'}
+                      {order.financing_info.status === 'contract_generated' && '合同已生成'}
+                      {order.financing_info.status === 'completed' && '已完成'}
+                      {order.financing_info.status === 'cancelled' && '已取消'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="授信金额">
+                      ¥{Number(order.financing_info.approved_amount || 0).toLocaleString()}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="融资期限">
+                      {order.financing_info.term_days} 天
+                    </Descriptions.Item>
+                    <Descriptions.Item label="年化利率">
+                      {order.financing_info.annual_rate}%
+                    </Descriptions.Item>
+                    <Descriptions.Item label="手续费">
+                      ¥{Number(order.financing_info.service_fee || 0).toLocaleString()}
+                    </Descriptions.Item>
+                    {order.financing_info.debt_contract_no && (
+                      <Descriptions.Item label="合同编号">
+                        {order.financing_info.debt_contract_no}
+                      </Descriptions.Item>
+                    )}
+                    {order.financing_info.debt_contract_url && (
+                      <Descriptions.Item label="合同文件">
+                        <a href={order.financing_info.debt_contract_url} target="_blank" rel="noreferrer">
+                          查看合同
+                        </a>
+                      </Descriptions.Item>
+                    )}
+                  </Descriptions>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    {[
+                      { key: 'applied', title: '申请提交', owner: '买方负责', hint: '提交融资申请，填写申请信息' },
+                      { key: 'risk_review', title: '风控审批', owner: '资金方负责', hint: '资金方进行风控审核，给出授信额度' },
+                      { key: 'buyer_confirm', title: '确认方案', owner: '买方负责', hint: '确认融资方案，同意授信条件' },
+                      { key: 'sign_contract', title: '签署合同', owner: '双方签署', hint: '签署债务质押合同，支付手续费' },
+                      { key: 'funded', title: '放款完成', owner: '资金方负责', hint: '资金方放款，订单进入支付完成状态' },
+                    ].map((step, index) => {
+                      const statusOrder = ['pending', 'risk_approved', 'buyer_confirmed', 'contract_generated', 'completed']
+                      const currentStep = statusOrder.indexOf(order.financing_info!.status)
+                      const stepState =
+                        index < currentStep
+                          ? 'completed'
+                          : index === currentStep
+                            ? 'current'
+                            : 'pending'
+                      const tagColor =
+                        stepState === 'completed'
+                          ? 'success'
+                          : stepState === 'current'
+                            ? 'processing'
+                            : 'default'
+                      return (
+                        <div
+                          key={step.key}
+                          className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                        >
+                          <div className="mb-2 flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-xs text-slate-500">节点 {index + 1}</div>
+                              <div className="text-sm font-medium text-slate-900">{step.title}</div>
+                            </div>
+                            <Tag color={tagColor}>
+                              {stepState === 'completed'
+                                ? '已完成'
+                                : stepState === 'current'
+                                  ? '进行中'
+                                  : '待处理'}
+                            </Tag>
+                          </div>
+                          <div className="space-y-1 text-xs text-slate-600">
+                            <div>
+                              <span className="font-medium text-slate-700">责任方：</span>
+                              {step.owner}
+                            </div>
+                            <div>
+                              <span className="font-medium text-slate-700">说明：</span>
+                              {step.hint}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </Space>
+              </Card>
+            )}
 
             {(order.receipt_voucher || order.receipt_at || order.status === 8) && (
               <Card title="签收信息" className="mt-6">
@@ -1534,13 +1627,57 @@ export default function OrderDetailPage() {
                     查看物流报价
                   </Button>
                 )}
+                {order.status === 17 && (
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      setLogisticsModalOpen(true)
+                      setSelectedQuoteId(null)
+                      setLogisticsLoading(true)
+                      orderService
+                        .listLogisticsQuotes(Number(id))
+                        .then((quotes) => {
+                          setLogisticsQuotes(quotes)
+                          if (quotes.length > 0 && quotes[0].id) {
+                            setSelectedQuoteId(quotes[0].id)
+                          }
+                        })
+                        .catch((error: unknown) => {
+                          message.error(getErrorMessage(error, '获取报价列表失败'))
+                        })
+                        .finally(() => {
+                          setLogisticsLoading(false)
+                        })
+                    }}
+                  >
+                    确认物流
+                  </Button>
+                )}
+                {order.status === 27 && (
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      orderService
+                        .buyerSignLogisticsContract(Number(id))
+                        .then(() => {
+                          message.success('物流合同签署成功')
+                          void queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+                        })
+                        .catch((error: unknown) => {
+                          message.error(getErrorMessage(error, '签署物流合同失败'))
+                        })
+                    }}
+                  >
+                    签署物流合同
+                  </Button>
+                )}
                 {canCancelOrder && (
                   <Button danger loading={cancelling} onClick={handleCancelOrder}>
                     取消订单
                   </Button>
                 )}
 
-                {(order.status === 6 || order.status === 7 || order.status === 17) && (
+                {(order.status === 6 || order.status === 7) && (
                   <Button
                     type="primary"
                     icon={<CheckCircleOutlined />}

@@ -64,6 +64,7 @@ const statusMeta: Record<number, { color: string; text: string }> = {
   23: { color: 'gold', text: '待签署融资合同' },
   24: { color: 'volcano', text: '待重新选仓' },
   25: { color: 'volcano', text: '待重新发起物流' },
+  27: { color: 'gold', text: '待签署物流合同' },
 }
 
 const shipmentStatusMap: Record<string, string> = {
@@ -259,7 +260,7 @@ const statusOptions = [
   { label: '已取消', value: 9 },
 ]
 
-const activeOrderStatuses = [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 17, 18, 22, 23]
+const activeOrderStatuses = [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25, 27]
 
 const summaryStatusItems = [
   { key: 'active', label: '进行中', statuses: activeOrderStatuses },
@@ -1947,9 +1948,7 @@ export default function OrdersPage() {
               ) : (
                 <Radio.Group
                   value={selectedQuoteId}
-                  onChange={(e) =>
-                    quoteModalOrder.status === 16 && setSelectedQuoteId(e.target.value)
-                  }
+                  onChange={(e) => setSelectedQuoteId(e.target.value)}
                 >
                   <Space direction="vertical" className="w-full">
                     {logisticsQuotes.map((quote) => (
@@ -1957,7 +1956,6 @@ export default function OrdersPage() {
                         key={quote.id}
                         value={quote.id}
                         className="w-full"
-                        disabled={quoteModalOrder.status === 16}
                       >
                         <Card className="w-full" hoverable={quoteModalOrder.status === 17}>
                           <div className="flex justify-between items-start">

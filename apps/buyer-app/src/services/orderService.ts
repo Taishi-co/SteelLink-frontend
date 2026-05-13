@@ -295,6 +295,8 @@ export const orderService = {
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/financing-requests/debt-sign`, payload).then((response) => response.data),
   confirmLogisticsQuote: (id: number, payload: { quote_id: number }) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/logistics-confirm`, payload).then((response) => response.data),
+  buyerSignLogisticsContract: (id: number, payload?: { contract_url?: string }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/logistics-contracts/buyer-sign`, payload || {}).then((response) => response.data),
   listLogisticsQuotes: async (id: number) => {
     const response = await api.get<ApiResponse<{ list: LogisticsQuoteInfo[] }>, ApiResponse<{ list: LogisticsQuoteInfo[] }>>(`/orders/${id}/logistics-quotes`)
     return response.data.list
