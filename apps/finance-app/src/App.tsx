@@ -10,6 +10,7 @@ import {
   SafetyCertificateOutlined,
   EditOutlined,
   DeleteOutlined,
+  DotChartOutlined,
 } from '@ant-design/icons'
 import { financeOrderService } from '@/services/orderService'
 import type { OrderInfo } from '@/services/orderService'
@@ -43,7 +44,7 @@ const statusMap: Record<number, { label: string; color: string }> = {
   11: { label: '异常', color: 'red' },
 }
 
-type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'all'
+type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'disburse' | 'pledge' | 'release-pledge' | 'finance-flow' | 'all'
 const productStatusMap: Record<number, { label: string; color: string }> = {
   1: { label: '待审核', color: 'processing' },
   2: { label: '已通过', color: 'success' },
@@ -92,6 +93,8 @@ function App() {
   const [releaseModal, setReleaseModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [releaseReason, setReleaseReason] = useState('')
   const [releaseVoucherURL, setReleaseVoucherURL] = useState('')
+  
+  const [expandedFinanceOrders, setExpandedFinanceOrders] = useState<number[]>([])
 
   const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
     Modal.success({
@@ -160,6 +163,10 @@ function App() {
     if (activeTab === 'products') fetchProducts()
     else if (activeTab === 'risk-review') fetchRiskOrders()
     else if (activeTab === 'debt-contract') fetchDebtOrders()
+    else if (activeTab === 'disburse') fetchDebtOrders()
+    else if (activeTab === 'pledge') fetchAll()
+    else if (activeTab === 'release-pledge') fetchAll()
+    else if (activeTab === 'finance-flow') fetchAll()
     else if (activeTab === 'all') fetchAll()
   }, [activeTab])
 
@@ -382,6 +389,22 @@ function App() {
     },
   ]
 
+  const getFinancingStepInfo = (status?: string) => {
+    const stepDefinitions = [
+      { key: 'pending', title: '申请提交', owner: '买方', hint: '提交融资申请' },
+      { key: 'risk_approved', title: '风控审批', owner: '资金方', hint: '风控审核通过' },
+      { key: 'buyer_confirmed', title: '确认方案', owner: '买方', hint: '确认授信方案' },
+      { key: 'contract_generated', title: '签署合同', owner: '双方', hint: '签署债务质押合同' },
+      { key: 'buyer_signed_fee_paid', title: '支付手续费', owner: '买方', hint: '支付融资手续费' },
+      { key: 'disbursed', title: '放款完成', owner: '资金方', hint: '资金方放款' },
+      { key: 'pledged', title: '货权质押', owner: '资金方', hint: '记录货权质押' },
+      { key: 'released', title: '质押释放', owner: '资金方', hint: '释放货权质押' },
+    ]
+    const statusOrder = ['pending', 'risk_approved', 'buyer_confirmed', 'contract_generated', 'buyer_signed_fee_paid', 'disbursed', 'pledged', 'released']
+    const currentStep = status ? statusOrder.indexOf(status) : -1
+    return { stepDefinitions, currentStep }
+  }
+
   const debtColumns: ColumnsType<OrderInfo> = [
     { title: '订单号', dataIndex: 'order_no', key: 'order_no', width: 160 },
     { title: '买方', dataIndex: 'buyer_name', key: 'buyer_name', width: 120 },
@@ -410,6 +433,46 @@ function App() {
         }
         const meta = map[fs || ''] || { label: fs || '--', color: 'default' }
         return <Tag color={meta.color}>{meta.label}</Tag>
+      },
+    },
+    {
+      title: '融资流程',
+      key: 'financing_flow',
+      width: 320,
+      render: (_: unknown, record: OrderInfo) => {
+        const { stepDefinitions, currentStep } = getFinancingStepInfo(record.financing_info?.status)
+        return (
+          <div className="grid grid-cols-4 gap-1">
+            {stepDefinitions.map((step, index) => {
+              const stepState =
+                index < currentStep
+                  ? 'completed'
+                  : index === currentStep
+                    ? 'current'
+                    : 'pending'
+              const tagColor =
+                stepState === 'completed'
+                  ? 'success'
+                  : stepState === 'current'
+                    ? 'processing'
+                    : 'default'
+              return (
+                <div
+                  key={step.key}
+                  className="rounded border border-slate-200 bg-slate-50 p-1.5"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs font-medium text-slate-700">{step.title}</span>
+                    <Tag color={tagColor} className="text-[10px]">
+                      {stepState === 'completed' ? '完成' : stepState === 'current' ? '进行中' : '待处理'}
+                    </Tag>
+                  </div>
+                  <div className="mt-1 text-[10px] text-slate-500">{step.owner}</div>
+                </div>
+              )
+            })}
+          </div>
+        )
       },
     },
     {
@@ -529,10 +592,14 @@ function App() {
   ]
 
   const menuItems = [
-    { key: 'products' as TabKey, label: '金融产品', icon: <BankOutlined /> },
-    { key: 'risk-review' as TabKey, label: '风控审批', icon: <AuditOutlined /> },
-    { key: 'debt-contract' as TabKey, label: '合同与放款', icon: <BankOutlined /> },
-    { key: 'all' as TabKey, label: '全部订单', icon: <FileSearchOutlined /> },
+    { key: 'products' as TabKey, label: '产品管理', icon: <BankOutlined />, group: 'product' },
+    { key: 'risk-review' as TabKey, label: '风控审批', icon: <AuditOutlined />, group: 'approval' },
+    { key: 'debt-contract' as TabKey, label: '债务合同', icon: <FileSearchOutlined />, group: 'contract' },
+    { key: 'disburse' as TabKey, label: '放款管理', icon: <DollarCircleOutlined />, group: 'contract' },
+    { key: 'pledge' as TabKey, label: '货权质押', icon: <SafetyCertificateOutlined />, group: 'pledge' },
+    { key: 'release-pledge' as TabKey, label: '质押释放', icon: <EditOutlined />, group: 'pledge' },
+    { key: 'finance-flow' as TabKey, label: '融资流程', icon: <DotChartOutlined />, group: 'center' },
+    { key: 'all' as TabKey, label: '订单中心', icon: <FileSearchOutlined />, group: 'center' },
   ]
 
   if (!hasFinanceCapability()) {
@@ -557,11 +624,33 @@ function App() {
           </Space>
         </div>
         <div style={{ padding: 16 }}>
-          <List
-            size="small"
-            dataSource={menuItems}
-            renderItem={(item) => (
+          <div className="space-y-2">
+            <div className="px-3 py-2">
+              <Text className="text-xs font-medium text-slate-500">产品管理</Text>
+            </div>
+            {menuItems.filter((item) => item.group === 'product').map((item) => (
               <List.Item
+                key={item.key}
+                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                onClick={() => setActiveTab(item.key)}
+              >
+                <Space>
+                  {item.icon}
+                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                    {item.label}
+                  </Text>
+                </Space>
+              </List.Item>
+            ))}
+            
+            <div className="border-t border-slate-200 my-2" />
+            
+            <div className="px-3 py-2">
+              <Text className="text-xs font-medium text-slate-500">融资审批</Text>
+            </div>
+            {menuItems.filter((item) => item.group === 'approval').map((item) => (
+              <List.Item
+                key={item.key}
                 style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
                 onClick={() => setActiveTab(item.key)}
               >
@@ -575,15 +664,87 @@ function App() {
                   </Text>
                 </Space>
               </List.Item>
-            )}
-          />
+            ))}
+            
+            <div className="border-t border-slate-200 my-2" />
+            
+            <div className="px-3 py-2">
+              <Text className="text-xs font-medium text-slate-500">合同放款</Text>
+            </div>
+            {menuItems.filter((item) => item.group === 'contract').map((item) => (
+              <List.Item
+                key={item.key}
+                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                onClick={() => setActiveTab(item.key)}
+              >
+                <Space>
+                  {item.icon}
+                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                    {item.label}
+                    {item.key === 'debt-contract' && debtOrders.length > 0 && (
+                      <Badge count={debtOrders.length} style={{ marginLeft: 8 }} />
+                    )}
+                  </Text>
+                </Space>
+              </List.Item>
+            ))}
+            
+            <div className="border-t border-slate-200 my-2" />
+            
+            <div className="px-3 py-2">
+              <Text className="text-xs font-medium text-slate-500">质押管理</Text>
+            </div>
+            {menuItems.filter((item) => item.group === 'pledge').map((item) => (
+              <List.Item
+                key={item.key}
+                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                onClick={() => setActiveTab(item.key)}
+              >
+                <Space>
+                  {item.icon}
+                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                    {item.label}
+                  </Text>
+                </Space>
+              </List.Item>
+            ))}
+            
+            <div className="border-t border-slate-200 my-2" />
+            
+            <div className="px-3 py-2">
+              <Text className="text-xs font-medium text-slate-500">订单中心</Text>
+            </div>
+            {menuItems.filter((item) => item.group === 'center').map((item) => (
+              <List.Item
+                key={item.key}
+                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                onClick={() => setActiveTab(item.key)}
+              >
+                <Space>
+                  {item.icon}
+                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                    {item.label}
+                  </Text>
+                </Space>
+              </List.Item>
+            ))}
+          </div>
         </div>
       </Sider>
       <Layout>
         <Header style={{ background: '#fff', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text strong>资金服务方工作台</Text>
           <Space>
-            <Button icon={<AuditOutlined />} onClick={() => { if (activeTab === 'products') fetchProducts(); else if (activeTab === 'risk-review') fetchRiskOrders(); else if (activeTab === 'debt-contract') fetchDebtOrders(); else fetchAll(); }}>
+            <Button icon={<AuditOutlined />} onClick={() => { 
+              if (activeTab === 'products') fetchProducts(); 
+              else if (activeTab === 'risk-review') fetchRiskOrders(); 
+              else if (activeTab === 'debt-contract') fetchDebtOrders();
+              else if (activeTab === 'disburse') fetchDebtOrders();
+              else if (activeTab === 'pledge') fetchAll();
+              else if (activeTab === 'release-pledge') fetchAll();
+              else if (activeTab === 'finance-flow') fetchAll();
+              else fetchAll(); 
+            }}>
               刷新
             </Button>
             <Button icon={<HomeOutlined />} href="/">买家首页</Button>
@@ -702,6 +863,273 @@ function App() {
                 />
               </Card>
             </>
+          )}
+
+          {activeTab === 'disburse' && (
+            <Card title="放款管理" extra={<Tag color="green">待放款</Tag>}>
+              <Spin spinning={loading}>
+                <Table 
+                  columns={[
+                    { title: '订单号', dataIndex: 'order_no', key: 'order_no', width: 160 },
+                    { title: '买方', dataIndex: 'buyer_name', key: 'buyer_name', width: 120 },
+                    { title: '卖方', dataIndex: 'seller_name', key: 'seller_name', width: 120 },
+                    {
+                      title: '审批金额',
+                      key: 'approved_amount',
+                      width: 120,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const amount = record.financing_info?.approved_amount
+                        return amount ? `¥${amount.toLocaleString()}` : '--'
+                      },
+                    },
+                    {
+                      title: '融资状态',
+                      key: 'financing_status',
+                      width: 140,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const fs = record.financing_info?.status
+                        const map: Record<string, { label: string; color: string }> = {
+                          buyer_confirmed: { label: '待生成合同', color: 'orange' },
+                          contract_generated: { label: '待买方签署', color: 'blue' },
+                          buyer_signed_fee_paid: { label: '待放款', color: 'purple' },
+                          disbursed: { label: '已放款', color: 'green' },
+                          pledged: { label: '已质押', color: 'cyan' },
+                          released: { label: '已释放', color: 'default' },
+                        }
+                        const meta = map[fs || ''] || { label: fs || '--', color: 'default' }
+                        return <Tag color={meta.color}>{meta.label}</Tag>
+                      },
+                    },
+                    {
+                      title: '操作',
+                      key: 'action',
+                      width: 120,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const fs = record.financing_info?.status
+                        if (fs === 'buyer_signed_fee_paid') {
+                          return (
+                            <Button type="primary" size="small" icon={<DollarCircleOutlined />} onClick={() => {
+                              setDisburseModal({ visible: true, orderId: record.id })
+                            }}>
+                              放款
+                            </Button>
+                          )
+                        }
+                        return <Text type="secondary">--</Text>
+                      },
+                    },
+                  ]}
+                  dataSource={debtOrders} 
+                  rowKey="id" 
+                  pagination={{ pageSize: 10 }} 
+                  scroll={{ x: 940 }} 
+                  locale={{ emptyText: '暂无待放款订单' }} 
+                />
+              </Spin>
+            </Card>
+          )}
+
+          {activeTab === 'pledge' && (
+            <Card title="货权质押" extra={<Tag color="cyan">已放款待质押</Tag>}>
+              <Spin spinning={loading}>
+                <Table 
+                  columns={[
+                    { title: '订单号', dataIndex: 'order_no', key: 'order_no', width: 160 },
+                    { title: '买方', dataIndex: 'buyer_name', key: 'buyer_name', width: 120 },
+                    { title: '卖方', dataIndex: 'seller_name', key: 'seller_name', width: 120 },
+                    {
+                      title: '放款金额',
+                      key: 'approved_amount',
+                      width: 120,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const amount = record.financing_info?.approved_amount
+                        return amount ? `¥${amount.toLocaleString()}` : '--'
+                      },
+                    },
+                    {
+                      title: '质押状态',
+                      key: 'pledge_status',
+                      width: 120,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const fs = record.financing_info?.status
+                        if (fs === 'disbursed') return <Tag color="orange">待质押</Tag>
+                        if (fs === 'pledged') return <Tag color="cyan">已质押</Tag>
+                        return <Text type="secondary">--</Text>
+                      },
+                    },
+                    {
+                      title: '操作',
+                      key: 'action',
+                      width: 120,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const fs = record.financing_info?.status
+                        if (fs === 'disbursed') {
+                          return (
+                            <Button type="primary" size="small" icon={<SafetyCertificateOutlined />} onClick={() => {
+                              setPledgeModal({ visible: true, orderId: record.id })
+                            }}>
+                              记录质押
+                            </Button>
+                          )
+                        }
+                        return <Text type="secondary">--</Text>
+                      },
+                    },
+                  ]}
+                  dataSource={allOrders.filter((order) => order.financing_info?.status === 'disbursed')} 
+                  rowKey="id" 
+                  pagination={{ pageSize: 10 }} 
+                  scroll={{ x: 800 }} 
+                  locale={{ emptyText: '暂无待质押订单' }} 
+                />
+              </Spin>
+            </Card>
+          )}
+
+          {activeTab === 'release-pledge' && (
+            <Card title="质押释放" extra={<Tag color="purple">已质押待释放</Tag>}>
+              <Spin spinning={loading}>
+                <Table 
+                  columns={[
+                    { title: '订单号', dataIndex: 'order_no', key: 'order_no', width: 160 },
+                    { title: '买方', dataIndex: 'buyer_name', key: 'buyer_name', width: 120 },
+                    { title: '卖方', dataIndex: 'seller_name', key: 'seller_name', width: 120 },
+                    {
+                      title: '质押金额',
+                      key: 'approved_amount',
+                      width: 120,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const amount = record.financing_info?.approved_amount
+                        return amount ? `¥${amount.toLocaleString()}` : '--'
+                      },
+                    },
+                    {
+                      title: '质押状态',
+                      key: 'pledge_status',
+                      width: 120,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const fs = record.financing_info?.status
+                        if (fs === 'pledged') return <Tag color="cyan">已质押</Tag>
+                        if (fs === 'released') return <Tag color="success">已释放</Tag>
+                        return <Text type="secondary">--</Text>
+                      },
+                    },
+                    {
+                      title: '操作',
+                      key: 'action',
+                      width: 120,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const fs = record.financing_info?.status
+                        if (fs === 'pledged') {
+                          return (
+                            <Button type="primary" size="small" icon={<EditOutlined />} onClick={() => {
+                              setReleaseModal({ visible: true, orderId: record.id })
+                            }}>
+                              释放质押
+                            </Button>
+                          )
+                        }
+                        return <Text type="secondary">--</Text>
+                      },
+                    },
+                  ]}
+                  dataSource={allOrders.filter((order) => order.financing_info?.status === 'pledged')} 
+                  rowKey="id" 
+                  pagination={{ pageSize: 10 }} 
+                  scroll={{ x: 800 }} 
+                  locale={{ emptyText: '暂无待释放质押订单' }} 
+                />
+              </Spin>
+            </Card>
+          )}
+
+          {activeTab === 'finance-flow' && (
+            <Card title="融资流程总览">
+              <Spin spinning={loading}>
+                <Table
+                  dataSource={allOrders.filter((order) => order.financing_info)}
+                  rowKey="id"
+                  pagination={{ pageSize: 10 }}
+                  expandable={{
+                    expandedRowKeys: expandedFinanceOrders,
+                    onExpandedRowsChange: (keys) => setExpandedFinanceOrders(keys as number[]),
+                    expandedRowRender: (record) => {
+                      const { currentStep, stepDefinitions } = getFinancingStepInfo(record.financing_info?.status)
+                      return (
+                        <div style={{ padding: '16px 24px', background: '#fafafa' }}>
+                          <Steps
+                            current={currentStep}
+                            size="small"
+                            items={stepDefinitions.map((step, index) => ({
+                              title: step.title,
+                              description: step.owner,
+                              status: index < currentStep ? 'finish' : index === currentStep ? 'process' : 'wait',
+                            }))}
+                          />
+                          <div style={{ marginTop: 16, display: 'flex', gap: 32, color: '#666' }}>
+                            <span>审批金额：<strong style={{ color: '#333' }}>¥{(record.financing_info?.approved_amount || 0).toLocaleString()}</strong></span>
+                            <span>账期：<strong style={{ color: '#333' }}>{record.financing_info?.term_days || '--'}天</strong></span>
+                            <span>年化费率：<strong style={{ color: '#333' }}>{record.financing_info?.annual_rate || '--'}%</strong></span>
+                            <span>手续费：<strong style={{ color: '#333' }}>¥{(record.financing_info?.service_fee || 0).toLocaleString()}</strong></span>
+                          </div>
+                        </div>
+                      )
+                    },
+                  }}
+                  columns={[
+                    {
+                      title: '订单号',
+                      dataIndex: 'order_no',
+                      key: 'order_no',
+                      width: 160,
+                      render: (text: string) => <Text strong>{text}</Text>,
+                    },
+                    {
+                      title: '买方',
+                      dataIndex: 'buyer_name',
+                      key: 'buyer_name',
+                      width: 140,
+                    },
+                    {
+                      title: '订单金额',
+                      dataIndex: 'total_amount',
+                      key: 'total_amount',
+                      width: 120,
+                      render: (v: number) => `¥${(v || 0).toLocaleString()}`,
+                    },
+                    {
+                      title: '融资状态',
+                      key: 'financing_status',
+                      width: 160,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const statusMap: Record<string, { label: string; color: string }> = {
+                          pending: { label: '待风控审核', color: 'orange' },
+                          risk_approved: { label: '风控已通过', color: 'cyan' },
+                          buyer_confirmed: { label: '买方已确认', color: 'blue' },
+                          contract_generated: { label: '合同已生成', color: 'purple' },
+                          buyer_signed_fee_paid: { label: '待放款', color: 'magenta' },
+                          disbursed: { label: '已放款', color: 'green' },
+                          pledged: { label: '已质押', color: 'geekblue' },
+                          released: { label: '已完成', color: 'success' },
+                        }
+                        const meta = statusMap[record.financing_info?.status || ''] || { label: record.financing_info?.status || '--', color: 'default' }
+                        return <Tag color={meta.color}>{meta.label}</Tag>
+                      },
+                    },
+                    {
+                      title: '当前节点',
+                      key: 'current_step',
+                      render: (_: unknown, record: OrderInfo) => {
+                        const { currentStep, stepDefinitions } = getFinancingStepInfo(record.financing_info?.status)
+                        const current = stepDefinitions[currentStep]
+                        return current ? `${currentStep + 1}. ${current.title}` : '--'
+                      },
+                    },
+                  ]}
+                  locale={{ emptyText: '暂无融资订单' }}
+                />
+              </Spin>
+            </Card>
           )}
 
           {activeTab === 'all' && (

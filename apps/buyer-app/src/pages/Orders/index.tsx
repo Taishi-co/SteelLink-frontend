@@ -31,6 +31,7 @@ const statusMap: Record<number, { label: string; color: string }> = {
   21: { label: '已归档', color: 'default' },
   22: { label: '融资审批中', color: 'purple' },
   23: { label: '待签署融资合同', color: 'gold' },
+  27: { label: '待签署物流合同', color: 'gold' },
 }
 
 function getStatusAction(order: { status: number; payment_info?: { voucher_url?: string }; delivery_info?: { pickup_code?: string } }) {
@@ -42,9 +43,10 @@ function getStatusAction(order: { status: number; payment_info?: { voucher_url?:
   if (order.status === 22) return '请签署融资合同'
   if (order.status === 4) return '支付完成，等待物流'
   if (order.status === 15) return '待买方确认订单'
-  if (order.status === 16) return '物流竞价中'
+  if (order.status === 16) return '物流竞价中，等待卖家选择'
   if (order.status === 5) return '待提货/运输'
-  if (order.status === 17) return '运输中'
+  if (order.status === 17) return '卖家已选择物流，等待买家确认'
+  if (order.status === 27) return '买家已确认，请签署物流合同'
   if (order.status === 7 || order.status === 6) return '待买家确认收货'
   if (order.status === 18) return '已收货，等待对账'
   if (order.status === 8 || order.status === 19 || order.status === 20) return '已完成'

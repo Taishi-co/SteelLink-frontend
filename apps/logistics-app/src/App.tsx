@@ -18,14 +18,11 @@ import {
   Table,
   Tag,
   Typography,
-  Upload,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import type { UploadFile } from 'antd/es/upload'
 import {
   CarOutlined,
-  DatabaseOutlined,
   HomeOutlined,
   RocketOutlined,
   SafetyCertificateOutlined,
@@ -37,47 +34,18 @@ import {
   AppstoreOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  UploadOutlined,
-  FileTextOutlined,
 } from '@ant-design/icons'
 import { logisticsOrderService, logisticsFulfillmentService } from '@/services/orderService'
-import type { OrderInfo, LogisticsOrder, ShipmentTaskInfo } from '@/services/orderService'
+import type { OrderInfo, LogisticsOrder } from '@/services/orderService'
 import { logisticsResourceService } from '@/services/logisticsResourceService'
 import type {
   LogisticsResource,
   LogisticsResourcePayload,
 } from '@/services/logisticsResourceService'
-import { uploadService } from '@/services/uploadService'
 import { getLogisticsToken, hasLogisticsCapability, saveLogisticsToken } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography
-
-const statusMap: Record<number, { label: string; color: string }> = {
-  0: { label: '待确认', color: 'default' },
-  12: { label: '待选择目的地仓储', color: 'geekblue' },
-  13: { label: '待仓库确认', color: 'orange' },
-  14: { label: '待卖方确认', color: 'blue' },
-  15: { label: '待买方确认', color: 'blue' },
-  2: { label: '待签合同', color: 'cyan' },
-  3: { label: '待付款', color: 'gold' },
-  4: { label: '待确认收款', color: 'purple' },
-  5: { label: '待提货', color: 'geekblue' },
-  16: { label: '物流竞价中', color: 'processing' },
-  17: { label: '待确认物流', color: 'blue' },
-  18: { label: '运输中', color: 'cyan' },
-  6: { label: '已发货', color: 'cyan' },
-  7: { label: '已到货', color: 'green' },
-  19: { label: '已收货', color: 'green' },
-  8: { label: '已完成', color: 'success' },
-  20: { label: '已对账', color: 'success' },
-  21: { label: '已归档', color: 'default' },
-  22: { label: '融资审批中', color: 'purple' },
-  23: { label: '待签署融资合同', color: 'magenta' },
-  24: { label: '待重新选仓', color: 'volcano' },
-  25: { label: '待重新发起物流', color: 'volcano' },
-  26: { label: '待选择仓库', color: 'geekblue' },
-}
 
 const resourceStatusMap: Record<number, { label: string; color: string }> = {
   1: { label: '待审核', color: 'orange' },
@@ -103,12 +71,11 @@ const logisticsOrderStatusMap: Record<string, { label: string; color: string }> 
   cancelled: { label: '已取消', color: 'error' },
 }
 
-type TabKey = 'dashboard' | 'bidding' | 'logistics-orders' | 'resources' | 'all'
+type TabKey = 'dashboard' | 'bidding' | 'logistics-flow' | 'resources'
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
   const [biddingOrders, setBiddingOrders] = useState<OrderInfo[]>([])
-  const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
   const [logisticsOrders, setLogisticsOrders] = useState<LogisticsOrder[]>([])
   const [resources, setResources] = useState<LogisticsResource[]>([])
   const [resourceLoading, setResourceLoading] = useState(false)
@@ -123,17 +90,8 @@ function App() {
   const [quotePrice, setQuotePrice] = useState<number>(0)
   const [quoteDays, setQuoteDays] = useState<number>(3)
   const [quoteRemark, setQuoteRemark] = useState('')
-
-  // 履约相关状态
-  const [fulfillmentModal, setFulfillmentModal] = useState<{
-    visible: boolean
-    orderId: number | null
-    action: 'pickup' | 'deliver' | 'signature' | null
-  }>({ visible: false, orderId: null, action: null })
-  const [fulfillmentLoading, setFulfillmentLoading] = useState(false)
-  const [fulfillmentFileList, setFulfillmentFileList] = useState<UploadFile[]>([])
-  const [fulfillmentRemark, setFulfillmentRemark] = useState('')
   const [tokenReady, setTokenReady] = useState(false)
+  const [expandedLogisticsOrders, setExpandedLogisticsOrders] = useState<number[]>([])
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -147,7 +105,7 @@ function App() {
 
   const hasLogisticsSession = tokenReady && Boolean(getLogisticsToken())
 
-  const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
+  const showCompleted = (title: string, next: string, targetTab: TabKey = 'logistics-flow') => {
     Modal.success({
       title,
       content: (
@@ -169,18 +127,6 @@ function App() {
       setBiddingOrders(list || [])
     } catch {
       message.error('获取竞价订单失败')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchAll = async () => {
-    setLoading(true)
-    try {
-      const list = await logisticsOrderService.listAll()
-      setAllOrders(list || [])
-    } catch {
-      message.error('获取订单列表失败')
     } finally {
       setLoading(false)
     }
@@ -285,10 +231,8 @@ function App() {
       fetchBidding()
       fetchLogisticsOrders()
       fetchResources()
-      fetchAll()
     } else if (activeTab === 'bidding') fetchBidding()
-    else if (activeTab === 'all') fetchAll()
-    else if (activeTab === 'logistics-orders') fetchLogisticsOrders()
+    else if (activeTab === 'logistics-flow') fetchLogisticsOrders()
     else if (activeTab === 'resources') fetchResources()
   }, [activeTab, hasLogisticsSession, tokenReady])
 
@@ -317,104 +261,18 @@ function App() {
     }
   }
 
-  const handleAcceptOrder = async (id: number) => {
-    try {
-      await logisticsFulfillmentService.acceptOrder(id)
-      showCompleted('物流接单已完成', '下一步发车并更新运输状态。', 'logistics-orders')
-      fetchLogisticsOrders()
-    } catch {
-      message.error('接单失败')
-    }
-  }
-
   const handleUpdateOrderStatus = async (id: number, status: string) => {
     try {
       await logisticsFulfillmentService.updateOrderStatus(id, { status })
       showCompleted(
         '物流状态更新已完成',
         status === 'delivered' ? '等待买方确认收货。' : '继续推进运输履约。',
-        'logistics-orders'
+        'logistics-flow'
       )
       fetchLogisticsOrders()
     } catch {
       message.error('操作失败')
     }
-  }
-
-  const handleConfirmLogisticsQuote = async (orderId: number, quoteId: number) => {
-    try {
-      await logisticsOrderService.confirmLogisticsQuote(orderId, quoteId)
-      showCompleted('物流报价已确认', '请按约定时间到指定仓库提货。', 'all')
-      fetchAll()
-    } catch {
-      message.error('确认物流报价失败')
-    }
-  }
-
-  // 履约相关函数
-  const openFulfillmentModal = (orderId: number, action: 'pickup' | 'deliver' | 'signature') => {
-    setFulfillmentModal({ visible: true, orderId, action })
-    setFulfillmentFileList([])
-    setFulfillmentRemark('')
-  }
-
-  const handleFulfillmentSubmit = async () => {
-    if (fulfillmentModal.orderId === null || !fulfillmentModal.action) {
-      return
-    }
-    if (fulfillmentFileList.length === 0) {
-      message.warning('请上传凭证文件')
-      return
-    }
-    setFulfillmentLoading(true)
-    try {
-      const file =
-        fulfillmentFileList[0].originFileObj || (fulfillmentFileList[0] as unknown as File)
-      const purpose =
-        fulfillmentModal.action === 'pickup'
-          ? 'shipment_pickup'
-          : fulfillmentModal.action === 'deliver'
-            ? 'shipment_delivery'
-            : 'shipment_signature'
-      const uploadResult = await uploadService.upload(file as File, purpose)
-      await logisticsOrderService.shipmentProgress(
-        fulfillmentModal.orderId,
-        fulfillmentModal.action,
-        {
-          voucher_url: uploadResult.url,
-          remark: fulfillmentRemark,
-        }
-      )
-      const nextStep =
-        fulfillmentModal.action === 'pickup'
-          ? '继续运输并在送达时更新状态。'
-          : fulfillmentModal.action === 'deliver'
-            ? '等待买方确认收货。'
-            : '履约完成！'
-      showCompleted('运输状态更新已完成', nextStep, 'all')
-      setFulfillmentModal({ visible: false, orderId: null, action: null })
-      fetchAll()
-    } catch {
-      message.error('操作失败')
-    } finally {
-      setFulfillmentLoading(false)
-    }
-  }
-
-  const getShipmentStepInfo = (shipmentTask?: ShipmentTaskInfo) => {
-    if (!shipmentTask) {
-      return {
-        currentStep: 0,
-        steps: ['等待确认报价', '等待确认报价', '等待确认报价', '等待确认报价'],
-      }
-    }
-    const steps = ['待提货', '已提货', '已送达', '已签收']
-    let currentStep = 0
-    if (shipmentTask.status === 'pending_pickup') currentStep = 0
-    if (shipmentTask.status === 'picked_up') currentStep = 1
-    if (shipmentTask.status === 'delivered') currentStep = 2
-    if (shipmentTask.status === 'signed') currentStep = 3
-    return { currentStep, steps }
   }
 
   const biddingColumns: ColumnsType<OrderInfo> = [
@@ -473,255 +331,37 @@ function App() {
     },
   ]
 
-  const logisticsOrderColumns: ColumnsType<LogisticsOrder> = [
-    { title: '订单号', dataIndex: 'order_no', key: 'order_no', width: 160 },
-    { title: '起始', dataIndex: 'origin', key: 'origin', width: 120 },
-    { title: '目的地', dataIndex: 'destination', key: 'destination', width: 120 },
-    { title: '货物', dataIndex: 'cargo_name', key: 'cargo_name', width: 100 },
-    {
-      title: '重量',
-      dataIndex: 'weight',
-      key: 'weight',
-      width: 80,
-      render: (v: number) => `${v} 吨`,
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (v: string) => {
-        const meta = logisticsOrderStatusMap[v] || { label: v, color: 'default' }
-        return <Tag color={meta.color}>{meta.label}</Tag>
-      },
-    },
-    {
-      title: '责任主体',
-      dataIndex: 'current_responsible_party',
-      key: 'current_responsible_party',
-      width: 120,
-      render: (v?: string) => {
-        const labelMap: Record<string, string> = {
-          buyer: '买方',
-          warehouse: '仓储方',
-          logistics: '物流方',
-          seller: '卖方协同',
-          unknown: '待确认',
-        }
-        return labelMap[v || 'unknown'] || v || '-'
-      },
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 120,
-      render: (_: unknown, record: LogisticsOrder) => {
-        if (record.status === 'task_created' || record.status === 'pending') {
-          return (
-            <Button type="primary" size="small" onClick={() => handleAcceptOrder(record.id)}>
-              接单
-            </Button>
-          )
-        }
-        if (record.status === 'pickup_scheduled' || record.status === 'accepted') {
-          return (
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => handleUpdateOrderStatus(record.id, 'arrival_signed_in')}
-            >
-              签到
-            </Button>
-          )
-        }
-        if (record.status === 'arrival_signed_in') {
-          return (
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => handleUpdateOrderStatus(record.id, 'outbound_confirmed')}
-            >
-              出库确认
-            </Button>
-          )
-        }
-        if (record.status === 'outbound_confirmed') {
-          return (
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => handleUpdateOrderStatus(record.id, 'loading_confirmed')}
-            >
-              装货确认
-            </Button>
-          )
-        }
-        if (record.status === 'loading_confirmed') {
-          return (
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => handleUpdateOrderStatus(record.id, 'in_transit')}
-            >
-              发车
-            </Button>
-          )
-        }
-        if (record.status === 'in_transit') {
-          return (
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => handleUpdateOrderStatus(record.id, 'arrival_confirmed')}
-            >
-              到货确认
-            </Button>
-          )
-        }
-        if (record.status === 'arrival_confirmed') {
-          return (
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => handleUpdateOrderStatus(record.id, 'receipt_signed')}
-            >
-              签收确认
-            </Button>
-          )
-        }
-        if (record.status === 'receipt_signed') {
-          return (
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => handleUpdateOrderStatus(record.id, 'inbound_completed')}
-            >
-              入库完成
-            </Button>
-          )
-        }
-        if (record.status === 'inbound_completed') {
-          return (
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => handleUpdateOrderStatus(record.id, 'completed')}
-            >
-              履约完成
-            </Button>
-          )
-        }
-        return null
-      },
-    },
-  ]
-
-  const allOrderColumns: ColumnsType<OrderInfo> = [
-    { title: '订单号', dataIndex: 'order_no', key: 'order_no', width: 160 },
-    { title: '买方', dataIndex: 'buyer_name', key: 'buyer_name', width: 120 },
-    { title: '卖方', dataIndex: 'seller_name', key: 'seller_name', width: 120 },
-    {
-      title: '金额',
-      dataIndex: 'total_amount',
-      key: 'total_amount',
-      width: 100,
-      render: (v: number) => `¥${v?.toLocaleString()}`,
-    },
-    {
-      title: '订单状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (s: number) => {
-        const meta = statusMap[s] || { label: `状态${s}`, color: 'default' }
-        return <Tag color={meta.color}>{meta.label}</Tag>
-      },
-    },
-    {
-      title: '履约进度',
-      key: 'shipment_progress',
-      width: 200,
-      render: (_: unknown, record: OrderInfo) => {
-        if (!record.shipment_task) {
-          return <span className="text-gray-400">--</span>
-        }
-        const { currentStep, steps } = getShipmentStepInfo(record.shipment_task)
-        return (
-          <Steps current={currentStep} size="small" direction="vertical">
-            {steps.map((step, index) => (
-              <Steps.Step key={index} title={step} />
-            ))}
-          </Steps>
-        )
-      },
-    },
-    {
-      title: '物流操作',
-      key: 'logistics_action',
-      width: 150,
-      render: (_: unknown, record: OrderInfo) => {
-        if (record.status === 17 && record.logistics_bidding?.selected_quote_id) {
-          return (
-            <Button
-              type="primary"
-              size="small"
-              onClick={() =>
-                handleConfirmLogisticsQuote(record.id, record.logistics_bidding!.selected_quote_id!)
-              }
-            >
-              确认报价
-            </Button>
-          )
-        }
-        {
-          ;(record.status === 6 || record.status === 18 || record.status === 7) &&
-            record.shipment_task && (
-              <Space direction="vertical" size="small">
-                {record.shipment_task.status === 'pending_pickup' && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    icon={<CarOutlined />}
-                    onClick={() => openFulfillmentModal(record.id, 'pickup')}
-                  >
-                    确认提货
-                  </Button>
-                )}
-                {record.shipment_task.status === 'picked_up' && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    icon={<FileTextOutlined />}
-                    onClick={() => openFulfillmentModal(record.id, 'deliver')}
-                  >
-                    确认送达
-                  </Button>
-                )}
-                {record.shipment_task.status === 'delivered' && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    icon={<CheckCircleOutlined />}
-                    onClick={() => openFulfillmentModal(record.id, 'signature')}
-                  >
-                    上传签收
-                  </Button>
-                )}
-                {record.shipment_task.status === 'signed' && <Tag color="success">履约完成</Tag>}
-              </Space>
-            )
-        }
-        return null
-      },
-    },
-  ]
+  const getLogisticsStepInfo = (status: string) => {
+    const stepDefinitions = [
+      { key: 'task_created', title: '运输任务', owner: '系统', hint: '运输任务已创建' },
+      { key: 'pickup_scheduled', title: '提货预约', owner: '物流方', hint: '预约提货时间' },
+      { key: 'arrival_signed_in', title: '到场签到', owner: '物流方', hint: '车辆到达仓库签到' },
+      { key: 'outbound_confirmed', title: '出库确认', owner: '仓储方', hint: '仓库执行出库操作' },
+      { key: 'loading_confirmed', title: '装货确认', owner: '物流方', hint: '确认货物装载完毕' },
+      { key: 'in_transit', title: '运输中', owner: '物流方', hint: '货物在途运输' },
+      { key: 'arrival_confirmed', title: '到货确认', owner: '物流方', hint: '到达目的地确认' },
+      { key: 'receipt_signed', title: '验收签收', owner: '买方', hint: '买方验收并签收' },
+      { key: 'inbound_completed', title: '入库登记', owner: '仓储方', hint: '货物入库登记' },
+      { key: 'completed', title: '履约结束', owner: '系统', hint: '物流履约流程结束' },
+    ]
+    const statusOrder = ['task_created', 'pickup_scheduled', 'arrival_signed_in', 'outbound_confirmed', 'loading_confirmed', 'in_transit', 'arrival_confirmed', 'receipt_signed', 'inbound_completed', 'completed']
+    
+    let completedStep = statusOrder.indexOf(status)
+    if (completedStep === -1) {
+      if (status === 'pending') completedStep = 0
+      else if (status === 'accepted') completedStep = 1
+    }
+    
+    const currentStep = Math.min(completedStep + 1, stepDefinitions.length - 1)
+    
+    return { stepDefinitions, currentStep }
+  }
 
   const menuItems = [
     { key: 'dashboard' as TabKey, label: '工作台概览', icon: <RocketOutlined /> },
     { key: 'bidding' as TabKey, label: '物流竞价', icon: <DollarCircleOutlined /> },
-    { key: 'logistics-orders' as TabKey, label: '物流订单', icon: <CarOutlined /> },
+    { key: 'logistics-flow' as TabKey, label: '物流流程', icon: <CarOutlined /> },
     { key: 'resources' as TabKey, label: '运力资源管理', icon: <AppstoreOutlined /> },
-    { key: 'all' as TabKey, label: '全部订单', icon: <DatabaseOutlined /> },
   ]
 
   if (!hasLogisticsCapability()) {
@@ -840,11 +480,9 @@ function App() {
                   fetchBidding()
                   fetchLogisticsOrders()
                   fetchResources()
-                  fetchAll()
                 } else if (activeTab === 'bidding') fetchBidding()
-                else if (activeTab === 'logistics-orders') fetchLogisticsOrders()
+                else if (activeTab === 'logistics-flow') fetchLogisticsOrders()
                 else if (activeTab === 'resources') fetchResources()
-                else fetchAll()
               }}
             >
               刷新
@@ -881,9 +519,9 @@ function App() {
                 </Col>
                 <Col xs={24} sm={12} lg={6}>
                   <Card>
-                    <Typography.Text type="secondary">全部订单</Typography.Text>
+                    <Typography.Text type="secondary">物流订单</Typography.Text>
                     <br />
-                    <Title level={3}>{allOrders.length}</Title>
+                    <Title level={3}>{logisticsOrders.length}</Title>
                   </Card>
                 </Col>
               </Row>
@@ -949,9 +587,9 @@ function App() {
                       <Button
                         block
                         icon={<CarOutlined />}
-                        onClick={() => setActiveTab('logistics-orders')}
+                        onClick={() => setActiveTab('logistics-flow')}
                       >
-                        查看物流订单
+                        查看物流流程
                       </Button>
                       <Button
                         block
@@ -959,9 +597,6 @@ function App() {
                         onClick={() => setActiveTab('resources')}
                       >
                         管理运力资源
-                      </Button>
-                      <Button block icon={<DatabaseOutlined />} onClick={() => setActiveTab('all')}>
-                        查看全部订单
                       </Button>
                     </Space>
                   </Card>
@@ -1010,31 +645,112 @@ function App() {
             </>
           )}
 
-          {activeTab === 'logistics-orders' && (
-            <Card title="物流订单管理" extra={<Tag color="blue">物流履约</Tag>}>
+          {activeTab === 'logistics-flow' && (
+            <Card title="物流流程总览">
               <Spin spinning={loading}>
                 <Table
-                  columns={logisticsOrderColumns}
                   dataSource={logisticsOrders}
                   rowKey="id"
-                  pagination={false}
-                  scroll={{ x: 800 }}
-                  locale={{ emptyText: '暂无物流订单' }}
-                />
-              </Spin>
-            </Card>
-          )}
-
-          {activeTab === 'all' && (
-            <Card title="全部订单">
-              <Spin spinning={loading}>
-                <Table
-                  columns={allOrderColumns}
-                  dataSource={allOrders}
-                  rowKey="id"
                   pagination={{ pageSize: 10 }}
-                  scroll={{ x: 940 }}
-                  locale={{ emptyText: '暂无订单' }}
+                  expandable={{
+                    expandedRowKeys: expandedLogisticsOrders,
+                    onExpandedRowsChange: (keys) => setExpandedLogisticsOrders(keys as number[]),
+                    expandedRowRender: (record) => {
+                      const { currentStep, stepDefinitions } = getLogisticsStepInfo(record.status)
+                      return (
+                        <div style={{ padding: '16px 24px', background: '#fafafa' }}>
+                          <Steps
+                            current={currentStep}
+                            size="small"
+                            items={stepDefinitions.map((step, index) => ({
+                              title: index === currentStep ? `${step.title}中` : step.title,
+                              description: step.owner,
+                              status: index < currentStep ? 'finish' : index === currentStep ? 'process' : 'wait',
+                            }))}
+                          />
+                          <div style={{ marginTop: 16, display: 'flex', gap: 32, color: '#666' }}>
+                            <span>起始地：<strong style={{ color: '#333' }}>{record.origin}</strong></span>
+                            <span>目的地：<strong style={{ color: '#333' }}>{record.destination}</strong></span>
+                            <span>货物：<strong style={{ color: '#333' }}>{record.cargo_name}</strong></span>
+                            <span>重量：<strong style={{ color: '#333' }}>{record.weight}吨</strong></span>
+                          </div>
+                        </div>
+                      )
+                    },
+                  }}
+                  columns={[
+                    {
+                      title: '订单号',
+                      dataIndex: 'order_no',
+                      key: 'order_no',
+                      width: 160,
+                      render: (text: string) => <Text strong>{text}</Text>,
+                    },
+                    {
+                      title: '起始地',
+                      dataIndex: 'origin',
+                      key: 'origin',
+                      width: 120,
+                    },
+                    {
+                      title: '目的地',
+                      dataIndex: 'destination',
+                      key: 'destination',
+                      width: 120,
+                    },
+                    {
+                      title: '货物',
+                      dataIndex: 'cargo_name',
+                      key: 'cargo_name',
+                      width: 100,
+                    },
+                    {
+                      title: '物流状态',
+                      key: 'logistics_status',
+                      width: 120,
+                      render: (_: unknown, record: LogisticsOrder) => {
+                        const meta = logisticsOrderStatusMap[record.status] || { label: record.status, color: 'default' }
+                        return <Tag color={meta.color}>{meta.label}</Tag>
+                      },
+                    },
+                    {
+                      title: '当前节点',
+                      key: 'current_step',
+                      width: 140,
+                      render: (_: unknown, record: LogisticsOrder) => {
+                        const { currentStep, stepDefinitions } = getLogisticsStepInfo(record.status)
+                        const current = stepDefinitions[currentStep]
+                        return current ? `${currentStep + 1}. ${current.title}中` : '--'
+                      },
+                    },
+                    {
+                      title: '操作',
+                      key: 'action',
+                      width: 120,
+                      render: (_: unknown, record: LogisticsOrder) => {
+                        const getNextAction = (status: string) => {
+                          if (status === 'task_created' || status === 'pending') return { label: '接单', next: 'pickup_scheduled' }
+                          if (status === 'pickup_scheduled' || status === 'accepted') return { label: '签到', next: 'arrival_signed_in' }
+                          if (status === 'arrival_signed_in') return { label: '出库确认', next: 'outbound_confirmed' }
+                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed' }
+                          if (status === 'loading_confirmed') return { label: '发车', next: 'in_transit' }
+                          if (status === 'in_transit') return { label: '到货确认', next: 'arrival_confirmed' }
+                          if (status === 'arrival_confirmed') return { label: '签收确认', next: 'receipt_signed' }
+                          if (status === 'receipt_signed') return { label: '入库完成', next: 'inbound_completed' }
+                          if (status === 'inbound_completed') return { label: '履约完成', next: 'completed' }
+                          return null
+                        }
+                        const nextAction = getNextAction(record.status)
+                        if (!nextAction) return null
+                        return (
+                          <Button type="primary" size="small" onClick={() => handleUpdateOrderStatus(record.id, nextAction.next as any)}>
+                            {nextAction.label}
+                          </Button>
+                        )
+                      },
+                    },
+                  ]}
+                  locale={{ emptyText: '暂无物流订单' }}
                 />
               </Spin>
             </Card>
@@ -1301,46 +1017,6 @@ function App() {
                   value={quoteRemark}
                   onChange={(e) => setQuoteRemark(e.target.value)}
                   placeholder="备注信息"
-                />
-              </div>
-            </Space>
-          </Modal>
-
-          {/* 履约模态框 */}
-          <Modal
-            title={
-              fulfillmentModal.action === 'pickup'
-                ? '确认提货'
-                : fulfillmentModal.action === 'deliver'
-                  ? '确认送达'
-                  : '上传签收凭证'
-            }
-            open={fulfillmentModal.visible}
-            onOk={handleFulfillmentSubmit}
-            onCancel={() => setFulfillmentModal({ visible: false, orderId: null, action: null })}
-            okText="确认"
-            okButtonProps={{ loading: fulfillmentLoading }}
-            width={500}
-            destroyOnClose
-          >
-            <Space direction="vertical" style={{ width: '100%' }} size="middle">
-              <div>
-                <Text strong>请上传凭证文件：</Text>
-                <Upload
-                  fileList={fulfillmentFileList}
-                  onChange={(info) => setFulfillmentFileList(info.fileList)}
-                  beforeUpload={() => false}
-                  maxCount={1}
-                >
-                  <Button icon={<UploadOutlined />}>选择文件</Button>
-                </Upload>
-              </div>
-              <div>
-                <Text>备注（选填）：</Text>
-                <Input
-                  value={fulfillmentRemark}
-                  onChange={(e) => setFulfillmentRemark(e.target.value)}
-                  placeholder="添加备注信息"
                 />
               </div>
             </Space>
