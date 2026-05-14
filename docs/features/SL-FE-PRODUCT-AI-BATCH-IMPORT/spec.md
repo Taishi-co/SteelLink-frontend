@@ -30,6 +30,7 @@
 ## 接口与数据影响
 
 - 受影响页面:
+  - `/seller/products`
   - `apps/seller-app/src/pages/Products/index.tsx`
 - 受影响服务:
   - `apps/seller-app/src/services/productService.ts`
@@ -45,7 +46,7 @@
 
 ## 验收标准
 
-1. 商品管理页可打开 AI 批量导入弹窗。
+1. `/seller/products` 商品管理页可打开 AI 批量导入弹窗。
 2. 上传台账后展示识别行和置信度。
 3. 商家可以编辑识别结果并删除错误行。
 4. 点击确认添加后商品列表刷新。
