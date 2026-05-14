@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import SellerLayout from '@/components/Layout/SellerLayout'
 import { getSellerToken, getSellerUser, isIdentityVerified, hasEnterprise } from '@/services/auth'
@@ -45,31 +45,33 @@ function RouteFallback() {
   )
 }
 
+function lazyPage(element: ReactNode) {
+  return <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+}
+
 export function AppRouter() {
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<SellerLayout />}>
-            <Route index element={<Navigate to="/identity" replace />} />
-            <Route path="identity" element={<IdentityPage />} />
-            <Route path="enterprise" element={<EnterprisePage />} />
-            <Route element={<RequireIdentity />}>
-              <Route element={<RequireEnterprise />}>
-                <Route path="dashboard" element={<DashboardPage />} />
-                <Route path="products" element={<ProductsPage />} />
-                <Route path="warehouses" element={<WarehousesPage />} />
-                <Route path="bidding" element={<BiddingPage />} />
-                <Route path="orders" element={<OrdersPage />} />
-                <Route path="notifications" element={<NotificationsPage />} />
-                <Route path="fulfillment" element={<FulfillmentPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-              </Route>
+    <Routes>
+      <Route path="/login" element={lazyPage(<LoginPage />)} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/" element={<SellerLayout />}>
+          <Route index element={<Navigate to="/identity" replace />} />
+          <Route path="identity" element={lazyPage(<IdentityPage />)} />
+          <Route path="enterprise" element={lazyPage(<EnterprisePage />)} />
+          <Route element={<RequireIdentity />}>
+            <Route element={<RequireEnterprise />}>
+              <Route path="dashboard" element={lazyPage(<DashboardPage />)} />
+              <Route path="products" element={lazyPage(<ProductsPage />)} />
+              <Route path="warehouses" element={lazyPage(<WarehousesPage />)} />
+              <Route path="bidding" element={lazyPage(<BiddingPage />)} />
+              <Route path="orders" element={lazyPage(<OrdersPage />)} />
+              <Route path="notifications" element={lazyPage(<NotificationsPage />)} />
+              <Route path="fulfillment" element={lazyPage(<FulfillmentPage />)} />
+              <Route path="settings" element={lazyPage(<SettingsPage />)} />
             </Route>
           </Route>
         </Route>
-      </Routes>
-    </Suspense>
+      </Route>
+    </Routes>
   )
 }
