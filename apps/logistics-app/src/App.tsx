@@ -743,7 +743,7 @@ function App() {
                         const nextAction = getNextAction(record.status)
                         if (!nextAction) return null
                         return (
-                          <Button type="primary" size="small" onClick={() => handleUpdateOrderStatus(record.id, nextAction.next as any)}>
+                          <Button type="primary" size="small" onClick={() => handleUpdateOrderStatus(record.id, nextAction.next)}>
                             {nextAction.label}
                           </Button>
                         )

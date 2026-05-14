@@ -38,7 +38,13 @@ import { getErrorMessage } from '@steellink/shared/utils'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { useNavigate } from 'react-router-dom'
-import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
+import {
+  categoryService,
+  fallbackProductCategories,
+  type ProductCategory,
+  type ProductGrade,
+  type ProductSteelMill,
+} from '@/services/categoryService'
 import { sellerProductService, type SellerProductRecord } from '@/services/productService'
 import { uploadService, type UploadPurpose } from '@/services/uploadService'
 import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
@@ -52,11 +58,23 @@ type ProductStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'off
 interface ProductFormValues {
   name: string
   goodsType: 'spot' | 'futures'
+  categoryId?: number
+  gradeId?: number
+  steelMillId?: number
   category: string
   subCategory: string
   steelMill: string
   material: string
   spec: string
+  heightSpecType: 'thickness' | 'diameter' | 'height'
+  heightSpecValue?: number
+  heightSpecUnit: string
+  widthSpecType: 'width' | 'wall_thickness'
+  widthSpecValue?: number
+  widthSpecUnit: string
+  lengthType: 'custom' | 'coil' | 'fixed'
+  lengthValue?: number
+  lengthUnit: string
   warehouseBindingMode: 'platform' | 'manual' | 'unbound'
   platformWarehouseId?: number
   warehouseServiceId?: number
@@ -151,6 +169,37 @@ const summaryStatusItems: Array<{ key: ProductStatus; label: string }> = [
   { key: 'offline', label: '已下架' },
 ]
 
+const heightSpecOptions = [
+  { label: '厚度', value: 'thickness' },
+  { label: '直径', value: 'diameter' },
+  { label: '高度', value: 'height' },
+]
+
+const widthSpecOptions = [
+  { label: '宽度', value: 'width' },
+  { label: '壁厚', value: 'wall_thickness' },
+]
+
+const lengthTypeOptions = [
+  { label: '自定义长度', value: 'custom' },
+  { label: '卷', value: 'coil' },
+  { label: '定尺', value: 'fixed' },
+]
+
+const specTypeLabels: Record<string, string> = {
+  thickness: '厚度',
+  diameter: '直径',
+  height: '高度',
+  width: '宽度',
+  wall_thickness: '壁厚',
+}
+
+const lengthTypeLabels: Record<string, string> = {
+  custom: '自定义长度',
+  coil: '卷',
+  fixed: '定尺',
+}
+
 function normalizeUploadList(fileList?: string[]) {
   return (fileList ?? []).map((file, index) => ({
     uid: `${file}-${index}`,
@@ -162,6 +211,27 @@ function normalizeUploadList(fileList?: string[]) {
 
 function firstImageURL(product: SellerProductRecord) {
   return product.image_urls.find(Boolean)
+}
+
+function formatNumber(value?: number) {
+  if (!value) return ''
+  return Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 3 })
+}
+
+function formatStructuredSpec(product: SellerProductRecord) {
+  const parts: string[] = []
+  if (product.height_spec_value) {
+    parts.push(`${specTypeLabels[product.height_spec_type || 'thickness'] || '厚度'} ${formatNumber(product.height_spec_value)}${product.height_spec_unit || 'mm'}`)
+  }
+  if (product.width_spec_value) {
+    parts.push(`${specTypeLabels[product.width_spec_type || 'width'] || '宽度'} ${formatNumber(product.width_spec_value)}${product.width_spec_unit || 'mm'}`)
+  }
+  if (product.length_type) {
+    const lengthLabel = lengthTypeLabels[product.length_type] || product.length_type
+    const lengthValue = product.length_value ? ` ${formatNumber(product.length_value)}${product.length_unit || 'mm'}` : ''
+    parts.push(`${lengthLabel}${lengthValue}`)
+  }
+  return parts.length ? parts.join(' / ') : product.specs || '-'
 }
 
 async function resolveUploadedURLs(fileList: UploadFile[] = [], purpose: UploadPurpose) {
@@ -186,12 +256,27 @@ function toPayload(values: ProductFormValues, imageURLs: string[], qualification
   return {
     name: values.name,
     goods_type: values.goodsType || 'spot',
+    category_id: values.categoryId,
+    grade_id: values.gradeId,
+    steel_mill_id: values.steelMillId,
     category: values.category,
     sub_category: values.subCategory,
     steel_mill: values.steelMill,
     spec: {
       material: values.material,
       spec: values.spec,
+      thickness: values.heightSpecType === 'thickness' && values.heightSpecValue ? String(values.heightSpecValue) : undefined,
+      width: values.widthSpecType === 'width' && values.widthSpecValue ? String(values.widthSpecValue) : undefined,
+      length: values.lengthValue ? String(values.lengthValue) : undefined,
+      height_spec_type: values.heightSpecType,
+      height_spec_value: values.heightSpecValue,
+      height_spec_unit: values.heightSpecUnit || 'mm',
+      width_spec_type: values.widthSpecType,
+      width_spec_value: values.widthSpecValue,
+      width_spec_unit: values.widthSpecUnit || 'mm',
+      length_type: values.lengthType,
+      length_value: values.lengthValue,
+      length_unit: values.lengthUnit || 'mm',
     },
     warehouse_service_id: values.warehouseServiceId || undefined,
     warehouse_info: {
@@ -229,6 +314,8 @@ export default function ProductsPage() {
   const navigate = useNavigate()
   const [products, setProducts] = useState<SellerProductRecord[]>([])
   const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
+  const [grades, setGrades] = useState<ProductGrade[]>([])
+  const [steelMills, setSteelMills] = useState<ProductSteelMill[]>([])
   const [platformWarehouses, setPlatformWarehouses] = useState<WarehouseServiceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [warehouseLoading, setWarehouseLoading] = useState(false)
@@ -243,6 +330,7 @@ export default function ProductsPage() {
   const [displayProduct, setDisplayProduct] = useState<SellerProductRecord | null>(null)
   const [form] = Form.useForm<ProductFormValues>()
   const [displayForm] = Form.useForm<ProductDisplayFormValues>()
+  const selectedCategory = Form.useWatch('category', form)
 
   const loadProducts = async () => {
     setLoading(true)
@@ -280,8 +368,22 @@ export default function ProductsPage() {
 
   const loadCategories = async () => {
     try {
-      const response = await categoryService.list()
-      setCategories(response.data.length > 0 ? response.data : fallbackProductCategories)
+      const [categoryResponse, gradeResponse, steelMillResponse] = await Promise.allSettled([
+        categoryService.list(),
+        categoryService.listGrades(),
+        categoryService.listSteelMills(),
+      ])
+      if (categoryResponse.status === 'fulfilled') {
+        setCategories(categoryResponse.value.data.length > 0 ? categoryResponse.value.data : fallbackProductCategories)
+      } else {
+        setCategories(fallbackProductCategories)
+      }
+      if (gradeResponse.status === 'fulfilled') {
+        setGrades(gradeResponse.value.data)
+      }
+      if (steelMillResponse.status === 'fulfilled') {
+        setSteelMills(steelMillResponse.value.data)
+      }
     } catch {
       setCategories(fallbackProductCategories)
     }
@@ -314,7 +416,7 @@ export default function ProductsPage() {
       }
     })
     return [
-      { label: '全部品类', value: '全部' },
+      { label: '全部品种', value: '全部' },
       ...Array.from(categoryNames).map((name) => {
         const category = categories.find((item) => item.name === name)
         return {
@@ -330,8 +432,30 @@ export default function ProductsPage() {
       categories.map((category) => ({
         label: category.display_name || category.name,
         value: category.name,
+        id: category.id,
       })),
     [categories],
+  )
+
+  const gradeInputOptions = useMemo(() => {
+    const category = categories.find((item) => item.name === selectedCategory)
+    return grades
+      .filter((grade) => !category?.id || grade.category_id === category.id || grade.category_id === 0)
+      .map((grade) => ({
+        label: grade.display_name || grade.name,
+        value: grade.name,
+        id: grade.id,
+      }))
+  }, [categories, grades, selectedCategory])
+
+  const steelMillInputOptions = useMemo(
+    () =>
+      steelMills.map((mill) => ({
+        label: mill.display_name || mill.name,
+        value: mill.name,
+        id: mill.id,
+      })),
+    [steelMills],
   )
 
   const productSummary = useMemo(
@@ -359,6 +483,12 @@ export default function ProductsPage() {
     form.resetFields()
     form.setFieldsValue({
       goodsType: 'spot',
+      heightSpecType: 'thickness',
+      heightSpecUnit: 'mm',
+      widthSpecType: 'width',
+      widthSpecUnit: 'mm',
+      lengthType: 'coil',
+      lengthUnit: 'mm',
       warehouseBindingMode: 'platform',
       deliveryDays: 3,
       quoteValidity: 72,
@@ -374,11 +504,23 @@ export default function ProductsPage() {
     form.setFieldsValue({
       name: product.name,
       goodsType: product.goods_type,
+      categoryId: product.category_id,
+      gradeId: product.grade_id,
+      steelMillId: product.steel_mill_id,
       category: product.category,
       subCategory: product.sub_category,
       steelMill: product.steel_mill,
       material: product.material,
       spec: product.specs,
+      heightSpecType: (product.height_spec_type as ProductFormValues['heightSpecType']) || 'thickness',
+      heightSpecValue: product.height_spec_value,
+      heightSpecUnit: product.height_spec_unit || 'mm',
+      widthSpecType: (product.width_spec_type as ProductFormValues['widthSpecType']) || 'width',
+      widthSpecValue: product.width_spec_value,
+      widthSpecUnit: product.width_spec_unit || 'mm',
+      lengthType: (product.length_type as ProductFormValues['lengthType']) || 'coil',
+      lengthValue: product.length_value,
+      lengthUnit: product.length_unit || 'mm',
       warehouseBindingMode: product.warehouse_service_id ? 'platform' : 'manual',
       warehouseServiceId: product.warehouse_service_id,
       platformWarehouseId: product.warehouse_service_id,
@@ -414,6 +556,34 @@ export default function ProductsPage() {
       district: warehouse.district,
       address: warehouse.address,
     })
+  }
+
+  const handleCategorySelect = (_value: string, option: { id?: number }) => {
+    form.setFieldsValue({ categoryId: option.id, gradeId: undefined })
+  }
+
+  const handleCategoryChange = (value: string) => {
+    const matched = categories.find((item) => item.name === value)
+    form.setFieldsValue({ categoryId: matched?.id, gradeId: undefined })
+  }
+
+  const handleGradeSelect = (_value: string, option: { id?: number }) => {
+    form.setFieldsValue({ gradeId: option.id })
+  }
+
+  const handleGradeChange = (value: string) => {
+    const category = categories.find((item) => item.name === form.getFieldValue('category'))
+    const matched = grades.find((item) => item.name === value && (!category?.id || item.category_id === category.id || item.category_id === 0))
+    form.setFieldsValue({ gradeId: matched?.id })
+  }
+
+  const handleSteelMillSelect = (_value: string, option: { id?: number }) => {
+    form.setFieldsValue({ steelMillId: option.id })
+  }
+
+  const handleSteelMillChange = (value: string) => {
+    const matched = steelMills.find((item) => item.name === value)
+    form.setFieldsValue({ steelMillId: matched?.id })
   }
 
   const closeModal = () => {
@@ -538,18 +708,39 @@ export default function ProductsPage() {
       ),
     },
     {
-      title: '品类',
+      title: '品种/牌号',
       dataIndex: 'category',
       key: 'category',
-      width: 110,
-      render: (value) => <Tag color="blue">{value}</Tag>,
+      width: 180,
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <Tag color="blue">{record.sub_category || record.category}</Tag>
+          <Text type="secondary" className="text-xs">{record.material || '-'}</Text>
+        </Space>
+      ),
     },
     {
-      title: '规格/品牌',
+      title: '规格',
       dataIndex: 'specs',
       key: 'specs',
-      width: 140,
-      ellipsis: true,
+      width: 220,
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <Text>{formatStructuredSpec(record)}</Text>
+          {record.specs ? <Text type="secondary" className="text-xs">原始：{record.specs}</Text> : null}
+        </Space>
+      ),
+    },
+    {
+      title: '产地/存放地',
+      key: 'origin_warehouse',
+      width: 220,
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <Text>{record.steel_mill || '-'}</Text>
+          <Text type="secondary" className="text-xs">{record.warehouse_name || record.city || '-'}</Text>
+        </Space>
+      ),
     },
     {
       title: '单价',
@@ -750,7 +941,7 @@ export default function ProductsPage() {
             dataSource={filteredProducts}
             rowKey="id"
             size="middle"
-            scroll={{ x: 1600 }}
+            scroll={{ x: 1800 }}
             pagination={{ pageSize: 10, showSizeChanger: false }}
           />
         </Spin>
@@ -761,7 +952,7 @@ export default function ProductsPage() {
         open={isModalOpen}
         onOk={() => void handleSubmitForReview()}
         onCancel={closeModal}
-        width={720}
+        width={860}
         okText={editingProduct ? '保存并提交审核' : '提交审核'}
         confirmLoading={submitting}
       >
@@ -781,10 +972,21 @@ export default function ProductsPage() {
               ]}
             />
           </Form.Item>
-          <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择或输入品类' }]}>
+          <Form.Item name="categoryId" hidden>
+            <Input type="hidden" />
+          </Form.Item>
+          <Form.Item name="gradeId" hidden>
+            <Input type="hidden" />
+          </Form.Item>
+          <Form.Item name="steelMillId" hidden>
+            <Input type="hidden" />
+          </Form.Item>
+          <Form.Item name="category" label="品种" rules={[{ required: true, message: '请选择或输入品种' }]}>
             <AutoComplete
               options={categoryInputOptions}
-              placeholder="请选择品类，不存在时可直接输入新业务品类"
+              placeholder="请选择品种，不存在时可直接输入新业务品种"
+              onSelect={handleCategorySelect}
+              onChange={handleCategoryChange}
               filterOption={(inputValue, option) =>
                 String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
                 String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
@@ -792,24 +994,82 @@ export default function ProductsPage() {
             />
           </Form.Item>
           <Space className="w-full" size="large" wrap>
-            <Form.Item name="subCategory" label="子品类" rules={[{ required: true, message: '请输入子品类' }]}>
-              <Input placeholder="例如：低合金卷 / 普卷" className="w-60" />
+            <Form.Item name="subCategory" label="细分品种" rules={[{ required: true, message: '请输入细分品种' }]}>
+              <Input placeholder="例如：热轧板卷 / 冷轧板卷" className="w-60" />
             </Form.Item>
-            <Form.Item name="steelMill" label="钢厂" rules={[{ required: true, message: '请输入钢厂' }]}>
-              <Input placeholder="例如：宝钢 / 首钢 / 鞍钢" className="w-60" />
+            <Form.Item name="steelMill" label="产地/钢厂" rules={[{ required: true, message: '请输入产地或钢厂' }]}>
+              <AutoComplete
+                className="w-60"
+                options={steelMillInputOptions}
+                placeholder="例如：宝钢 / 首钢 / 鞍钢"
+                onSelect={handleSteelMillSelect}
+                onChange={handleSteelMillChange}
+                filterOption={(inputValue, option) =>
+                  String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
+                  String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
+                }
+              />
             </Form.Item>
           </Space>
           <Space className="w-full" size="large" wrap>
-            <Form.Item name="material" label="材质" rules={[{ required: true, message: '请输入材质' }]}>
-              <Input placeholder="例如：Q235B" className="w-60" />
+            <Form.Item name="material" label="牌号" rules={[{ required: true, message: '请输入牌号' }]}>
+              <AutoComplete
+                className="w-60"
+                options={gradeInputOptions}
+                placeholder="例如：Q235B / Q355B / SPHC"
+                onSelect={handleGradeSelect}
+                onChange={handleGradeChange}
+                filterOption={(inputValue, option) =>
+                  String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
+                  String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
+                }
+              />
             </Form.Item>
-            <Form.Item name="spec" label="规格" rules={[{ required: true, message: '请输入规格' }]}>
+            <Form.Item name="spec" label="原始规格" rules={[{ required: true, message: '请输入原始规格' }]}>
               <Input placeholder="例如：3.0*1500*C" className="w-60" />
+            </Form.Item>
+          </Space>
+          <Alert
+            className="mb-4"
+            type="info"
+            showIcon
+            message="规格已拆分为可检索字段"
+            description="卷材可选择长度为“卷”，定尺板建议填写具体长度；后续台账和截图识别也会落到这些字段后再让商家确认。"
+          />
+          <Space className="w-full" size="large" wrap>
+            <Form.Item name="heightSpecType" label="厚度/直径/高度" rules={[{ required: true, message: '请选择规格维度' }]}>
+              <Select className="w-36" options={heightSpecOptions} />
+            </Form.Item>
+            <Form.Item name="heightSpecValue" label="数值">
+              <InputNumber min={0} precision={3} className="w-32" placeholder="例如 3.0" />
+            </Form.Item>
+            <Form.Item name="heightSpecUnit" label="单位">
+              <Input className="w-24" placeholder="mm" />
+            </Form.Item>
+            <Form.Item name="widthSpecType" label="宽度/壁厚" rules={[{ required: true, message: '请选择规格维度' }]}>
+              <Select className="w-36" options={widthSpecOptions} />
+            </Form.Item>
+            <Form.Item name="widthSpecValue" label="数值">
+              <InputNumber min={0} precision={3} className="w-32" placeholder="例如 1500" />
+            </Form.Item>
+            <Form.Item name="widthSpecUnit" label="单位">
+              <Input className="w-24" placeholder="mm" />
+            </Form.Item>
+          </Space>
+          <Space className="w-full" size="large" wrap>
+            <Form.Item name="lengthType" label="长度类型" rules={[{ required: true, message: '请选择长度类型' }]}>
+              <Select className="w-40" options={lengthTypeOptions} />
+            </Form.Item>
+            <Form.Item name="lengthValue" label="长度">
+              <InputNumber min={0} precision={3} className="w-40" placeholder="卷材可不填" />
+            </Form.Item>
+            <Form.Item name="lengthUnit" label="单位">
+              <Input className="w-24" placeholder="mm" />
             </Form.Item>
           </Space>
           <Space className="w-full" size="large" wrap>
             <Form.Item name="bundleNo" label="捆包号" rules={[{ required: true, message: '请输入捆包号' }]}>
-              <Input placeholder="请输入唯一捆包号" className="w-60" />
+              <Input placeholder="请输入捆包号，可与其他商品重复" className="w-60" />
             </Form.Item>
             <Form.Item name="minOrderQty" label="最小起订量（吨）" rules={[{ required: true, message: '请输入最小起订量' }]}>
               <InputNumber min={0.01} className="w-60" placeholder="请输入最小起订量" />
@@ -967,8 +1227,11 @@ export default function ProductsPage() {
             <Descriptions bordered column={1} size="small">
               <Descriptions.Item label="商品名称">{displayProduct.name}</Descriptions.Item>
               <Descriptions.Item label="捆包号">{displayProduct.bundle_no}</Descriptions.Item>
-              <Descriptions.Item label="规格/材质">
-                {displayProduct.specs || '-'} / {displayProduct.material || '-'}
+              <Descriptions.Item label="品种/牌号">
+                {displayProduct.sub_category || displayProduct.category || '-'} / {displayProduct.material || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="规格">
+                {formatStructuredSpec(displayProduct)}
               </Descriptions.Item>
               <Descriptions.Item label="库存/单价">
                 {displayProduct.stock} 吨 / ¥{displayProduct.price}/吨
@@ -1053,11 +1316,12 @@ export default function ProductsPage() {
               <Descriptions.Item label="货品类型">
                 <Tag color={goodsTypeMeta[drawerProduct.goods_type].color}>{goodsTypeMeta[drawerProduct.goods_type].text}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="主品类">{drawerProduct.category || '-'}</Descriptions.Item>
-              <Descriptions.Item label="子品类">{drawerProduct.sub_category || '-'}</Descriptions.Item>
-              <Descriptions.Item label="钢厂">{drawerProduct.steel_mill || '-'}</Descriptions.Item>
-              <Descriptions.Item label="材质">{drawerProduct.material || '-'}</Descriptions.Item>
-              <Descriptions.Item label="规格">{drawerProduct.specs || '-'}</Descriptions.Item>
+              <Descriptions.Item label="品种大类">{drawerProduct.category || '-'}</Descriptions.Item>
+              <Descriptions.Item label="细分品种">{drawerProduct.sub_category || '-'}</Descriptions.Item>
+              <Descriptions.Item label="产地/钢厂">{drawerProduct.steel_mill || '-'}</Descriptions.Item>
+              <Descriptions.Item label="牌号">{drawerProduct.material || '-'}</Descriptions.Item>
+              <Descriptions.Item label="规格">{formatStructuredSpec(drawerProduct)}</Descriptions.Item>
+              <Descriptions.Item label="原始规格">{drawerProduct.specs || '-'}</Descriptions.Item>
               <Descriptions.Item label="捆包号">{drawerProduct.bundle_no || '-'}</Descriptions.Item>
               <Descriptions.Item label="最小起订量">{drawerProduct.min_order_qty ? `${drawerProduct.min_order_qty} 吨` : '-'}</Descriptions.Item>
               <Descriptions.Item label="绑定仓储资源">
