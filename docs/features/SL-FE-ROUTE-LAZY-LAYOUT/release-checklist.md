@@ -14,7 +14,8 @@
 - [x] `pnpm --filter @steellink/seller-app build` 已通过
 - [x] 已确认环境变量、CI 或跨仓依赖: 本次无环境变量、CI 或跨仓依赖变化
 - [x] 已确认 smoke test 范围: buyer-app 与 seller-app 的后台页面切换
-- [ ] GitHub PR 创建后，已执行 `./harness/lark-pr-doc.sh docs/features/SL-FE-ROUTE-LAZY-LAYOUT --pr-url <github-pr-url> --pr-title "<pr-title>"` 并写入共享飞书 PR 记录
+- [x] GitHub PR 创建后，已执行 `./harness/lark-pr-doc.sh docs/features/SL-FE-ROUTE-LAZY-LAYOUT --pr-url https://github.com/Taishi-co/SteelLink-frontend/pull/92 --pr-title "[codex] fix route lazy layout fallback"` 并写入共享飞书 PR 记录
+- [x] 飞书 PR 文档: https://www.feishu.cn/wiki/CuWzwGARji8uDPk8JdycAqGInFf
 
 ## 回滚信息
 
