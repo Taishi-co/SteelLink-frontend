@@ -45,7 +45,7 @@ import type {
   WarehouseResource,
   WarehouseResourcePayload,
 } from '@/services/warehouseResourceService'
-import { hasWarehouseCapability, saveWarehouseToken, getWarehouseToken } from '@/services/auth'
+import { hasWarehouseCapability, saveWarehouseToken } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography

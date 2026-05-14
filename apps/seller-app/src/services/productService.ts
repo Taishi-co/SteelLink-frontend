@@ -21,11 +21,23 @@ export interface SellerProductRecord {
   seller_uid: string
   seller_name: string
   name: string
+  category_id?: number
+  grade_id?: number
+  steel_mill_id?: number
   category: string
   sub_category: string
   steel_mill: string
   specs: string
   material: string
+  height_spec_type?: string
+  height_spec_value?: number
+  height_spec_unit?: string
+  width_spec_type?: string
+  width_spec_value?: number
+  width_spec_unit?: string
+  length_type?: string
+  length_value?: number
+  length_unit?: string
   warehouse_name: string
   warehouse_code: string
   warehouse_service_id?: number
@@ -76,13 +88,38 @@ interface BackendProductInfo {
   product_no: string
   name: string
   goods_type?: 'spot' | 'futures'
+  category_id?: number
+  grade_id?: number
+  steel_mill_id?: number
   category: string
   sub_category: string
   steel_mill: string
   spec: {
     material: string
     spec: string
+    thickness?: string
+    width?: string
+    length?: string
+    height_spec_type?: string
+    height_spec_value?: number
+    height_spec_unit?: string
+    width_spec_type?: string
+    width_spec_value?: number
+    width_spec_unit?: string
+    length_type?: string
+    length_value?: number
+    length_unit?: string
   }
+  spec_raw?: string
+  height_spec_type?: string
+  height_spec_value?: number
+  height_spec_unit?: string
+  width_spec_type?: string
+  width_spec_value?: number
+  width_spec_unit?: string
+  length_type?: string
+  length_value?: number
+  length_unit?: string
   warehouse_info: {
     warehouse_service_id?: number
     warehouse_enterprise_id?: number
@@ -123,12 +160,27 @@ interface BackendProductListResponse {
 export interface UpsertProductPayload {
   name: string
   goods_type?: 'spot' | 'futures'
+  category_id?: number
+  grade_id?: number
+  steel_mill_id?: number
   category: string
   sub_category: string
   steel_mill: string
   spec: {
     material: string
     spec: string
+    thickness?: string
+    width?: string
+    length?: string
+    height_spec_type?: string
+    height_spec_value?: number
+    height_spec_unit?: string
+    width_spec_type?: string
+    width_spec_value?: number
+    width_spec_unit?: string
+    length_type?: string
+    length_value?: number
+    length_unit?: string
   }
   warehouse_service_id?: number
   warehouse_info: {
@@ -186,11 +238,23 @@ function toSellerProductRecord(product: BackendProductInfo): SellerProductRecord
     seller_uid: String(product.enterprise_id),
     seller_name: `企业 ${product.enterprise_id}`,
     name: product.name,
+    category_id: product.category_id,
+    grade_id: product.grade_id,
+    steel_mill_id: product.steel_mill_id,
     category: product.category,
     sub_category: product.sub_category,
     steel_mill: product.steel_mill,
-    specs: product.spec?.spec || '',
+    specs: product.spec?.spec || product.spec_raw || '',
     material: product.spec?.material || '',
+    height_spec_type: product.spec?.height_spec_type || product.height_spec_type,
+    height_spec_value: product.spec?.height_spec_value || product.height_spec_value,
+    height_spec_unit: product.spec?.height_spec_unit || product.height_spec_unit,
+    width_spec_type: product.spec?.width_spec_type || product.width_spec_type,
+    width_spec_value: product.spec?.width_spec_value || product.width_spec_value,
+    width_spec_unit: product.spec?.width_spec_unit || product.width_spec_unit,
+    length_type: product.spec?.length_type || product.length_type,
+    length_value: product.spec?.length_value || product.length_value,
+    length_unit: product.spec?.length_unit || product.length_unit,
     warehouse_name: product.warehouse_info?.warehouse_name || '',
     warehouse_code: product.warehouse_info?.warehouse_code || '',
     warehouse_service_id: product.warehouse_service_id || product.warehouse_info?.warehouse_service_id,
