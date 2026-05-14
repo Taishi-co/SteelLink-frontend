@@ -55,13 +55,17 @@ export interface OrderInfo {
     requirement?: string
     quotes?: LogisticsQuote[]
     selected_quote_id?: number
+    responder_confirmed?: boolean
   }
+  logistics_quotes?: LogisticsQuote[]
+  logistics_contract?: LogisticsContractInfo
   shipment_task?: ShipmentTaskInfo
 }
 
 export interface LogisticsQuote {
   id: number
   logistics_service_id: number
+  logistics_enterprise_id: number
   order_id: number
   price: number
   estimated_days: number
@@ -95,6 +99,29 @@ export interface LogisticsOrder {
   created_at: string
 }
 
+export interface LogisticsContractInfo {
+  id: number
+  contract_no: string
+  order_id: number
+  bidding_id: number
+  quote_id: number
+  buyer_enterprise_id: number
+  logistics_enterprise_id: number
+  seller_enterprise_id: number
+  contract_url: string
+  freight_amount: number
+  commission_rate: number
+  pickup_warehouse_id: number
+  pickup_warehouse_name: string
+  destination_address: string
+  is_financing_order: boolean
+  status: string
+  buyer_signed_at?: string
+  logistics_signed_at?: string
+  completed_at?: string
+  created_at: string
+}
+
 export interface EstimateResult {
   logistics_service_id: number
   origin: string
@@ -108,7 +135,7 @@ export interface EstimateResult {
 export const logisticsOrderService = {
   async listBidding() {
     const response = await api.get<unknown, ApiResponse<{ list: OrderInfo[] }>>(
-      '/orders?status=16&role=logistics'
+      '/orders?role=logistics&bidding=true'
     )
     return response.data.list
   },
@@ -154,6 +181,14 @@ export const logisticsOrderService = {
     const response = await api.post<unknown, ApiResponse<OrderInfo>>(
       `/orders/${orderId}/logistics-confirm`,
       { quote_id: quoteId }
+    )
+    return response.data
+  },
+
+  async signLogisticsContract(orderId: number, payload?: { contract_url?: string }) {
+    const response = await api.post<unknown, ApiResponse<OrderInfo>>(
+      `/orders/${orderId}/logistics-sign`,
+      payload || {}
     )
     return response.data
   },

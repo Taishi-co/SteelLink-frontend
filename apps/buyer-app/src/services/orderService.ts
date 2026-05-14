@@ -92,6 +92,7 @@ export interface OrderInfo {
   shipment_task?: ShipmentTaskInfo
   logistics_bidding?: LogisticsBiddingInfo
   logistics_quotes?: LogisticsQuoteInfo[]
+  logistics_contract?: LogisticsContractInfo
   remark?: Record<string, unknown>
   financing_info?: FinancingRequestInfo
 }
@@ -119,6 +120,10 @@ export interface LogisticsBiddingInfo {
   order_no: string
   status: string
   freight_payer: string
+  initiator_enterprise_id: number
+  initiator_role: string
+  responder_enterprise_id: number
+  responder_confirmed: boolean
   selected_quote_id: number
   created_at: string
   updated_at: string
@@ -147,6 +152,29 @@ export interface VoucherEvidence {
   captured_at?: string
   gps_latitude?: number
   gps_longitude?: number
+}
+
+export interface LogisticsContractInfo {
+  id: number
+  contract_no: string
+  order_id: number
+  bidding_id: number
+  quote_id: number
+  buyer_enterprise_id: number
+  logistics_enterprise_id: number
+  seller_enterprise_id: number
+  contract_url: string
+  freight_amount: number
+  commission_rate: number
+  pickup_warehouse_id: number
+  pickup_warehouse_name: string
+  destination_address: string
+  is_financing_order: boolean
+  status: string
+  buyer_signed_at?: string
+  logistics_signed_at?: string
+  completed_at?: string
+  created_at: string
 }
 
 export interface OrderTimelineItem {
@@ -295,6 +323,12 @@ export const orderService = {
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/financing-requests/debt-sign`, payload).then((response) => response.data),
   confirmLogisticsQuote: (id: number, payload: { quote_id: number }) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/logistics-confirm`, payload).then((response) => response.data),
+  respondConfirmLogistics: (id: number) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/logistics-quotes/respond-confirm`, {}).then((response) => response.data),
+  selectLogisticsQuote: (id: number, payload: { quote_id: number }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/logistics-quotes/select`, payload).then((response) => response.data),
+  initiatorSignLogisticsContract: (id: number, payload?: { contract_url?: string }) =>
+    api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/logistics-contracts/initiator-sign`, payload || {}).then((response) => response.data),
   buyerSignLogisticsContract: (id: number, payload?: { contract_url?: string }) =>
     api.post<ApiResponse<OrderInfo>, ApiResponse<OrderInfo>>(`/orders/${id}/logistics-contracts/buyer-sign`, payload || {}).then((response) => response.data),
   listLogisticsQuotes: async (id: number) => {

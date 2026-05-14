@@ -34,6 +34,7 @@ import {
   AppstoreOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
 import { logisticsOrderService, logisticsFulfillmentService } from '@/services/orderService'
 import type { OrderInfo, LogisticsOrder } from '@/services/orderService'
@@ -275,6 +276,28 @@ function App() {
     }
   }
 
+  const handleConfirmLogisticsQuote = async (orderId: number, quoteId: number) => {
+    try {
+      await logisticsOrderService.confirmLogisticsQuote(orderId, quoteId)
+      message.success('接单成功，请签署物流合同')
+      fetchBidding()
+      fetchLogisticsOrders()
+    } catch {
+      message.error('接单失败')
+    }
+  }
+
+  const handleSignLogisticsContract = async (orderId: number) => {
+    try {
+      await logisticsOrderService.signLogisticsContract(orderId)
+      message.success('签署物流合同成功')
+      fetchBidding()
+      fetchLogisticsOrders()
+    } catch {
+      message.error('签署物流合同失败')
+    }
+  }
+
   const biddingColumns: ColumnsType<OrderInfo> = [
     { title: '订单号', dataIndex: 'order_no', key: 'order_no', width: 160 },
     { title: '卖方', dataIndex: 'seller_name', key: 'seller_name', width: 120 },
@@ -317,17 +340,59 @@ function App() {
     {
       title: '操作',
       key: 'action',
-      width: 100,
-      render: (_: unknown, record: OrderInfo) => (
-        <Button
-          type="primary"
-          size="small"
-          icon={<DollarCircleOutlined />}
-          onClick={() => setQuoteModal({ visible: true, orderId: record.id })}
-        >
-          报价
-        </Button>
-      ),
+      width: 120,
+      render: (_: unknown, record: OrderInfo) => {
+        const bidding = record.logistics_bidding
+        const isPendingConfirm = record.status === 17 && bidding?.responder_confirmed && bidding?.selected_quote_id && bidding.selected_quote_id > 0
+        const isPendingSignContract = record.status === 27 && record.logistics_contract && record.logistics_contract.status === 'buyer_signed'
+
+        if (isPendingSignContract) {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              icon={<FileTextOutlined />}
+              onClick={() => handleSignLogisticsContract(record.id)}
+            >
+              签署物流合同
+            </Button>
+          )
+        }
+        if (isPendingConfirm) {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              icon={<CheckCircleOutlined />}
+              onClick={() => {
+                if (bidding.selected_quote_id) {
+                  handleConfirmLogisticsQuote(record.id, bidding.selected_quote_id)
+                }
+              }}
+            >
+              接单
+            </Button>
+          )
+        }
+        if (record.status >= 18 || (record.logistics_contract && record.logistics_contract.status === 'completed')) {
+          return (
+            <span className="text-green-600">
+              <CheckCircleOutlined className="mr-1" />
+              已签署
+            </span>
+          )
+        }
+        return (
+          <Button
+            type="primary"
+            size="small"
+            icon={<DollarCircleOutlined />}
+            onClick={() => setQuoteModal({ visible: true, orderId: record.id })}
+          >
+            报价
+          </Button>
+        )
+      },
     },
   ]
 
@@ -359,7 +424,7 @@ function App() {
 
   const menuItems = [
     { key: 'dashboard' as TabKey, label: '工作台概览', icon: <RocketOutlined /> },
-    { key: 'bidding' as TabKey, label: '物流竞价', icon: <DollarCircleOutlined /> },
+    { key: 'bidding' as TabKey, label: '竞价与接单', icon: <DollarCircleOutlined /> },
     { key: 'logistics-flow' as TabKey, label: '物流流程', icon: <CarOutlined /> },
     { key: 'resources' as TabKey, label: '运力资源管理', icon: <AppstoreOutlined /> },
   ]
@@ -498,7 +563,7 @@ function App() {
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
                 <Col xs={24} sm={12} lg={6}>
                   <Card>
-                    <Typography.Text type="secondary">待报价竞价</Typography.Text>
+                    <Typography.Text type="secondary">待处理订单</Typography.Text>
                     <br />
                     <Title level={3}>{biddingOrders.length}</Title>
                   </Card>
@@ -531,8 +596,8 @@ function App() {
                     <List
                       dataSource={[
                         {
-                          title: '待报价物流竞价',
-                          description: `${biddingOrders.length} 单等待报价`,
+                          title: '待处理竞价与接单',
+                          description: `${biddingOrders.length} 单待处理`,
                           icon: <DollarCircleOutlined />,
                           tab: 'bidding' as TabKey,
                         },
@@ -582,7 +647,7 @@ function App() {
                         icon={<DollarCircleOutlined />}
                         onClick={() => setActiveTab('bidding')}
                       >
-                        进入物流竞价
+                        进入竞价与接单
                       </Button>
                       <Button
                         block
@@ -610,7 +675,7 @@ function App() {
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
                 <Col xs={24} sm={8}>
                   <Card>
-                    <Typography.Text type="secondary">待报价订单</Typography.Text>
+                    <Typography.Text type="secondary">待处理订单</Typography.Text>
                     <br />
                     <Title level={3}>{biddingOrders.length}</Title>
                   </Card>
@@ -630,7 +695,7 @@ function App() {
                   </Card>
                 </Col>
               </Row>
-              <Card title="物流竞价订单" extra={<Tag color="processing">状态 15</Tag>}>
+              <Card title="竞价与接单列表" extra={<Tag color="processing">状态 15/16</Tag>}>
                 <Spin spinning={loading}>
                   <Table
                     columns={biddingColumns}
@@ -735,13 +800,16 @@ function App() {
                           if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed' }
                           if (status === 'loading_confirmed') return { label: '发车', next: 'in_transit' }
                           if (status === 'in_transit') return { label: '到货确认', next: 'arrival_confirmed' }
-                          if (status === 'arrival_confirmed') return { label: '签收确认', next: 'receipt_signed' }
+                          if (status === 'arrival_confirmed') return { label: '等待买方验货签收', next: 'receipt_signed', buyerAction: true }
                           if (status === 'receipt_signed') return { label: '入库完成', next: 'inbound_completed' }
                           if (status === 'inbound_completed') return { label: '履约完成', next: 'completed' }
                           return null
                         }
                         const nextAction = getNextAction(record.status)
                         if (!nextAction) return null
+                        if (nextAction.buyerAction) {
+                          return <Tag color="blue">等待买方签收</Tag>
+                        }
                         return (
                           <Button type="primary" size="small" onClick={() => handleUpdateOrderStatus(record.id, nextAction.next as any)}>
                             {nextAction.label}

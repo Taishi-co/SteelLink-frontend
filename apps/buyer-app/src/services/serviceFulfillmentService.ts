@@ -202,4 +202,9 @@ export const serviceFulfillmentService = {
     api.post<unknown, ApiResponse<GuaranteeInfo>>('/fulfillment-guarantees', payload),
   getOrderFulfillment: (orderId: number) =>
     api.get<unknown, ApiResponse<FulfillmentSummary>>(`/orders/${orderId}/service-fulfillment`),
+  updateLogisticsOrderStatus: (logisticsOrderId: number, status: string, remark?: string) =>
+    api.put<unknown, ApiResponse<LogisticsOrderInfo>>(`/logistics/orders/${logisticsOrderId}/status`, {
+      status,
+      remark,
+    }),
 }
