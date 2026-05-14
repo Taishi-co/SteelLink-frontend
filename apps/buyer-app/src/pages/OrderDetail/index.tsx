@@ -480,11 +480,18 @@ function getStatusNotice(
   if (status === 19) {
     return {
       type: 'success' as const,
-      title: '当前状态：对账已完成',
+      title: '当前状态：已收货',
+      message: '下一步：等待卖方对账确认。',
+    }
+  }
+  if (status === 20) {
+    return {
+      type: 'success' as const,
+      title: '当前状态：已对账',
       message: '下一步：等待归档。',
     }
   }
-  if (status === 8 || status === 20) {
+  if (status === 8 || status === 21) {
     return {
       type: 'success' as const,
       title: '当前状态：交易闭环已完成',
@@ -813,6 +820,22 @@ export default function OrderDetailPage() {
       message.error(getErrorMessage(error, '确认收货失败'))
     } finally {
       setConfirmingReceipt(false)
+    }
+  }
+
+  const handleInspectionSign = async () => {
+    if (!logisticsOrder) {
+      message.error('物流订单不存在')
+      return
+    }
+    try {
+      await serviceFulfillmentService.updateLogisticsOrderStatus(logisticsOrder.id, 'receipt_signed')
+      message.success('验货签收已完成')
+      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+      await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+      await queryClient.invalidateQueries({ queryKey: ['order-service-fulfillment', id] })
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '验货签收失败'))
     }
   }
 
@@ -1627,38 +1650,74 @@ export default function OrderDetailPage() {
                     查看物流报价
                   </Button>
                 )}
-                {order.status === 17 && (
-                  <Button
-                    type="primary"
-                    onClick={() => {
-                      setLogisticsModalOpen(true)
-                      setSelectedQuoteId(null)
-                      setLogisticsLoading(true)
-                      orderService
-                        .listLogisticsQuotes(Number(id))
-                        .then((quotes) => {
-                          setLogisticsQuotes(quotes)
-                          if (quotes.length > 0 && quotes[0].id) {
-                            setSelectedQuoteId(quotes[0].id)
-                          }
-                        })
-                        .catch((error: unknown) => {
-                          message.error(getErrorMessage(error, '获取报价列表失败'))
-                        })
-                        .finally(() => {
-                          setLogisticsLoading(false)
-                        })
-                    }}
-                  >
-                    确认物流
-                  </Button>
+                {order.status === 17 && order.logistics_bidding && (
+                  (() => {
+                    const bidding = order.logistics_bidding
+                    const isResponder = bidding.responder_enterprise_id === order.buyer_id
+                    const isInitiator = bidding.initiator_enterprise_id === order.buyer_id
+                    if (isResponder && !bidding.responder_confirmed && bidding.selected_quote_id > 0) {
+                      return (
+                        <Button
+                          type="primary"
+                          onClick={() => {
+                            orderService
+                              .respondConfirmLogistics(Number(id))
+                              .then(() => {
+                                message.success('已确认物流选择，等待物流方接单')
+                                void queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
+                              })
+                              .catch((error: unknown) => {
+                                message.error(getErrorMessage(error, '确认物流失败'))
+                              })
+                          }}
+                        >
+                          确认物流选择
+                        </Button>
+                      )
+                    }
+                    if (isInitiator && bidding.selected_quote_id > 0 && !bidding.responder_confirmed) {
+                      return <Tag color="processing">已选定物流，等待对方确认</Tag>
+                    }
+                    if (bidding.responder_confirmed && bidding.selected_quote_id > 0) {
+                      return <Tag color="processing">双方已确认，等待物流方接单</Tag>
+                    }
+                    if (isInitiator && bidding.selected_quote_id === 0) {
+                      return (
+                        <Button
+                          type="primary"
+                          onClick={() => {
+                            setLogisticsModalOpen(true)
+                            setSelectedQuoteId(null)
+                            setLogisticsLoading(true)
+                            orderService
+                              .listLogisticsQuotes(Number(id))
+                              .then((quotes) => {
+                                setLogisticsQuotes(quotes)
+                                if (quotes.length > 0 && quotes[0].id) {
+                                  setSelectedQuoteId(quotes[0].id)
+                                }
+                              })
+                              .catch((error: unknown) => {
+                                message.error(getErrorMessage(error, '获取报价列表失败'))
+                              })
+                              .finally(() => {
+                                setLogisticsLoading(false)
+                              })
+                          }}
+                        >
+                          选择物流报价
+                        </Button>
+                      )
+                    }
+                    return null
+                  })()
                 )}
-                {order.status === 27 && (
+                {order.status === 27 && order.logistics_contract && order.logistics_contract.status !== 'buyer_signed' && order.logistics_contract.status !== 'completed' && (
                   <Button
                     type="primary"
                     onClick={() => {
                       orderService
-                        .buyerSignLogisticsContract(Number(id))
+                        .initiatorSignLogisticsContract(Number(id))
                         .then(() => {
                           message.success('物流合同签署成功')
                           void queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
@@ -1671,10 +1730,32 @@ export default function OrderDetailPage() {
                     签署物流合同
                   </Button>
                 )}
+                {order.status === 27 && order.logistics_contract && (order.logistics_contract.status === 'buyer_signed' || order.logistics_contract.status === 'completed') && (
+                  <span className="text-green-600">
+                    <CheckCircleOutlined className="mr-1" />
+                    已签署物流合同
+                  </span>
+                )}
                 {canCancelOrder && (
                   <Button danger loading={cancelling} onClick={handleCancelOrder}>
                     取消订单
                   </Button>
+                )}
+
+                {logisticsOrder?.status === 'arrival_confirmed' && (
+                  <Button
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    onClick={handleInspectionSign}
+                  >
+                    验货签收
+                  </Button>
+                )}
+                {logisticsOrder?.status === 'receipt_signed' && (
+                  <span className="text-green-600">
+                    <CheckCircleOutlined className="mr-1" />
+                    已验货签收
+                  </span>
                 )}
 
                 {(order.status === 6 || order.status === 7) && (
@@ -1686,10 +1767,7 @@ export default function OrderDetailPage() {
                     确认收货
                   </Button>
                 )}
-                {(order.status === 8 ||
-                  order.status === 18 ||
-                  order.status === 19 ||
-                  order.status === 20) && (
+                {(order.status === 8 || order.status === 21) && (
                   <span className="text-green-600">
                     <CheckCircleOutlined className="mr-1" />
                     订单已完成归档
