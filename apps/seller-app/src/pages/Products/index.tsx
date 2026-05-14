@@ -4,6 +4,7 @@ import {
   AutoComplete,
   Button,
   Card,
+  Checkbox,
   Descriptions,
   Drawer,
   Form,
@@ -25,8 +26,10 @@ import {
 import {
   CheckCircleOutlined,
   CloudUploadOutlined,
+  DeleteOutlined,
   EditOutlined,
   EyeOutlined,
+  FileSearchOutlined,
   InfoCircleOutlined,
   PlusOutlined,
   CloseCircleOutlined,
@@ -45,7 +48,7 @@ import {
   type ProductGrade,
   type ProductSteelMill,
 } from '@/services/categoryService'
-import { sellerProductService, type SellerProductRecord } from '@/services/productService'
+import { sellerProductService, type ProductImportDraftItem, type SellerProductRecord } from '@/services/productService'
 import { uploadService, type UploadPurpose } from '@/services/uploadService'
 import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
 
@@ -101,6 +104,13 @@ interface ProductDisplayFormValues {
   quoteValidity: number
   imageFiles: UploadFile[]
   qualificationFiles: UploadFile[]
+}
+
+interface ImportParseMeta {
+  sourceFilename: string
+  sourceType: string
+  usedModel: boolean
+  warnings: string[]
 }
 
 const goodsTypeMeta: Record<'spot' | 'futures', { color: string; text: string }> = {
@@ -325,9 +335,17 @@ export default function ProductsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | ProductStatus>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDisplayModalOpen, setIsDisplayModalOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [drawerProduct, setDrawerProduct] = useState<SellerProductRecord | null>(null)
   const [editingProduct, setEditingProduct] = useState<SellerProductRecord | null>(null)
   const [displayProduct, setDisplayProduct] = useState<SellerProductRecord | null>(null)
+  const [importFileList, setImportFileList] = useState<UploadFile[]>([])
+  const [importHint, setImportHint] = useState('')
+  const [importRows, setImportRows] = useState<ProductImportDraftItem[]>([])
+  const [importMeta, setImportMeta] = useState<ImportParseMeta | null>(null)
+  const [importParsing, setImportParsing] = useState(false)
+  const [importSubmitting, setImportSubmitting] = useState(false)
+  const [importSubmitForReview, setImportSubmitForReview] = useState(false)
   const [form] = Form.useForm<ProductFormValues>()
   const [displayForm] = Form.useForm<ProductDisplayFormValues>()
   const selectedCategory = Form.useWatch('category', form)
@@ -610,6 +628,123 @@ export default function ProductsPage() {
     setIsDisplayModalOpen(false)
   }
 
+  const openImportModal = () => {
+    setImportFileList([])
+    setImportHint('')
+    setImportRows([])
+    setImportMeta(null)
+    setImportSubmitForReview(false)
+    setIsImportModalOpen(true)
+  }
+
+  const closeImportModal = () => {
+    setIsImportModalOpen(false)
+    setImportFileList([])
+    setImportHint('')
+    setImportRows([])
+    setImportMeta(null)
+    setImportSubmitForReview(false)
+  }
+
+  const updateImportProduct = (rowNo: number, patch: Partial<ProductImportDraftItem['product']>) => {
+    setImportRows((rows) =>
+      rows.map((row) => (row.row_no === rowNo ? { ...row, product: { ...row.product, ...patch } } : row)),
+    )
+  }
+
+  const updateImportSpec = (rowNo: number, patch: Partial<ProductImportDraftItem['product']['spec']>) => {
+    setImportRows((rows) =>
+      rows.map((row) =>
+        row.row_no === rowNo
+          ? { ...row, product: { ...row.product, spec: { ...row.product.spec, ...patch } } }
+          : row,
+      ),
+    )
+  }
+
+  const updateImportWarehouse = (rowNo: number, patch: Partial<ProductImportDraftItem['product']['warehouse_info']>) => {
+    setImportRows((rows) =>
+      rows.map((row) =>
+        row.row_no === rowNo
+          ? { ...row, product: { ...row.product, warehouse_info: { ...row.product.warehouse_info, ...patch } } }
+          : row,
+      ),
+    )
+  }
+
+  const handleImportCategoryChange = (row: ProductImportDraftItem, value: string) => {
+    const matched = categories.find((item) => item.name === value)
+    updateImportProduct(row.row_no, {
+      category: value,
+      sub_category: row.product.sub_category || value,
+      category_id: matched?.id,
+      grade_id: undefined,
+    })
+  }
+
+  const handleImportGradeChange = (row: ProductImportDraftItem, value: string) => {
+    const category = categories.find((item) => item.name === row.product.category)
+    const matched = grades.find((item) => item.name === value && (!category?.id || item.category_id === category.id || item.category_id === 0))
+    updateImportProduct(row.row_no, { grade_id: matched?.id })
+    updateImportSpec(row.row_no, { material: value })
+  }
+
+  const handleImportSteelMillChange = (row: ProductImportDraftItem, value: string) => {
+    const matched = steelMills.find((item) => item.name === value)
+    updateImportProduct(row.row_no, { steel_mill: value, steel_mill_id: matched?.id })
+  }
+
+  const handleParseImport = async () => {
+    const file = importFileList[0]?.originFileObj
+    if (!file) {
+      message.warning('请选择要导入的台账或截图')
+      return
+    }
+    setImportParsing(true)
+    try {
+      const response = await sellerProductService.parseBatchImport(file, importHint)
+      setImportRows(response.data.items)
+      setImportMeta({
+        sourceFilename: response.data.source_filename,
+        sourceType: response.data.source_type,
+        usedModel: response.data.used_model,
+        warnings: response.data.warnings,
+      })
+      message.success(`已识别 ${response.data.items.length} 条商品草稿`)
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '导入解析失败'))
+    } finally {
+      setImportParsing(false)
+    }
+  }
+
+  const handleConfirmImport = async () => {
+    if (importRows.length === 0) {
+      message.warning('请先解析并确认商品草稿')
+      return
+    }
+    setImportSubmitting(true)
+    try {
+      const response = await sellerProductService.confirmBatchImport(importRows, importSubmitForReview)
+      const { success_count: successCount, failed_count: failedCount } = response.data
+      if (successCount > 0) {
+        message.success(`已添加 ${successCount} 条商品${failedCount ? `，${failedCount} 条需修正` : ''}`)
+        await loadProducts()
+      }
+      if (failedCount > 0) {
+        const failedRows = new Set(response.data.items.filter((item) => item.status === 'failed').map((item) => item.row_no))
+        setImportRows((rows) => rows.filter((row) => failedRows.has(row.row_no)))
+        message.warning('未成功的行已保留，请修正后再次确认')
+        return
+      }
+      closeImportModal()
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '批量添加失败'))
+    } finally {
+      setImportSubmitting(false)
+    }
+  }
+
   const handleSubmitForReview = async () => {
     const values = await form.validateFields()
     setSubmitting(true)
@@ -849,6 +984,167 @@ export default function ProductsPage() {
     },
   ]
 
+  const importColumns: ColumnsType<ProductImportDraftItem> = [
+    {
+      title: '行',
+      dataIndex: 'row_no',
+      key: 'row_no',
+      width: 110,
+      fixed: 'left',
+      render: (_, record) => (
+        <Space direction="vertical" size={4}>
+          <Text>#{record.row_no}</Text>
+          <Tag color={record.confidence >= 0.75 ? 'green' : record.confidence >= 0.55 ? 'gold' : 'red'}>
+            {Math.round((record.confidence || 0) * 100)}%
+          </Tag>
+          {record.warnings?.length ? <Text type="secondary" className="text-xs">{record.warnings.slice(0, 2).join('、')}</Text> : null}
+        </Space>
+      ),
+    },
+    {
+      title: '商品名称',
+      key: 'name',
+      width: 220,
+      render: (_, record) => (
+        <Input
+          value={record.product.name}
+          placeholder="商品名称"
+          onChange={(event) => updateImportProduct(record.row_no, { name: event.target.value })}
+        />
+      ),
+    },
+    {
+      title: '品种',
+      key: 'category',
+      width: 240,
+      render: (_, record) => (
+        <Space direction="vertical" size={8}>
+          <AutoComplete
+            className="w-52"
+            value={record.product.category}
+            options={categoryInputOptions}
+            placeholder="品种"
+            onChange={(value) => handleImportCategoryChange(record, value)}
+            filterOption={(inputValue, option) =>
+              String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
+              String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
+            }
+          />
+          <Input
+            value={record.product.sub_category}
+            placeholder="细分品种"
+            onChange={(event) => updateImportProduct(record.row_no, { sub_category: event.target.value })}
+          />
+        </Space>
+      ),
+    },
+    {
+      title: '牌号/规格',
+      key: 'spec',
+      width: 260,
+      render: (_, record) => {
+        const category = categories.find((item) => item.name === record.product.category)
+        const rowGradeOptions = grades
+          .filter((grade) => !category?.id || grade.category_id === category.id || grade.category_id === 0)
+          .map((grade) => ({
+            label: grade.display_name || grade.name,
+            value: grade.name,
+          }))
+        return (
+          <Space direction="vertical" size={8}>
+            <AutoComplete
+              className="w-56"
+              value={record.product.spec.material}
+              options={rowGradeOptions}
+              placeholder="牌号"
+              onChange={(value) => handleImportGradeChange(record, value)}
+              filterOption={(inputValue, option) =>
+                String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
+                String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
+              }
+            />
+            <Input
+              value={record.product.spec.spec}
+              placeholder="规格"
+              onChange={(event) => updateImportSpec(record.row_no, { spec: event.target.value })}
+            />
+          </Space>
+        )
+      },
+    },
+    {
+      title: '产地/存放地',
+      key: 'origin',
+      width: 260,
+      render: (_, record) => (
+        <Space direction="vertical" size={8}>
+          <AutoComplete
+            className="w-56"
+            value={record.product.steel_mill}
+            options={steelMillInputOptions}
+            placeholder="产地/钢厂"
+            onChange={(value) => handleImportSteelMillChange(record, value)}
+            filterOption={(inputValue, option) =>
+              String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase()) ||
+              String(option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
+            }
+          />
+          <Input
+            value={record.product.warehouse_info.warehouse_name}
+            placeholder="存放地"
+            onChange={(event) => updateImportWarehouse(record.row_no, { warehouse_name: event.target.value })}
+          />
+        </Space>
+      ),
+    },
+    {
+      title: '捆包/库存/价格',
+      key: 'stock',
+      width: 280,
+      render: (_, record) => (
+        <Space direction="vertical" size={8}>
+          <Input
+            value={record.product.bundle_no}
+            placeholder="捆包号"
+            onChange={(event) => updateImportProduct(record.row_no, { bundle_no: event.target.value })}
+          />
+          <Space size={8}>
+            <InputNumber
+              min={0}
+              precision={3}
+              value={record.product.quantity}
+              placeholder="库存"
+              className="w-28"
+              onChange={(value) => updateImportProduct(record.row_no, { quantity: Number(value || 0) })}
+            />
+            <InputNumber
+              min={0}
+              precision={2}
+              value={record.product.unit_price}
+              placeholder="单价"
+              className="w-28"
+              onChange={(value) => updateImportProduct(record.row_no, { unit_price: Number(value || 0) })}
+            />
+          </Space>
+        </Space>
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 90,
+      fixed: 'right',
+      render: (_, record) => (
+        <Button
+          danger
+          type="text"
+          icon={<DeleteOutlined />}
+          onClick={() => setImportRows((rows) => rows.filter((row) => row.row_no !== record.row_no))}
+        />
+      ),
+    },
+  ]
+
   return (
     <div className="min-w-0">
       <Card
@@ -860,6 +1156,9 @@ export default function ProductsPage() {
             </Button>
             <Button onClick={() => navigate('/warehouses')}>
               仓库管理
+            </Button>
+            <Button icon={<FileSearchOutlined />} onClick={openImportModal}>
+              AI批量导入
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
               发布商品
@@ -946,6 +1245,74 @@ export default function ProductsPage() {
           />
         </Spin>
       </Card>
+
+      <Modal
+        title="AI批量导入商品"
+        open={isImportModalOpen}
+        onCancel={closeImportModal}
+        width={1120}
+        footer={[
+          <Button key="cancel" onClick={closeImportModal}>
+            取消
+          </Button>,
+          <Button key="parse" icon={<FileSearchOutlined />} loading={importParsing} onClick={() => void handleParseImport()}>
+            识别
+          </Button>,
+          <Button
+            key="confirm"
+            type="primary"
+            loading={importSubmitting}
+            disabled={importRows.length === 0}
+            onClick={() => void handleConfirmImport()}
+          >
+            确认添加
+          </Button>,
+        ]}
+      >
+        <Space direction="vertical" size="middle" className="w-full">
+          <Upload.Dragger
+            accept=".csv,.tsv,.txt,.xlsx,.jpg,.jpeg,.png,.webp"
+            beforeUpload={() => false}
+            maxCount={1}
+            fileList={importFileList}
+            onChange={({ fileList }) => setImportFileList(fileList.slice(-1))}
+          >
+            <p className="ant-upload-drag-icon">
+              <CloudUploadOutlined />
+            </p>
+            <p className="ant-upload-text">上传台账、表格或截图</p>
+          </Upload.Dragger>
+          <Input.TextArea
+            rows={2}
+            value={importHint}
+            onChange={(event) => setImportHint(event.target.value)}
+            placeholder="补充说明，例如默认仓库、价格含税口径、列名含义"
+          />
+          {importMeta ? (
+            <Alert
+              type={importMeta.warnings.length ? 'warning' : 'success'}
+              showIcon
+              message={`${importMeta.sourceFilename} · ${importMeta.usedModel ? 'AI识别' : '规则识别'} · ${importRows.length} 条`}
+              description={importMeta.warnings.length ? importMeta.warnings.join('；') : undefined}
+            />
+          ) : null}
+          <div className="flex items-center justify-between gap-3">
+            <Checkbox checked={importSubmitForReview} onChange={(event) => setImportSubmitForReview(event.target.checked)}>
+              直接提交审核
+            </Checkbox>
+            <Text type="secondary">未直接提交审核时，商品会先保存为草稿。</Text>
+          </div>
+          <Table<ProductImportDraftItem>
+            columns={importColumns}
+            dataSource={importRows}
+            rowKey="row_no"
+            size="small"
+            pagination={false}
+            scroll={{ x: 1460, y: 360 }}
+            locale={{ emptyText: '暂无待确认商品' }}
+          />
+        </Space>
+      </Modal>
 
       <Modal
         title={editingProduct ? '编辑商品并重新提交审核' : '发布商品并提交审核'}
