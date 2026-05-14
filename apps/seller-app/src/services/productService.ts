@@ -211,6 +211,32 @@ export interface UpdateProductDisplayPayload {
   quote_validity: number
 }
 
+export interface ProductImportDraftItem {
+  row_no: number
+  confidence: number
+  warnings: string[]
+  product: UpsertProductPayload
+}
+
+export interface ProductImportParseResponse {
+  source_filename: string
+  source_type: string
+  used_model: boolean
+  items: ProductImportDraftItem[]
+  warnings: string[]
+}
+
+export interface ProductImportConfirmResponse {
+  success_count: number
+  failed_count: number
+  items: Array<{
+    row_no: number
+    status: 'created' | 'failed'
+    error?: string
+    product?: unknown
+  }>
+}
+
 function mapStatus(status: number): ProductStatus {
   switch (status) {
     case 0:
@@ -322,4 +348,21 @@ export const sellerProductService = {
     api.put<unknown, ApiResponse<BackendProductInfo>>(`/products/${id}/display`, payload),
   remove: (id: number) =>
     api.delete<unknown, ApiResponse<{ message: string }>>(`/products/${id}`),
+  parseBatchImport: async (file: File, hint?: string) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (hint) {
+      formData.append('hint', hint)
+    }
+    return api.post<unknown, ApiResponse<ProductImportParseResponse>>('/products/batch-import/parse', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+  },
+  confirmBatchImport: (items: ProductImportDraftItem[], submitForReview = false) =>
+    api.post<unknown, ApiResponse<ProductImportConfirmResponse>>('/products/batch-import/confirm', {
+      submit_for_review: submitForReview,
+      items,
+    }),
 }
