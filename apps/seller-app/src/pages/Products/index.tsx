@@ -48,7 +48,12 @@ import {
   type ProductGrade,
   type ProductSteelMill,
 } from '@/services/categoryService'
-import { sellerProductService, type ProductImportDraftItem, type SellerProductRecord } from '@/services/productService'
+import {
+  sellerProductService,
+  type ProductImportDraftItem,
+  type ProductImportStreamEvent,
+  type SellerProductRecord,
+} from '@/services/productService'
 import { uploadService, type UploadPurpose } from '@/services/uploadService'
 import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
 
@@ -111,6 +116,13 @@ interface ImportParseMeta {
   sourceType: string
   usedModel: boolean
   warnings: string[]
+}
+
+interface ImportProgressItem {
+  key: string
+  color: 'blue' | 'green' | 'red' | 'gray'
+  title: string
+  description?: string
 }
 
 const goodsTypeMeta: Record<'spot' | 'futures', { color: string; text: string }> = {
@@ -343,6 +355,7 @@ export default function ProductsPage() {
   const [importHint, setImportHint] = useState('')
   const [importRows, setImportRows] = useState<ProductImportDraftItem[]>([])
   const [importMeta, setImportMeta] = useState<ImportParseMeta | null>(null)
+  const [importProgress, setImportProgress] = useState<ImportProgressItem[]>([])
   const [importParsing, setImportParsing] = useState(false)
   const [importSubmitting, setImportSubmitting] = useState(false)
   const [importSubmitForReview, setImportSubmitForReview] = useState(false)
@@ -633,6 +646,7 @@ export default function ProductsPage() {
     setImportHint('')
     setImportRows([])
     setImportMeta(null)
+    setImportProgress([])
     setImportSubmitForReview(false)
     setIsImportModalOpen(true)
   }
@@ -643,7 +657,23 @@ export default function ProductsPage() {
     setImportHint('')
     setImportRows([])
     setImportMeta(null)
+    setImportProgress([])
     setImportSubmitForReview(false)
+  }
+
+  const appendImportProgress = (event: ProductImportStreamEvent) => {
+    const key = event.stage || event.type
+    const title = event.message || 'AI识别处理中'
+    const description = event.elapsed_sec ? `已耗时 ${event.elapsed_sec} 秒` : undefined
+    const color: ImportProgressItem['color'] = event.type === 'error' ? 'red' : event.type === 'done' ? 'green' : 'blue'
+    setImportProgress((items) => {
+      const existingIndex = items.findIndex((item) => item.key === key)
+      const nextItem = { key, color, title, description }
+      if (existingIndex === -1) {
+        return [...items, nextItem]
+      }
+      return items.map((item, index) => (index === existingIndex ? nextItem : item))
+    })
   }
 
   const updateImportProduct = (rowNo: number, patch: Partial<ProductImportDraftItem['product']>) => {
@@ -701,8 +731,9 @@ export default function ProductsPage() {
       return
     }
     setImportParsing(true)
+    setImportProgress([])
     try {
-      const response = await sellerProductService.parseBatchImport(file, importHint)
+      const response = await sellerProductService.parseBatchImportStream(file, importHint, appendImportProgress)
       setImportRows(response.data.items)
       setImportMeta({
         sourceFilename: response.data.source_filename,
@@ -1256,7 +1287,7 @@ export default function ProductsPage() {
             取消
           </Button>,
           <Button key="parse" icon={<FileSearchOutlined />} loading={importParsing} onClick={() => void handleParseImport()}>
-            识别
+            AI识别
           </Button>,
           <Button
             key="confirm"
@@ -1294,6 +1325,20 @@ export default function ProductsPage() {
               showIcon
               message={`${importMeta.sourceFilename} · ${importMeta.usedModel ? 'AI识别' : '规则识别'} · ${importRows.length} 条`}
               description={importMeta.warnings.length ? importMeta.warnings.join('；') : undefined}
+            />
+          ) : null}
+          {importProgress.length ? (
+            <Timeline
+              items={importProgress.map((item) => ({
+                key: item.key,
+                color: item.color,
+                children: (
+                  <Space direction="vertical" size={0}>
+                    <Text>{item.title}</Text>
+                    {item.description ? <Text type="secondary" className="text-xs">{item.description}</Text> : null}
+                  </Space>
+                ),
+              }))}
             />
           ) : null}
           <div className="flex items-center justify-between gap-3">

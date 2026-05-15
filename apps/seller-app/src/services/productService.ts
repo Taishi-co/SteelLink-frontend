@@ -1,5 +1,5 @@
 import api from './api'
-import { getSellerEnterpriseID } from './auth'
+import { clearSellerSession, getSellerEnterpriseID, getSellerToken } from './auth'
 
 export interface AuditLogItem {
   id: number
@@ -237,6 +237,14 @@ export interface ProductImportConfirmResponse {
   }>
 }
 
+export interface ProductImportStreamEvent {
+  type: 'progress' | 'done' | 'error'
+  stage: string
+  message: string
+  elapsed_sec?: number
+  data?: ProductImportParseResponse
+}
+
 function mapStatus(status: number): ProductStatus {
   switch (status) {
     case 0:
@@ -321,6 +329,127 @@ function toSellerProductRecord(product: BackendProductInfo): SellerProductRecord
   }
 }
 
+function resolveApiURL(path: string) {
+  const baseURL = String(api.defaults.baseURL || '')
+  if (/^https?:\/\//i.test(path)) {
+    return path
+  }
+  return `${baseURL.replace(/\/$/, '')}${path}`
+}
+
+function redirectToSellerLogin() {
+  clearSellerSession()
+  const currentPath = window.location.pathname + window.location.search
+  window.location.href = `/seller/login?redirect=${encodeURIComponent(currentPath)}`
+}
+
+function parseProductImportSSEBlock(block: string): { event: string; payload: Omit<ProductImportStreamEvent, 'type'> } | null {
+  let event = 'message'
+  const dataLines: string[] = []
+  block.split(/\r?\n/).forEach((line) => {
+    if (line.startsWith('event:')) {
+      event = line.slice('event:'.length).trim()
+    }
+    if (line.startsWith('data:')) {
+      dataLines.push(line.slice('data:'.length).trimStart())
+    }
+  })
+  if (dataLines.length === 0) {
+    return null
+  }
+  return {
+    event,
+    payload: JSON.parse(dataLines.join('\n')) as Omit<ProductImportStreamEvent, 'type'>,
+  }
+}
+
+async function parseBatchImportStream(
+  file: File,
+  hint: string | undefined,
+  onEvent?: (event: ProductImportStreamEvent) => void,
+): Promise<ApiResponse<ProductImportParseResponse>> {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (hint) {
+    formData.append('hint', hint)
+  }
+  onEvent?.({ type: 'progress', stage: 'uploading', message: '正在上传文件' })
+
+  const headers: HeadersInit = {
+    'X-Trade-Role': 'seller',
+  }
+  const token = getSellerToken()
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  const response = await fetch(resolveApiURL('/products/batch-import/parse-stream'), {
+    method: 'POST',
+    headers,
+    body: formData,
+  })
+  if (response.status === 401) {
+    redirectToSellerLogin()
+    throw new Error('未登录')
+  }
+  if (response.status === 404 || !response.body) {
+    onEvent?.({ type: 'progress', stage: 'fallback', message: '正在使用普通解析接口' })
+    return sellerProductService.parseBatchImport(file, hint)
+  }
+  if (!response.ok) {
+    throw new Error((await response.text()) || '导入解析失败')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let finalData: ProductImportParseResponse | null = null
+  let streamError: Error | null = null
+
+  const handleBlock = (block: string) => {
+    const parsed = parseProductImportSSEBlock(block)
+    if (!parsed) return
+    const event = {
+      type: parsed.event === 'done' || parsed.event === 'error' ? parsed.event : 'progress',
+      ...parsed.payload,
+    } as ProductImportStreamEvent
+    onEvent?.(event)
+    if (event.type === 'done' && event.data) {
+      finalData = event.data
+    }
+    if (event.type === 'error') {
+      streamError = new Error(event.message || '导入解析失败')
+    }
+  }
+
+  let reading = true
+  while (reading) {
+    const { value, done } = await reader.read()
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+    const blocks = buffer.split(/\n\n/)
+    buffer = blocks.pop() || ''
+    blocks.forEach(handleBlock)
+    if (streamError) {
+      throw streamError
+    }
+    reading = !done
+  }
+  if (buffer.trim()) {
+    handleBlock(buffer)
+  }
+  if (streamError) {
+    throw streamError
+  }
+  if (!finalData) {
+    throw new Error('导入解析未返回结果')
+  }
+  return {
+    code: 0,
+    message: 'success',
+    data: finalData,
+  }
+}
+
 export const sellerProductService = {
   list: async (): Promise<SellerProductListServiceResponse> => {
     const enterpriseId = getSellerEnterpriseID()
@@ -360,6 +489,7 @@ export const sellerProductService = {
       },
     })
   },
+  parseBatchImportStream,
   confirmBatchImport: (items: ProductImportDraftItem[], submitForReview = false) =>
     api.post<unknown, ApiResponse<ProductImportConfirmResponse>>('/products/batch-import/confirm', {
       submit_for_review: submitForReview,
