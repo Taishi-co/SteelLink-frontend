@@ -9,7 +9,7 @@ export default function HomeLayout() {
   return (
     <Layout className="min-h-screen">
       <HomeHeader />
-      <Content className="mt-16">
+      <Content className="mt-20">
         <Outlet />
       </Content>
       <HomeFooter />

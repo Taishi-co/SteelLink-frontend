@@ -3,22 +3,30 @@
 @tailwind utilities;
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "Aptos Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light;
-  color: #213547;
-  background-color: #f5f5f5;
+  color: #17221b;
+  background-color: #f4efe6;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  background: #f4efe6;
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  min-width: 1200px;
+  min-width: 320px;
   min-height: 100vh;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(208, 138, 60, 0.12), transparent 32%),
+    linear-gradient(180deg, #fffaf1 0%, #f4efe6 46%, #efe3d1 100%);
 }
 
 #root {
@@ -27,11 +35,96 @@ body {
   flex-direction: column;
 }
 
-/* Ant Design 样式覆盖 */
+a {
+  transition: color 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
 .ant-layout {
   min-height: 100vh;
+  background: transparent;
 }
 
 .ant-layout-content {
-  background: #f5f5f5;
+  background: transparent;
+}
+
+.home-nav.ant-menu-horizontal {
+  line-height: 78px;
+}
+
+.home-nav.ant-menu-horizontal > .ant-menu-item,
+.home-nav.ant-menu-horizontal > .ant-menu-submenu {
+  color: #38463b;
+  font-weight: 650;
+}
+
+.home-nav.ant-menu-horizontal > .ant-menu-item::after,
+.home-nav.ant-menu-horizontal > .ant-menu-submenu::after {
+  border-bottom-color: #c47b34 !important;
+}
+
+.home-nav.ant-menu-horizontal > .ant-menu-item-selected,
+.home-nav.ant-menu-horizontal > .ant-menu-item-active {
+  color: #9f5f23 !important;
+}
+
+.home-reveal {
+  animation: home-rise 720ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.home-reveal-delay {
+  animation-delay: 140ms;
+}
+
+.home-capability-card,
+.home-service-card {
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease, background 220ms ease;
+}
+
+.home-capability-card:hover {
+  transform: translateY(-6px);
+  border-color: #caa370 !important;
+  box-shadow: 0 20px 44px rgba(73, 50, 26, 0.14) !important;
+}
+
+.home-service-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(239, 181, 111, 0.42) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.24) !important;
+}
+
+.reco-home .ant-card {
+  overflow: hidden;
+}
+
+.reco-home .ant-card-body {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .ant-layout-header {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .reco-home h1.ant-typography {
+    font-size: 42px !important;
+  }
+
+  .reco-home h2.ant-typography {
+    font-size: 30px !important;
+  }
 }
