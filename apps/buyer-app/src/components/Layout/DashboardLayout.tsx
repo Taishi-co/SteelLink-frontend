@@ -55,7 +55,7 @@ const allNavItems: NavItem[] = [
   {
     key: '/dashboard/warehouse',
     icon: <CloudServerOutlined />,
-    label: '仓库服务/货物管理',
+    label: '货物管理',
     services: ['procurement', 'sales'],
   },
   {

@@ -95,7 +95,7 @@ export default function WarehousePage() {
         <Space align="start">
           <CloudServerOutlined className="mt-1 text-xl text-emerald-600" />
           <div>
-            <Title level={4} className="!mb-1">仓库服务/货物管理</Title>
+            <Title level={4} className="!mb-1">货物管理</Title>
             <Paragraph className="!mb-0 !text-gray-500">
               买卖方可查看平台已审核仓库、申请仓储服务，并跟踪自己所属货权的入出库作业。仓库上架与库容维护仅由仓储方工作台处理。
             </Paragraph>
