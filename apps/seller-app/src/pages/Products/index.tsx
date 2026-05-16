@@ -1505,7 +1505,7 @@ export default function ProductsPage() {
             type="info"
             showIcon
             message="商品可绑定平台登记仓库"
-            description="绑定仓库后，买家下单会自动带出提货仓库并推荐覆盖该仓库线路的物流商；暂不绑定的商品后续需要买家通过物流平台找车确认提货点。当前后端仍要求提交 warehouse_info，暂不绑定仅用于前端业务评审。"
+            description="选择仓储方上架并审核通过的仓库后，平台可协同仓库确认、出库单据、监管库存和物流履约；手动填写或暂不绑定的仓库只作为线下地址展示，平台暂无法管理库容、单据和货权监控。"
           />
           <Space className="w-full" size="large" wrap>
             <Form.Item name="warehouseBindingMode" label="仓库绑定方式" rules={[{ required: true, message: '请选择仓库绑定方式' }]}>

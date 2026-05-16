@@ -110,8 +110,8 @@ export function AppRouter() {
         <Route path="identity" element={lazyPage(<IdentityPage />)} />
         <Route path="enterprise" element={lazyPage(<EnterprisePage />)} />
         <Route path="finance" element={lazyPage(<DashboardAccessGate services={['procurement', 'sales']}><DashboardFinance /></DashboardAccessGate>)} />
-        <Route path="logistics" element={lazyPage(<DashboardAccessGate services={['logistics']}><DashboardLogistics /></DashboardAccessGate>)} />
-        <Route path="warehouse" element={lazyPage(<DashboardAccessGate services={['warehouse']}><DashboardWarehouse /></DashboardAccessGate>)} />
+        <Route path="logistics" element={lazyPage(<DashboardAccessGate services={['procurement', 'sales']}><DashboardLogistics /></DashboardAccessGate>)} />
+        <Route path="warehouse" element={lazyPage(<DashboardAccessGate services={['procurement', 'sales']}><DashboardWarehouse /></DashboardAccessGate>)} />
         <Route path="services/:service" element={lazyPage(<DashboardAccessGate><ServiceWorkspacePage /></DashboardAccessGate>)} />
         <Route path="warehouse-resources" element={lazyPage(<DashboardAccessGate services={['warehouse']}><ServicePanelGate serviceKey="warehouse"><WarehouseManagePage /></ServicePanelGate></DashboardAccessGate>)} />
         <Route path="logistics-resources" element={lazyPage(<DashboardAccessGate services={['logistics']}><ServicePanelGate serviceKey="logistics"><LogisticsManagePage /></ServicePanelGate></DashboardAccessGate>)} />

@@ -204,6 +204,12 @@ export default function CheckoutPage() {
                     ? `${pickupWarehouse.warehouse_name}（WH-${String(pickupWarehouse.id).padStart(6, '0')}） · ${pickupWarehouse.address}`
                     : '后端仓库关系完善前，未绑定仓库的商品无法自动生成提货点和推荐线路。'}
                 />
+                <Alert
+                  type="info"
+                  showIcon
+                  message="平台仓库与自填仓库的管理差异"
+                  description="选择仓储方上架并审核通过的仓库后，平台可进入仓库确认、出入库单据和监管库存协同；自填地址或线下仓库只能作为收发货地址，平台暂无法管理库容、单据和货权监控。"
+                />
                 {!canSelectDestWarehouse && (
                   <Alert
                     type="warning"

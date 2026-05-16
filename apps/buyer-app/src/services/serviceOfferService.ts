@@ -34,6 +34,10 @@ export interface LogisticsServiceItem {
   route_start: string
   route_end: string
   service_scope?: string
+  transport_mode?: string
+  transit_cycle?: string
+  unit_price?: number
+  contact_info?: string
   vehicle_type?: string
   load_capacity?: number
   price_rule?: string

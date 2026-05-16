@@ -43,7 +43,7 @@ const allNavItems: NavItem[] = [
     key: '/dashboard/bidding',
     icon: <RiseOutlined />,
     label: '竞价管理',
-    services: ['procurement'],
+    services: ['procurement', 'sales'],
   },
   {
     key: '/dashboard/orders',
@@ -55,14 +55,14 @@ const allNavItems: NavItem[] = [
   {
     key: '/dashboard/warehouse',
     icon: <CloudServerOutlined />,
-    label: '仓储管理',
-    services: ['warehouse'],
+    label: '仓库服务/货物管理',
+    services: ['procurement', 'sales'],
   },
   {
     key: '/dashboard/logistics',
     icon: <TruckOutlined />,
-    label: '物流管理',
-    services: ['logistics'],
+    label: '物流服务',
+    services: ['procurement', 'sales'],
   },
   {
     key: '/dashboard/services',
