@@ -71,6 +71,43 @@ export interface WarehouseMovement {
   created_at: string
 }
 
+export interface WarehouseInventorySnapshot {
+  id: number
+  snapshot_no: string
+  warehouse_service_id: number
+  warehouse_enterprise_id: number
+  product_name: string
+  bundle_no: string
+  batch_no: string
+  location_code: string
+  quantity: number
+  frozen_quantity: number
+  quality_status: string
+  pledge_status: string
+  external_system: string
+  external_ref_no: string
+  sync_status: string
+  remark: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WarehouseInventorySnapshotPayload {
+  warehouse_service_id: number
+  product_name: string
+  bundle_no?: string
+  batch_no?: string
+  location_code?: string
+  quantity: number
+  frozen_quantity?: number
+  quality_status?: string
+  pledge_status?: string
+  external_system?: string
+  external_ref_no?: string
+  sync_status?: string
+  remark?: string
+}
+
 export const warehouseOrderService = {
   async listPending() {
     const response = await api.get<unknown, ApiResponse<{ list: OrderInfo[] }>>(
@@ -136,6 +173,31 @@ export const warehouseMovementService = {
   async updateStatus(id: number, payload: { status: string; remark?: string }) {
     const response = await api.put<unknown, ApiResponse<WarehouseMovement>>(
       `/warehouse-movements/${id}/status`,
+      payload
+    )
+    return response.data
+  },
+}
+
+export const warehouseInventoryService = {
+  async list() {
+    const response = await api.get<unknown, ApiResponse<{ list: WarehouseInventorySnapshot[] }>>(
+      '/warehouse-inventory-snapshots'
+    )
+    return response.data.list
+  },
+
+  async create(payload: WarehouseInventorySnapshotPayload) {
+    const response = await api.post<unknown, ApiResponse<WarehouseInventorySnapshot>>(
+      '/warehouse-inventory-snapshots',
+      payload
+    )
+    return response.data
+  },
+
+  async update(id: number, payload: WarehouseInventorySnapshotPayload) {
+    const response = await api.put<unknown, ApiResponse<WarehouseInventorySnapshot>>(
+      `/warehouse-inventory-snapshots/${id}`,
       payload
     )
     return response.data

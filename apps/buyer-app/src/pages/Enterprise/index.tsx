@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Form, Input, Button, Typography, Select, Upload, Spin, message, Divider, Descriptions, Tag } from 'antd'
+import { Card, Form, Input, Button, Typography, Select, Upload, Spin, message, Divider, Descriptions, Tag, Checkbox } from 'antd'
 import { BankOutlined, UploadOutlined, ArrowLeftOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons'
 import { certificationService } from '@/services/certificationService'
 import { uploadService } from '@/services/uploadService'
@@ -47,6 +47,23 @@ const enterpriseRoleDocumentMap: Record<string, Array<{ type: string; label: str
 
 type CreateEnterpriseFormValues = Omit<CreateEnterprisePayload, 'business_license_url'>
 type ApiError = { response?: { data?: { message?: string } } }
+type ServiceCapability = NonNullable<CreateEnterprisePayload['service_capabilities']>[number]
+
+const roleToService: Record<string, ServiceCapability> = {
+  buyer: 'procurement',
+  seller: 'sales',
+  logistics: 'logistics',
+  warehouse: 'warehouse',
+  fund: 'finance',
+}
+
+const serviceOptions: Array<{ value: ServiceCapability; label: string }> = [
+  { value: 'procurement', label: '采购交易能力' },
+  { value: 'sales', label: '销售交易能力' },
+  { value: 'warehouse', label: '仓储服务商能力' },
+  { value: 'logistics', label: '物流服务商能力' },
+  { value: 'finance', label: '资金方服务能力' },
+]
 
 export default function EnterprisePage() {
   const [form] = Form.useForm()
@@ -134,6 +151,11 @@ export default function EnterprisePage() {
       return
     }
 
+    const capabilitySet = new Set(values.service_capabilities || [])
+    const primaryService = roleToService[values.enterprise_role]
+    if (primaryService) capabilitySet.add(primaryService)
+    const serviceCapabilities = Array.from(capabilitySet)
+
     const requiredDocs = enterpriseRoleDocumentMap[values.enterprise_role] || []
     const missingDocs = requiredDocs.filter((doc) => !serviceDocuments[doc.type])
     if (missingDocs.length > 0) {
@@ -150,6 +172,7 @@ export default function EnterprisePage() {
     try {
       const payload = {
         ...values,
+        service_capabilities: serviceCapabilities,
         business_license_url: licenseUrl,
         documents,
       }
@@ -318,6 +341,13 @@ export default function EnterprisePage() {
                     { value: 'fund', label: '资金方' },
                   ]} />
                 </Form.Item>
+
+                <Form.Item label="同步申请额外平台能力" name="service_capabilities">
+                  <Checkbox.Group options={serviceOptions} />
+                </Form.Item>
+                <Paragraph type="secondary" className="!-mt-3">
+                  主供应链身份会自动申请对应能力；这里可额外申请多能力组合，审核通过后以服务权限表为准。
+                </Paragraph>
 
                 <Form.Item label="统一社会信用代码" name="unified_social_credit_code" rules={[{ required: true, message: '请输入统一社会信用代码' }]}>
                   <Input placeholder="18位统一社会信用代码" size="large" maxLength={18} />

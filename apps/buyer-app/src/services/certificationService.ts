@@ -21,6 +21,7 @@ export interface EnterpriseInfo {
   enterprise_name: string
   name?: string
   enterprise_role: string
+  service_capabilities?: Array<'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'>
   status: number
   legal_person: string
   credit_code?: string
@@ -40,6 +41,7 @@ export interface EnterpriseInfo {
 export interface CreateEnterprisePayload {
   enterprise_name: string
   enterprise_role: string
+  service_capabilities?: Array<'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'>
   unified_social_credit_code: string
   legal_person: string
   legal_id_card: string
@@ -147,6 +149,7 @@ export const certificationService = {
       contact_name: payload.legal_person,
       contact_phone: payload.contact_phone,
       address: payload.registered_address,
+      service_capabilities: payload.service_capabilities,
       documents: payload.documents,
     })
     return {
@@ -160,6 +163,7 @@ export const certificationService = {
       name: payload.enterprise_name,
       credit_code: payload.unified_social_credit_code,
       enterprise_role: payload.enterprise_role,
+      service_capabilities: payload.service_capabilities,
       contact_name: payload.legal_person,
       contact_phone: payload.contact_phone,
       address: payload.registered_address,

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Alert, Button, Card, Col, Row, Space, Spin, Steps, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Space, Spin, Steps, Table, Tag, Typography, message } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import {
   BankOutlined,
   CheckCircleOutlined,
@@ -15,6 +16,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { certificationService, EnterpriseInfo, EnterpriseServicePermission, getIdentityStatusLabel } from '@/services/certificationService'
+import { personalInquiryDraftService, type PersonalInquiryDraft, type PersonalInquiryDraftPayload } from '@/services/personalInquiryDraftService'
 import { useUserStore } from '@/stores'
 
 const { Text, Title, Paragraph } = Typography
@@ -62,6 +64,10 @@ export default function PersonalWorkspace() {
   const [loading, setLoading] = useState(true)
   const [enterprise, setEnterprise] = useState<EnterpriseInfo | null>(null)
   const [permissions, setPermissions] = useState<EnterpriseServicePermission[]>([])
+  const [drafts, setDrafts] = useState<PersonalInquiryDraft[]>([])
+  const [draftModalOpen, setDraftModalOpen] = useState(false)
+  const [editingDraft, setEditingDraft] = useState<PersonalInquiryDraft | null>(null)
+  const [draftForm] = Form.useForm<PersonalInquiryDraftPayload>()
 
   useEffect(() => {
     let ignore = false
@@ -81,6 +87,10 @@ export default function PersonalWorkspace() {
             }
           }
         }
+        if (user?.identityStatus === 2) {
+          const draftList = await personalInquiryDraftService.list()
+          if (!ignore) setDrafts(draftList || [])
+        }
       } finally {
         if (!ignore) setLoading(false)
       }
@@ -90,7 +100,7 @@ export default function PersonalWorkspace() {
     return () => {
       ignore = true
     }
-  }, [user?.enterpriseCode])
+  }, [user?.enterpriseCode, user?.identityStatus])
 
   const identityDone = user?.identityStatus === 2
   const enterpriseApproved = enterprise?.status === 1
@@ -106,6 +116,74 @@ export default function PersonalWorkspace() {
       return acc
     }, {})
   }, [permissions])
+
+  const openDraftModal = (draft?: PersonalInquiryDraft) => {
+    setEditingDraft(draft || null)
+    draftForm.setFieldsValue(
+      draft || {
+        title: '',
+        product_name: '',
+        category: '',
+        material: '',
+        spec: '',
+        quantity: 0,
+        unit: '吨',
+        target_price: 0,
+        delivery_address: '',
+        requirement: '',
+      },
+    )
+    setDraftModalOpen(true)
+  }
+
+  const reloadDrafts = async () => {
+    if (user?.identityStatus !== 2) return
+    const list = await personalInquiryDraftService.list()
+    setDrafts(list || [])
+  }
+
+  const submitDraft = async () => {
+    try {
+      const values = await draftForm.validateFields()
+      if (editingDraft) {
+        await personalInquiryDraftService.update(editingDraft.id, values)
+        message.success('询价草稿已更新')
+      } else {
+        await personalInquiryDraftService.create(values)
+        message.success('询价草稿已保存')
+      }
+      setDraftModalOpen(false)
+      setEditingDraft(null)
+      await reloadDrafts()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('保存询价草稿失败')
+    }
+  }
+
+  const deleteDraft = async (draft: PersonalInquiryDraft) => {
+    await personalInquiryDraftService.remove(draft.id)
+    message.success('询价草稿已删除')
+    await reloadDrafts()
+  }
+
+  const draftColumns: ColumnsType<PersonalInquiryDraft> = [
+    { title: '标题', dataIndex: 'title', key: 'title' },
+    { title: '品名', dataIndex: 'product_name', key: 'product_name', render: (value?: string) => value || '-' },
+    { title: '规格', dataIndex: 'spec', key: 'spec', render: (value?: string) => value || '-' },
+    { title: '数量', key: 'quantity', render: (_, record) => `${Number(record.quantity || 0).toLocaleString()} ${record.unit || '吨'}` },
+    { title: '目标价', dataIndex: 'target_price', key: 'target_price', render: (value: number) => (value ? `¥${Number(value).toLocaleString()}` : '-') },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_, record) => (
+        <Space>
+          <Button size="small" onClick={() => openDraftModal(record)}>编辑</Button>
+          <Button size="small" danger onClick={() => deleteDraft(record)}>删除</Button>
+        </Space>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -146,6 +224,25 @@ export default function PersonalWorkspace() {
       </Card>
 
       <Spin spinning={loading}>
+        {identityDone && (
+          <Card className="mb-4" title="实名个人轻量能力" extra={<Button type="primary" onClick={() => openDraftModal()}>保存询价草稿</Button>}>
+            <Alert
+              className="mb-4"
+              type="info"
+              showIcon
+              message="实名个人可保存询价草稿，但不开放交易闭环"
+              description="草稿用于记录采购意向。下单、竞价、金融服务和物流履约仍需企业认证并开通对应服务能力。"
+            />
+            <Table
+              rowKey="id"
+              size="small"
+              columns={draftColumns}
+              dataSource={drafts}
+              pagination={{ pageSize: 5 }}
+            />
+          </Card>
+        )}
+
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={12}>
             <Card title="个人实名认证" extra={<Tag color={identityDone ? 'success' : 'warning'}>{getIdentityStatusLabel(user?.identityStatus ?? 0)}</Tag>}>
@@ -215,6 +312,59 @@ export default function PersonalWorkspace() {
           </Card>
         )}
       </Spin>
+
+      <Modal
+        title={editingDraft ? '编辑询价草稿' : '保存询价草稿'}
+        open={draftModalOpen}
+        onCancel={() => setDraftModalOpen(false)}
+        onOk={submitDraft}
+        okText="保存"
+      >
+        <Form form={draftForm} layout="vertical">
+          <Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入草稿标题' }]}>
+            <Input placeholder="例：Q235B 热轧卷采购意向" />
+          </Form.Item>
+          <Form.Item name="product_name" label="品名">
+            <Input placeholder="例：热轧卷" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="category" label="品类">
+                <Input placeholder="例：板材" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="material" label="材质">
+                <Input placeholder="例：Q235B" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="spec" label="规格">
+            <Input placeholder="例：5.75*1500*C" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="quantity" label="数量">
+                <InputNumber min={0} className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="unit" label="单位">
+                <Input placeholder="吨" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="target_price" label="目标单价">
+            <InputNumber min={0} className="w-full" prefix="¥" />
+          </Form.Item>
+          <Form.Item name="delivery_address" label="收货地址">
+            <Input placeholder="请输入收货地址" />
+          </Form.Item>
+          <Form.Item name="requirement" label="采购要求">
+            <Input.TextArea rows={3} placeholder="补充交期、质保、发票等要求" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }

@@ -62,6 +62,68 @@ export interface OrderInfo {
 
 export type FinancingRequestInfo = NonNullable<OrderInfo['financing_info']>
 
+export interface WarehouseInventorySnapshotInfo {
+  id: number
+  snapshot_no: string
+  warehouse_service_id: number
+  warehouse_enterprise_id: number
+  product_name: string
+  bundle_no: string
+  batch_no: string
+  location_code: string
+  quantity: number
+  frozen_quantity: number
+  quality_status: string
+  pledge_status: string
+  external_system: string
+  external_ref_no: string
+  sync_status: string
+  remark: string
+  created_at: string
+  updated_at: string
+}
+
+export interface FulfillmentDocumentInfo {
+  id: number
+  logistics_order_id: number
+  order_id: number
+  doc_type: string
+  file_url: string
+  remark: string
+  gps_latitude?: number
+  gps_longitude?: number
+  captured_at?: string
+  uploaded_by: number
+  enterprise_id: number
+  uploaded_role: string
+  created_at: string
+}
+
+export interface CollateralMonitorInfo {
+  financing_request_id: number
+  order_id: number
+  order_no: string
+  buyer_enterprise_id: number
+  seller_enterprise_id: number
+  finance_service_id: number
+  requested_amount: number
+  approved_amount: number
+  financing_status: string
+  order_status: number
+  warehouse_service_id: number
+  warehouse_name: string
+  warehouse_address: string
+  logistics_status: string
+  last_logistics_event: string
+  pledge_voucher_url: string
+  pledge_remark: string
+  pledged_at?: string
+  release_condition: string
+  released_at?: string
+  inventory_snapshots?: WarehouseInventorySnapshotInfo[]
+  fulfillment_docs?: FulfillmentDocumentInfo[]
+}
+
 const withOrderDetails = async (requests: FinancingRequestInfo[]) => {
   const orders = await Promise.all(
     requests.map(async (financing) => {
@@ -116,5 +178,10 @@ export const financeOrderService = {
   async releasePledge(orderId: number, payload: { reason: string; voucher_url?: string }) {
     const response = await api.post<unknown, ApiResponse<OrderInfo['financing_info']>>(`/orders/${orderId}/pledges/release`, payload)
     return response.data
+  },
+
+  async listCollateralMonitor() {
+    const response = await api.get<unknown, ApiResponse<{ list: CollateralMonitorInfo[] }>>('/finance/collateral-monitor')
+    return response.data.list
   },
 }

@@ -11,9 +11,10 @@ import {
   EditOutlined,
   DeleteOutlined,
   DotChartOutlined,
+  ControlOutlined,
 } from '@ant-design/icons'
 import { financeOrderService } from '@/services/orderService'
-import type { OrderInfo } from '@/services/orderService'
+import type { CollateralMonitorInfo, OrderInfo } from '@/services/orderService'
 import { financeService, type FinanceServiceItem } from '@/services/financeService'
 import { hasFinanceCapability } from '@/services/auth'
 
@@ -44,7 +45,7 @@ const statusMap: Record<number, { label: string; color: string }> = {
   11: { label: '异常', color: 'red' },
 }
 
-type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'disburse' | 'pledge' | 'release-pledge' | 'finance-flow' | 'all'
+type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'disburse' | 'pledge' | 'collateral-monitor' | 'release-pledge' | 'finance-flow' | 'all'
 const productStatusMap: Record<number, { label: string; color: string }> = {
   1: { label: '待审核', color: 'processing' },
   2: { label: '已通过', color: 'success' },
@@ -64,6 +65,7 @@ function App() {
   const [riskOrders, setRiskOrders] = useState<OrderInfo[]>([])
   const [debtOrders, setDebtOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
+  const [collateralList, setCollateralList] = useState<CollateralMonitorInfo[]>([])
   const [loading, setLoading] = useState(false)
 
   const [riskModal, setRiskModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
@@ -159,12 +161,25 @@ function App() {
     }
   }
 
+  const fetchCollateralMonitor = async () => {
+    setLoading(true)
+    try {
+      const list = await financeOrderService.listCollateralMonitor()
+      setCollateralList(list || [])
+    } catch {
+      message.error('获取货权监控失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (activeTab === 'products') fetchProducts()
     else if (activeTab === 'risk-review') fetchRiskOrders()
     else if (activeTab === 'debt-contract') fetchDebtOrders()
     else if (activeTab === 'disburse') fetchDebtOrders()
     else if (activeTab === 'pledge') fetchAll()
+    else if (activeTab === 'collateral-monitor') fetchCollateralMonitor()
     else if (activeTab === 'release-pledge') fetchAll()
     else if (activeTab === 'finance-flow') fetchAll()
     else if (activeTab === 'all') fetchAll()
@@ -597,6 +612,7 @@ function App() {
     { key: 'debt-contract' as TabKey, label: '债务合同', icon: <FileSearchOutlined />, group: 'contract' },
     { key: 'disburse' as TabKey, label: '放款管理', icon: <DollarCircleOutlined />, group: 'contract' },
     { key: 'pledge' as TabKey, label: '货权质押', icon: <SafetyCertificateOutlined />, group: 'pledge' },
+    { key: 'collateral-monitor' as TabKey, label: '货权监控', icon: <ControlOutlined />, group: 'pledge' },
     { key: 'release-pledge' as TabKey, label: '质押释放', icon: <EditOutlined />, group: 'pledge' },
     { key: 'finance-flow' as TabKey, label: '融资流程', icon: <DotChartOutlined />, group: 'center' },
     { key: 'all' as TabKey, label: '订单中心', icon: <FileSearchOutlined />, group: 'center' },
@@ -741,6 +757,7 @@ function App() {
               else if (activeTab === 'debt-contract') fetchDebtOrders();
               else if (activeTab === 'disburse') fetchDebtOrders();
               else if (activeTab === 'pledge') fetchAll();
+              else if (activeTab === 'collateral-monitor') fetchCollateralMonitor();
               else if (activeTab === 'release-pledge') fetchAll();
               else if (activeTab === 'finance-flow') fetchAll();
               else fetchAll(); 
@@ -1041,6 +1058,173 @@ function App() {
                 />
               </Spin>
             </Card>
+          )}
+
+          {activeTab === 'collateral-monitor' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">监控订单</Typography.Text><br /><Title level={3}>{collateralList.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">已质押</Typography.Text><br /><Title level={3}>{collateralList.filter((item) => item.financing_status === 'pledged').length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">已释放</Typography.Text><br /><Title level={3}>{collateralList.filter((item) => item.financing_status === 'released').length}</Title></Card>
+                </Col>
+              </Row>
+              <Card title="货权监控看板" extra={<Tag color="geekblue">仓库 / 物流 / 单据</Tag>}>
+                <Spin spinning={loading}>
+                  <Table
+                    rowKey="financing_request_id"
+                    dataSource={collateralList}
+                    pagination={{ pageSize: 10 }}
+                    scroll={{ x: 1280 }}
+                    expandable={{
+                      expandedRowRender: (record) => (
+                        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                          <Card size="small" title="库存快照">
+                            <Table
+                              size="small"
+                              rowKey="id"
+                              dataSource={record.inventory_snapshots || []}
+                              pagination={false}
+                              columns={[
+                                { title: '快照号', dataIndex: 'snapshot_no', key: 'snapshot_no', width: 150 },
+                                { title: '商品', dataIndex: 'product_name', key: 'product_name', width: 120 },
+                                { title: '批次', dataIndex: 'batch_no', key: 'batch_no', width: 100, render: (v: string) => v || '--' },
+                                { title: '库位', dataIndex: 'location_code', key: 'location_code', width: 100, render: (v: string) => v || '--' },
+                                { title: '库存', dataIndex: 'quantity', key: 'quantity', width: 90, render: (v: number) => `${Number(v || 0).toLocaleString()} 吨` },
+                                { title: '冻结', dataIndex: 'frozen_quantity', key: 'frozen_quantity', width: 90, render: (v: number) => `${Number(v || 0).toLocaleString()} 吨` },
+                                { title: '质检', dataIndex: 'quality_status', key: 'quality_status', width: 90 },
+                                { title: '质押', dataIndex: 'pledge_status', key: 'pledge_status', width: 90 },
+                                { title: '同步', dataIndex: 'sync_status', key: 'sync_status', width: 90 },
+                              ]}
+                              locale={{ emptyText: '暂无库存快照' }}
+                            />
+                          </Card>
+                          <Card size="small" title="履约单据">
+                            <List
+                              size="small"
+                              dataSource={record.fulfillment_docs || []}
+                              locale={{ emptyText: '暂无履约单据' }}
+                              renderItem={(doc) => (
+                                <List.Item>
+                                  <List.Item.Meta
+                                    title={
+                                      <Space>
+                                        <Tag>{doc.doc_type}</Tag>
+                                        <Text>{doc.uploaded_role || '--'}</Text>
+                                      </Space>
+                                    }
+                                    description={
+                                      <Space direction="vertical" size={2}>
+                                        <Text type="secondary">{doc.remark || '无备注'}</Text>
+                                        <Text type="secondary">{doc.file_url || '--'}</Text>
+                                      </Space>
+                                    }
+                                  />
+                                </List.Item>
+                              )}
+                            />
+                          </Card>
+                        </Space>
+                      ),
+                    }}
+                    columns={[
+                      {
+                        title: '订单号',
+                        dataIndex: 'order_no',
+                        key: 'order_no',
+                        width: 160,
+                        render: (v: string) => <Text strong>{v}</Text>,
+                      },
+                      {
+                        title: '审批金额',
+                        dataIndex: 'approved_amount',
+                        key: 'approved_amount',
+                        width: 120,
+                        render: (v: number) => (v ? `¥${v.toLocaleString()}` : '--'),
+                      },
+                      {
+                        title: '融资状态',
+                        dataIndex: 'financing_status',
+                        key: 'financing_status',
+                        width: 130,
+                        render: (v: string) => {
+                          const map: Record<string, { label: string; color: string }> = {
+                            disbursed: { label: '已放款', color: 'green' },
+                            pledged: { label: '已质押', color: 'geekblue' },
+                            released: { label: '已释放', color: 'success' },
+                          }
+                          const meta = map[v] || { label: v || '--', color: 'default' }
+                          return <Tag color={meta.color}>{meta.label}</Tag>
+                        },
+                      },
+                      {
+                        title: '订单状态',
+                        dataIndex: 'order_status',
+                        key: 'order_status',
+                        width: 120,
+                        render: (v: number) => {
+                          const meta = statusMap[v] || { label: `状态${v}`, color: 'default' }
+                          return <Tag color={meta.color}>{meta.label}</Tag>
+                        },
+                      },
+                      {
+                        title: '监管仓库',
+                        key: 'warehouse',
+                        width: 220,
+                        render: (_: unknown, record: CollateralMonitorInfo) => (
+                          <Space direction="vertical" size={0}>
+                            <Text>{record.warehouse_name || '非平台监管仓'}</Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>{record.warehouse_address || '--'}</Text>
+                          </Space>
+                        ),
+                      },
+                      {
+                        title: '物流状态',
+                        dataIndex: 'logistics_status',
+                        key: 'logistics_status',
+                        width: 130,
+                        render: (v: string) => <Tag color={v ? 'processing' : 'default'}>{v || '未创建'}</Tag>,
+                      },
+                      {
+                        title: '最近物流事件',
+                        dataIndex: 'last_logistics_event',
+                        key: 'last_logistics_event',
+                        width: 180,
+                        ellipsis: true,
+                        render: (v: string) => v || '--',
+                      },
+                      {
+                        title: '库存/单据',
+                        key: 'assets',
+                        width: 120,
+                        render: (_: unknown, record: CollateralMonitorInfo) =>
+                          `${record.inventory_snapshots?.length || 0} 快照 / ${record.fulfillment_docs?.length || 0} 单据`,
+                      },
+                      {
+                        title: '质押凭证',
+                        key: 'pledge_voucher',
+                        width: 120,
+                        render: (_: unknown, record: CollateralMonitorInfo) =>
+                          record.pledge_voucher_url ? <Tag color="cyan">已上传</Tag> : <Tag>未上传</Tag>,
+                      },
+                      {
+                        title: '释放条件',
+                        dataIndex: 'release_condition',
+                        key: 'release_condition',
+                        width: 180,
+                        ellipsis: true,
+                        render: (v: string) => v || '--',
+                      },
+                    ]}
+                    locale={{ emptyText: '暂无货权监控数据' }}
+                  />
+                </Spin>
+              </Card>
+            </>
           )}
 
           {activeTab === 'finance-flow' && (

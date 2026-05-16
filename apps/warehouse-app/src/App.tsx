@@ -38,8 +38,8 @@ import {
   AppstoreOutlined,
   DashboardOutlined,
 } from '@ant-design/icons'
-import { warehouseOrderService, warehouseMovementService } from '@/services/orderService'
-import type { OrderEventInfo, OrderInfo, WarehouseMovement } from '@/services/orderService'
+import { warehouseOrderService, warehouseMovementService, warehouseInventoryService } from '@/services/orderService'
+import type { OrderEventInfo, OrderInfo, WarehouseInventorySnapshot, WarehouseMovement } from '@/services/orderService'
 import { warehouseResourceService } from '@/services/warehouseResourceService'
 import type {
   WarehouseResource,
@@ -84,18 +84,22 @@ const resourceStatusMap: Record<number, { label: string; color: string }> = {
   4: { label: '已下线', color: 'default' },
 }
 
-type TabKey = 'dashboard' | 'pending' | 'movements' | 'resources' | 'all'
+type TabKey = 'dashboard' | 'pending' | 'movements' | 'inventory' | 'resources' | 'all'
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
   const [pendingOrders, setPendingOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
   const [movements, setMovements] = useState<WarehouseMovement[]>([])
+  const [inventorySnapshots, setInventorySnapshots] = useState<WarehouseInventorySnapshot[]>([])
   const [resources, setResources] = useState<WarehouseResource[]>([])
   const [resourceLoading, setResourceLoading] = useState(false)
   const [resourceModalVisible, setResourceModalVisible] = useState(false)
   const [editingResource, setEditingResource] = useState<WarehouseResource | null>(null)
   const [resourceForm] = Form.useForm<WarehouseResourcePayload>()
+  const [inventoryForm] = Form.useForm()
+  const [inventoryModalVisible, setInventoryModalVisible] = useState(false)
+  const [editingInventory, setEditingInventory] = useState<WarehouseInventorySnapshot | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirmModal, setConfirmModal] = useState<{ visible: boolean; orderId: number | null }>({
     visible: false,
@@ -177,6 +181,18 @@ function App() {
     }
   }
 
+  const fetchInventory = async () => {
+    setLoading(true)
+    try {
+      const list = await warehouseInventoryService.list()
+      setInventorySnapshots(list || [])
+    } catch {
+      message.error('获取库存快照失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const fetchResources = async () => {
     setResourceLoading(true)
     try {
@@ -216,6 +232,43 @@ function App() {
     setResourceModalVisible(true)
   }
 
+  const openCreateInventory = () => {
+    setEditingInventory(null)
+    inventoryForm.resetFields()
+    inventoryForm.setFieldsValue({
+      quantity: 0,
+      frozen_quantity: 0,
+      quality_status: 'unchecked',
+      pledge_status: 'none',
+      sync_status: 'manual',
+    })
+    setInventoryModalVisible(true)
+  }
+
+  const openEditInventory = (record: WarehouseInventorySnapshot) => {
+    setEditingInventory(record)
+    inventoryForm.setFieldsValue(record)
+    setInventoryModalVisible(true)
+  }
+
+  const handleInventorySubmit = async () => {
+    try {
+      const values = await inventoryForm.validateFields()
+      if (editingInventory) {
+        await warehouseInventoryService.update(editingInventory.id, values)
+        message.success('库存快照已更新')
+      } else {
+        await warehouseInventoryService.create(values)
+        message.success('库存快照已创建')
+      }
+      setInventoryModalVisible(false)
+      fetchInventory()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('保存库存快照失败')
+    }
+  }
+
   const handleResourceSubmit = async () => {
     try {
       const values = await resourceForm.validateFields()
@@ -252,17 +305,19 @@ function App() {
     })
   }
 
-  useEffect(() => {
-    if (activeTab === 'dashboard') {
-      fetchPending()
-      fetchMovements()
-      fetchResources()
-      fetchAll()
-    } else if (activeTab === 'pending') fetchPending()
-    else if (activeTab === 'all') fetchAll()
-    else if (activeTab === 'movements') fetchMovements()
-    else if (activeTab === 'resources') fetchResources()
-  }, [activeTab])
+	useEffect(() => {
+		if (activeTab === 'dashboard') {
+			fetchPending()
+			fetchMovements()
+			fetchInventory()
+			fetchResources()
+			fetchAll()
+		} else if (activeTab === 'pending') fetchPending()
+		else if (activeTab === 'all') fetchAll()
+		else if (activeTab === 'movements') fetchMovements()
+		else if (activeTab === 'inventory') fetchInventory()
+		else if (activeTab === 'resources') fetchResources()
+	}, [activeTab])
 
   const handleWarehouseConfirm = async () => {
     if (!confirmModal.orderId) return
@@ -457,6 +512,7 @@ function App() {
     { key: 'dashboard' as TabKey, label: '工作台概览', icon: <DashboardOutlined /> },
     { key: 'pending' as TabKey, label: '待确认订单', icon: <ExclamationCircleOutlined /> },
     { key: 'movements' as TabKey, label: '出入库管理', icon: <DatabaseOutlined /> },
+    { key: 'inventory' as TabKey, label: '库存快照', icon: <SafetyCertificateOutlined /> },
     { key: 'resources' as TabKey, label: '仓库资源管理', icon: <AppstoreOutlined /> },
     { key: 'all' as TabKey, label: '全部订单', icon: <InboxOutlined /> },
   ]
@@ -559,6 +615,7 @@ function App() {
                   fetchAll()
                 } else if (activeTab === 'pending') fetchPending()
                 else if (activeTab === 'movements') fetchMovements()
+                else if (activeTab === 'inventory') fetchInventory()
                 else if (activeTab === 'resources') fetchResources()
                 else fetchAll()
               }}
@@ -736,6 +793,47 @@ function App() {
                   pagination={false}
                   scroll={{ x: 720 }}
                   locale={{ emptyText: '暂无出入库记录' }}
+                />
+              </Spin>
+            </Card>
+          )}
+
+          {activeTab === 'inventory' && (
+            <Card
+              title="库存快照"
+              extra={
+                <Button type="primary" icon={<PlusOutlined />} onClick={openCreateInventory}>
+                  新增库存快照
+                </Button>
+              }
+            >
+              <Spin spinning={loading}>
+                <Table
+                  rowKey="id"
+                  dataSource={inventorySnapshots}
+                  pagination={{ pageSize: 10 }}
+                  scroll={{ x: 1200 }}
+                  columns={[
+                    { title: '快照号', dataIndex: 'snapshot_no', key: 'snapshot_no', width: 160 },
+                    { title: '商品', dataIndex: 'product_name', key: 'product_name', width: 140 },
+                    { title: '批次', dataIndex: 'batch_no', key: 'batch_no', width: 100, render: (v: string) => v || '--' },
+                    { title: '库位', dataIndex: 'location_code', key: 'location_code', width: 100, render: (v: string) => v || '--' },
+                    { title: '库存', dataIndex: 'quantity', key: 'quantity', width: 90, render: (v: number) => `${Number(v || 0).toLocaleString()} 吨` },
+                    { title: '冻结', dataIndex: 'frozen_quantity', key: 'frozen_quantity', width: 90, render: (v: number) => `${Number(v || 0).toLocaleString()} 吨` },
+                    { title: '质检', dataIndex: 'quality_status', key: 'quality_status', width: 90 },
+                    { title: '质押', dataIndex: 'pledge_status', key: 'pledge_status', width: 90 },
+                    { title: '同步', dataIndex: 'sync_status', key: 'sync_status', width: 90 },
+                    { title: '外部单号', dataIndex: 'external_ref_no', key: 'external_ref_no', width: 140, render: (v: string) => v || '--' },
+                    {
+                      title: '操作',
+                      key: 'action',
+                      width: 90,
+                      render: (_: unknown, record: WarehouseInventorySnapshot) => (
+                        <Button size="small" onClick={() => openEditInventory(record)}>编辑</Button>
+                      ),
+                    },
+                  ]}
+                  locale={{ emptyText: '暂无库存快照，可先手工录入，后续对接 WMS/MRP 同步' }}
                 />
               </Spin>
             </Card>
@@ -1008,6 +1106,103 @@ function App() {
               </Modal>
             </>
           )}
+
+          <Modal
+            title={editingInventory ? '编辑库存快照' : '新增库存快照'}
+            open={inventoryModalVisible}
+            onOk={handleInventorySubmit}
+            onCancel={() => setInventoryModalVisible(false)}
+            width={720}
+            okText="保存"
+          >
+            <Form form={inventoryForm} layout="vertical">
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="warehouse_service_id" label="仓储资源ID" rules={[{ required: true, message: '请输入仓储资源ID' }]}>
+                    <InputNumber min={1} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="product_name" label="商品名称" rules={[{ required: true, message: '请输入商品名称' }]}>
+                    <Input placeholder="例：热轧卷" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item name="bundle_no" label="捆包号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="batch_no" label="批次号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="location_code" label="库位">
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="quantity" label="当前库存" rules={[{ required: true, message: '请输入库存数量' }]}>
+                    <InputNumber min={0} style={{ width: '100%' }} addonAfter="吨" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="frozen_quantity" label="冻结/质押数量">
+                    <InputNumber min={0} style={{ width: '100%' }} addonAfter="吨" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item name="quality_status" label="质检状态">
+                    <Select options={[
+                      { value: 'unchecked', label: '未质检' },
+                      { value: 'passed', label: '通过' },
+                      { value: 'failed', label: '异常' },
+                    ]} />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="pledge_status" label="质押状态">
+                    <Select options={[
+                      { value: 'none', label: '未质押' },
+                      { value: 'frozen', label: '已冻结' },
+                      { value: 'released', label: '已释放' },
+                    ]} />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="sync_status" label="同步状态">
+                    <Select options={[
+                      { value: 'manual', label: '手工录入' },
+                      { value: 'synced', label: '已同步' },
+                      { value: 'failed', label: '同步失败' },
+                    ]} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="external_system" label="外部系统">
+                    <Input placeholder="例：WMS/MRP" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="external_ref_no" label="外部单号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="remark" label="备注">
+                <TextArea rows={3} />
+              </Form.Item>
+            </Form>
+          </Modal>
 
           <Modal
             title={confirmOk ? '确认仓库条件' : '打回仓库条件'}
