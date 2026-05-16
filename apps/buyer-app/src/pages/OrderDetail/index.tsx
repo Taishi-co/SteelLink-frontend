@@ -107,8 +107,8 @@ const logisticsStatusText: Record<string, string> = {
   loading_confirmed: '已装货确认',
   in_transit: '运输中',
   arrival_confirmed: '已到货确认',
-  receipt_signed: '已验收签收',
-  inbound_completed: '已入库完成',
+  inbound_completed: '收货仓已验货入库',
+  receipt_signed: '已确认收货',
   pending: '待接单',
   accepted: '已接单',
   delivered: '已送达',
@@ -176,23 +176,23 @@ const fulfillmentStepDefinitions = [
   {
     key: 'arrival_confirmed',
     title: '到货确认',
-    owner: '买方负责',
+    owner: '物流方负责',
     pendingText: '待到货',
-    proofHint: '校对到货时间，上传到货照片、卸货回执',
-  },
-  {
-    key: 'receipt_signed',
-    title: '验收签收',
-    owner: '买方负责',
-    pendingText: '待买方签收',
-    proofHint: '上传签收单、质检结果或验收意见',
+    proofHint: '物流方上传到货照片，确认货物到达收货仓',
   },
   {
     key: 'inbound_completed',
-    title: '入库完成',
+    title: '收货仓验货入库',
     owner: '仓储方负责',
-    pendingText: '按需入库',
-    proofHint: '上传入库单、入库磅单、库位回执',
+    pendingText: '待收货仓验货入库',
+    proofHint: '上传封条照片、入库单、收货单',
+  },
+  {
+    key: 'receipt_signed',
+    title: '确认收货',
+    owner: '买方/资金方负责',
+    pendingText: '待确认收货',
+    proofHint: '查看仓储单据后确认收货',
   },
   {
     key: 'completed',
@@ -241,8 +241,8 @@ const fulfillmentStepOrder = [
   'loading_confirmed',
   'in_transit',
   'arrival_confirmed',
-  'receipt_signed',
   'inbound_completed',
+  'receipt_signed',
   'completed',
 ] as const
 
@@ -298,11 +298,11 @@ function getFulfillmentStepDescription(
     case 'receipt_signed':
       return logistics.receipt_signed_at
         ? new Date(logistics.receipt_signed_at).toLocaleString()
-        : '待买方签收'
+        : '待确认收货'
     case 'inbound_completed':
       return logistics.inbound_completed_at
         ? new Date(logistics.inbound_completed_at).toLocaleString()
-        : '按需入库'
+        : '待收货仓验货入库'
     case 'completed':
       return normalizeFulfillmentStatus(logistics.status) === 'completed' ? '已完成' : '未完成'
     default:
@@ -1786,10 +1786,13 @@ export default function OrderDetailPage() {
                   </Button>
                 )}
 
-                {logisticsOrder?.status === 'arrival_confirmed' && isFinancingOrder && (
+                {logisticsOrder?.status === 'inbound_completed' && isFinancingOrder && (
                   <Tag color="gold">融资订单待资金方确认监管收货</Tag>
                 )}
-                {logisticsOrder?.status === 'arrival_confirmed' && !isFinancingOrder && (
+                {logisticsOrder?.status === 'arrival_confirmed' && (
+                  <Tag color="gold">待收货仓验货入库</Tag>
+                )}
+                {logisticsOrder?.status === 'inbound_completed' && !isFinancingOrder && (
                   <Button
                     type="primary"
                     icon={<CheckCircleOutlined />}
@@ -2034,7 +2037,7 @@ export default function OrderDetailPage() {
             >
               <Form form={inspectionSignForm} layout="vertical">
                 <Paragraph type="secondary">
-                  该节点会作为物流履约的验收签收凭证。融资订单由资金方确认，普通订单由买方确认。
+                  收货仓完成验货入库并上传封条照片、入库单、收货单后，普通订单由买方确认收货；融资订单由资金方确认。
                 </Paragraph>
                 <Form.Item
                   name="receipt_file"

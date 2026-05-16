@@ -363,11 +363,6 @@ function App() {
       return
     }
     try {
-      await financeOrderService.uploadFulfillmentDocument(record.logistics_order_id, {
-        doc_type: 'receipt_order',
-        file_url: collateralReceiptURL,
-        remark: collateralReceiptRemark || '资金方监管收货确认',
-      })
       await financeOrderService.confirmCollateralReceipt(record.logistics_order_id, {
         receipt_url: collateralReceiptURL,
         remark: collateralReceiptRemark || '资金方确认监管收货',
@@ -1260,7 +1255,7 @@ function App() {
                         render: (_: unknown, record: CollateralMonitorInfo) => {
                           if (!record.logistics_order_id) return <Text type="secondary">无物流单</Text>
                           if (record.financing_status !== 'pledged') return <Text type="secondary">--</Text>
-                          if (record.logistics_status !== 'arrival_confirmed') return <Text type="secondary">待到货</Text>
+                          if (record.logistics_status !== 'inbound_completed') return <Text type="secondary">待收货仓入库</Text>
                           return (
                             <Button size="small" type="primary" onClick={() => setCollateralReceiptModal({ visible: true, record })}>
                               确认收货
@@ -1549,7 +1544,7 @@ function App() {
           >
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               <Paragraph type="secondary">
-                融资订单到货后由资金方上传收货单并确认监管收货，确认后订单进入已收货节点。
+                收货仓完成验货入库并上传封条照片、入库单、收货单后，资金方确认监管收货。
               </Paragraph>
               <div>
                 <Text>收货单 URL：</Text>

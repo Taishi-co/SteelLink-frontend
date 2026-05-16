@@ -556,11 +556,11 @@ function App() {
       { key: 'loading_confirmed', title: '装货确认', owner: '物流方', hint: '确认货物装载完毕' },
       { key: 'in_transit', title: '运输中', owner: '物流方', hint: '货物在途运输' },
       { key: 'arrival_confirmed', title: '到货确认', owner: '物流方', hint: '到达目的地确认' },
-      { key: 'receipt_signed', title: '验收签收', owner: '买方', hint: '买方验收并签收' },
-      { key: 'inbound_completed', title: '入库登记', owner: '仓储方', hint: '货物入库登记' },
+      { key: 'inbound_completed', title: '收货仓验货入库', owner: '仓储方', hint: '收货仓验货并上传入库资料' },
+      { key: 'receipt_signed', title: '确认收货', owner: '买方/资金方', hint: '查看入库资料后确认收货' },
       { key: 'completed', title: '履约结束', owner: '系统', hint: '物流履约流程结束' },
     ]
-    const statusOrder = ['task_created', 'pickup_scheduled', 'arrival_signed_in', 'outbound_confirmed', 'loading_confirmed', 'in_transit', 'arrival_confirmed', 'receipt_signed', 'inbound_completed', 'completed']
+    const statusOrder = ['task_created', 'pickup_scheduled', 'arrival_signed_in', 'outbound_confirmed', 'loading_confirmed', 'in_transit', 'arrival_confirmed', 'inbound_completed', 'receipt_signed', 'completed']
     
     let completedStep = statusOrder.indexOf(status)
     if (completedStep === -1) {
@@ -972,9 +972,9 @@ function App() {
                           if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed', docs: ['loading_voucher'] }
                           if (status === 'loading_confirmed') return { label: '发车', next: 'in_transit', docs: ['gps_track'] }
                           if (status === 'in_transit') return { label: '到货确认', next: 'arrival_confirmed', docs: ['delivery_photo'] }
-                          if (status === 'arrival_confirmed') return { label: '等待买方验货签收', next: 'receipt_signed', buyerAction: true }
-                          if (status === 'receipt_signed') return { label: '等待仓储入库', next: 'inbound_completed', externalAction: true }
-                          if (status === 'inbound_completed') return { label: '履约完成', next: 'completed' }
+                          if (status === 'arrival_confirmed') return { label: '等待收货仓验货入库', next: 'inbound_completed', externalAction: true }
+                          if (status === 'inbound_completed') return { label: '等待买方/资金方确认收货', next: 'receipt_signed', buyerAction: true }
+                          if (status === 'receipt_signed') return { label: '履约完成', next: 'completed' }
                           return null
                         }
                         const nextAction = getNextAction(record.status)
@@ -983,7 +983,7 @@ function App() {
                           return <Tag color="orange">{nextAction.label}</Tag>
                         }
                         if (nextAction.buyerAction) {
-                          return <Tag color="blue">等待买方签收</Tag>
+                          return <Tag color="blue">{nextAction.label}</Tag>
                         }
                         return (
                           <Button

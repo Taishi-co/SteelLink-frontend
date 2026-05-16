@@ -747,7 +747,7 @@ function App() {
                         },
                         {
                           title: '物流到场/出入库协同',
-                          description: `${logisticsOrders.filter((item) => ['pickup_scheduled', 'arrival_signed_in', 'receipt_signed'].includes(item.status)).length} 单待仓储协同`,
+                          description: `${logisticsOrders.filter((item) => ['pickup_scheduled', 'arrival_signed_in', 'arrival_confirmed'].includes(item.status)).length} 单待仓储协同`,
                           icon: <SafetyCertificateOutlined />,
                           tab: 'logistics' as TabKey,
                         },
@@ -912,14 +912,14 @@ function App() {
                             </Button>
                           )
                         }
-                        if (record.status === 'receipt_signed') {
+                        if (record.status === 'arrival_confirmed') {
                           return (
                             <Button
                               size="small"
                               type="primary"
-                              onClick={() => openLogisticsModal(record, 'inbound_completed', '确认入库', ['inbound_order'])}
+                              onClick={() => openLogisticsModal(record, 'inbound_completed', '收货仓验货入库', ['seal_photo', 'inbound_order', 'receipt_order'])}
                             >
-                              上传入库单并确认
+                              上传封条/入库/收货单
                             </Button>
                           )
                         }
