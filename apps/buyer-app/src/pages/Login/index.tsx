@@ -108,13 +108,13 @@ export default function LoginPage() {
       <div className="w-full max-w-[1080px] grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8 items-center">
         <section className="text-slate-900">
           <div className="inline-flex items-center rounded-full border border-white/70 bg-white/70 px-4 py-1 text-sm font-medium text-blue-700 shadow-sm">
-            SteelLink 采购平台
+            RecoLink 采购平台
           </div>
           <h1 className="mt-6 text-4xl font-black leading-tight text-slate-900">
             在线询价、一键下单、全程可追踪
           </h1>
           <Paragraph className="mt-5 max-w-[620px] text-base leading-7 text-slate-600">
-            SteelLink 为钢材采购方提供一站式在线交易服务。浏览商品、比价下单、合同签署到提货确认，全流程线上完成。
+            RecoLink 为钢材采购方提供一站式在线交易服务。浏览商品、比价下单、合同签署到提货确认，全流程线上完成。
           </Paragraph>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="rounded-2xl bg-white/85 p-4 shadow-sm ring-1 ring-white/60">

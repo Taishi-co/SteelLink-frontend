@@ -69,9 +69,9 @@ export default function EnterpriseIntroPage() {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <div className="inline-flex items-center rounded-full border border-white/70 bg-white/70 px-4 py-1 text-sm font-medium text-blue-700 shadow-sm mb-6">
-            SteelLink 企业入驻
+            RecoLink 企业入驻
           </div>
-          <Title level={2} className="!mb-3">成为 SteelLink 企业会员</Title>
+          <Title level={2} className="!mb-3">成为 RecoLink 企业会员</Title>
           <Paragraph className="text-base text-slate-500 max-w-lg mx-auto">
             入驻平台后可发布商品、参与竞价采购、智能撮合交易，开启钢材数字化交易之旅
           </Paragraph>

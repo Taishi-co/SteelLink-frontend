@@ -620,7 +620,7 @@ function App() {
         <div style={{ height: 64, display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: '1px solid #edf0f5' }}>
           <Space>
             <DollarCircleOutlined style={{ color: '#7c3aed' }} />
-            <Text strong>SteelLink 资金</Text>
+            <Text strong>RecoLink 资金</Text>
           </Space>
         </div>
         <div style={{ padding: 16 }}>

@@ -45,7 +45,7 @@ export default function Header() {
     <AntHeader className="bg-white shadow-sm flex items-center px-6 h-16">
       <div className="flex items-center gap-8 flex-1">
         <Link to="/" className="text-xl font-bold text-primary-600 no-underline">
-          SteelLink
+          RecoLink
         </Link>
 
         <Menu

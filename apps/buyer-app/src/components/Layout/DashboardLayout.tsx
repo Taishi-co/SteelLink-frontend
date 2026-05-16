@@ -38,7 +38,7 @@ interface NavItem {
 const allNavItems: NavItem[] = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '个人工作台' },
   { key: '/dashboard/notifications', icon: <MailOutlined />, label: '站内信' },
-  { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情' },
+  { key: '/dashboard/market', icon: <LineChartOutlined />, label: '钢材行情', roles: ['enterprise'] },
   {
     key: '/dashboard/bidding',
     icon: <RiseOutlined />,
@@ -51,7 +51,7 @@ const allNavItems: NavItem[] = [
     label: '我的订单',
     services: ['procurement', 'sales'],
   },
-  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '凭单融资', services: ['finance'] },
+  { key: '/dashboard/finance', icon: <DollarOutlined />, label: '资金服务', services: ['procurement', 'sales'] },
   {
     key: '/dashboard/warehouse',
     icon: <CloudServerOutlined />,
@@ -133,15 +133,9 @@ export default function DashboardLayout() {
     switch (user?.enterpriseRole) {
       case 'buyer':
         services.add('procurement')
-        services.add('warehouse')
-        services.add('logistics')
-        services.add('finance')
         break
       case 'seller':
         services.add('sales')
-        services.add('warehouse')
-        services.add('logistics')
-        services.add('finance')
         break
       case 'logistics':
         services.add('logistics')
@@ -231,8 +225,8 @@ export default function DashboardLayout() {
               </div>
               {!collapsed && (
                 <div>
-                  <div className="text-white font-bold text-[15px] tracking-wide">SteelLink</div>
-                  <div className="text-white/30 text-[10px]">钢联贸易平台</div>
+                  <div className="text-white font-bold text-[15px] tracking-wide">RecoLink</div>
+                  <div className="text-white/30 text-[10px]">产业资源协同平台</div>
                 </div>
               )}
             </div>
@@ -308,7 +302,7 @@ export default function DashboardLayout() {
           </nav>
 
           <div className="px-2.5 mb-2">
-            {hasEnterpriseAccess(user) && (
+            {effectiveServices.has('sales') && (
               <div
                 className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
                 style={{

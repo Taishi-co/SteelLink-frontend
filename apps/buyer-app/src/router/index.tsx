@@ -4,6 +4,8 @@ import HomeLayout from '@/components/Layout/HomeLayout'
 import MainLayout from '@/components/Layout/MainLayout'
 import DashboardLayout from '@/components/Layout/DashboardLayout'
 import RequireAuth from '@/components/RequireAuth'
+import DashboardAccessGate from '@/components/DashboardAccessGate'
+import ServicePanelGate from '@/pages/Dashboard/ServicePanelGate'
 
 const HomePage = lazy(() => import('@/pages/Home'))
 const MallPage = lazy(() => import('@/pages/Mall'))
@@ -99,21 +101,21 @@ export function AppRouter() {
 
       <Route path="/dashboard" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
         <Route index element={lazyPage(<PersonalWorkspacePage />)} />
-        <Route path="market" element={lazyPage(<DashboardMarket />)} />
-        <Route path="services" element={lazyPage(<DashboardServices />)} />
-        <Route path="bidding" element={lazyPage(<BiddingModulePage />)} />
-        <Route path="orders" element={lazyPage(<OrdersPage />)} />
-        <Route path="orders/:id" element={lazyPage(<OrderDetailPage />)} />
+        <Route path="market" element={lazyPage(<DashboardAccessGate><DashboardMarket /></DashboardAccessGate>)} />
+        <Route path="services" element={lazyPage(<DashboardAccessGate><DashboardServices /></DashboardAccessGate>)} />
+        <Route path="bidding" element={lazyPage(<DashboardAccessGate services={['procurement']}><BiddingModulePage /></DashboardAccessGate>)} />
+        <Route path="orders" element={lazyPage(<DashboardAccessGate services={['procurement', 'sales']}><OrdersPage /></DashboardAccessGate>)} />
+        <Route path="orders/:id" element={lazyPage(<DashboardAccessGate services={['procurement', 'sales']}><OrderDetailPage /></DashboardAccessGate>)} />
         <Route path="notifications" element={lazyPage(<NotificationsPage />)} />
         <Route path="identity" element={lazyPage(<IdentityPage />)} />
         <Route path="enterprise" element={lazyPage(<EnterprisePage />)} />
-        <Route path="finance" element={lazyPage(<DashboardFinance />)} />
-        <Route path="logistics" element={lazyPage(<DashboardLogistics />)} />
-        <Route path="warehouse" element={lazyPage(<DashboardWarehouse />)} />
-        <Route path="services/:service" element={lazyPage(<ServiceWorkspacePage />)} />
-        <Route path="warehouse-resources" element={lazyPage(<WarehouseManagePage />)} />
-        <Route path="logistics-resources" element={lazyPage(<LogisticsManagePage />)} />
-        <Route path="finance-products" element={lazyPage(<FinanceManagePage />)} />
+        <Route path="finance" element={lazyPage(<DashboardAccessGate services={['procurement', 'sales']}><DashboardFinance /></DashboardAccessGate>)} />
+        <Route path="logistics" element={lazyPage(<DashboardAccessGate services={['logistics']}><DashboardLogistics /></DashboardAccessGate>)} />
+        <Route path="warehouse" element={lazyPage(<DashboardAccessGate services={['warehouse']}><DashboardWarehouse /></DashboardAccessGate>)} />
+        <Route path="services/:service" element={lazyPage(<DashboardAccessGate><ServiceWorkspacePage /></DashboardAccessGate>)} />
+        <Route path="warehouse-resources" element={lazyPage(<DashboardAccessGate services={['warehouse']}><ServicePanelGate serviceKey="warehouse"><WarehouseManagePage /></ServicePanelGate></DashboardAccessGate>)} />
+        <Route path="logistics-resources" element={lazyPage(<DashboardAccessGate services={['logistics']}><ServicePanelGate serviceKey="logistics"><LogisticsManagePage /></ServicePanelGate></DashboardAccessGate>)} />
+        <Route path="finance-products" element={lazyPage(<DashboardAccessGate services={['finance']}><ServicePanelGate serviceKey="finance"><FinanceManagePage /></ServicePanelGate></DashboardAccessGate>)} />
       </Route>
     </Routes>
   )

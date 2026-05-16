@@ -12,7 +12,7 @@ export default function Footer() {
           <Link to="/products" className="text-gray-600 hover:text-primary-600 mx-2">商品列表</Link>
           <Link to="/cart" className="text-gray-600 hover:text-primary-600 mx-2">购物车</Link>
         </p>
-        <p>© 2024 SteelLink. B2B钢材交易平台</p>
+        <p>© 2024 RecoLink. 产业资源协同平台</p>
       </div>
     </AntFooter>
   )

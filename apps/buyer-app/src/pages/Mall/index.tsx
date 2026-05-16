@@ -19,7 +19,7 @@ interface MallCategory {
 const bannerItems = [
   {
     key: '1',
-    title: 'SteelLink B2B钢材交易平台',
+    title: 'RecoLink 产业资源协同平台',
     description: '现货直采 · 在线询价 · 一站式采购',
     bgColor: 'bg-primary-600',
   },
