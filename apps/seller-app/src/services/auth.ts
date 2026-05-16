@@ -183,6 +183,23 @@ export function getSellerEnterpriseRole(): string {
   return getStorageItem([ENTERPRISE_ROLE_KEY]) || ''
 }
 
+export function sellerHasService(service: string): boolean {
+  const token = getSellerToken()
+  const payload = parseJwtPayload(token || '')
+  const capabilities = payload?.service_capabilities
+  if (Array.isArray(capabilities) && capabilities.includes(service)) {
+    return true
+  }
+
+  const role = (payload?.enterprise_role as string) || getSellerEnterpriseRole()
+  if (service === 'sales') return role === 'seller'
+  if (service === 'warehouse') return role === 'warehouse'
+  if (service === 'logistics') return role === 'logistics'
+  if (service === 'finance') return role === 'fund'
+  if (service === 'procurement') return role === 'buyer'
+  return false
+}
+
 export function getSellerEnterpriseID(): number {
   const payload = parseJwtPayload(getSellerToken() || '')
   const id = payload?.enterprise_id
