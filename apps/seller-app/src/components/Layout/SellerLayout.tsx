@@ -125,7 +125,7 @@ export default function SellerLayout() {
         <Header className="bg-white px-6 flex items-center justify-between shadow-sm h-16">
           <Text className="text-lg font-medium">卖家后台</Text>
           <Space size="middle">
-            <a href={`${buyerBaseURL}/`}>
+            <a href={`${buyerBaseURL}/dashboard`}>
               <Button icon={<HomeOutlined />}>买家首页</Button>
             </a>
             <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
