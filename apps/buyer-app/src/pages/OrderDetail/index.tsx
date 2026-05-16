@@ -627,9 +627,9 @@ export default function OrderDetailPage() {
   const fulfillment = fulfillmentData
   const aiFinanceRecommendation = getAIFinanceRecommendation(order?.remark)
   const { data: financeProductsData, isLoading: financeProductsLoading } = useQuery({
-    queryKey: ['approved-finance-services', order?.id],
+    queryKey: ['available-finance-services', order?.id],
     queryFn: async () =>
-      (await serviceOfferService.listFinance({ page: 1, page_size: 50, status: 2 })).data.list,
+      (await serviceOfferService.listFinanceAvailableForOrder(Number(order?.id))).data.list,
     enabled: Boolean(order?.id && financeOpen),
   })
   const { data: myWarehousesData } = useQuery({

@@ -101,6 +101,8 @@ interface ProductFormValues {
   quoteValidity: number
   imageFiles: UploadFile[]
   qualificationFiles: UploadFile[]
+  titleVoucherFiles: UploadFile[]
+  titleVoucherRemark?: string
 }
 
 interface ProductDisplayFormValues {
@@ -274,7 +276,7 @@ async function resolveUploadedURLs(fileList: UploadFile[] = [], purpose: UploadP
   return urls
 }
 
-function toPayload(values: ProductFormValues, imageURLs: string[], qualificationURLs: string[]) {
+function toPayload(values: ProductFormValues, imageURLs: string[], qualificationURLs: string[], titleVoucherURLs: string[]) {
   return {
     name: values.name,
     goods_type: values.goodsType || 'spot',
@@ -316,6 +318,8 @@ function toPayload(values: ProductFormValues, imageURLs: string[], qualification
     min_order_qty: values.minOrderQty,
     images: imageURLs,
     quality_cert: qualificationURLs[0] || '',
+    title_voucher_url: titleVoucherURLs[0] || '',
+    title_voucher_remark: values.titleVoucherRemark || '',
     description: values.description,
     delivery_days: values.deliveryDays,
     quote_validity: values.quoteValidity,
@@ -525,6 +529,8 @@ export default function ProductsPage() {
       quoteValidity: 72,
       imageFiles: [],
       qualificationFiles: [],
+      titleVoucherFiles: [],
+      titleVoucherRemark: '',
     } as Partial<ProductFormValues>)
     setIsModalOpen(true)
   }
@@ -570,6 +576,8 @@ export default function ProductsPage() {
       quoteValidity: product.quote_validity || 72,
       imageFiles: normalizeUploadList(product.image_urls),
       qualificationFiles: normalizeUploadList(product.qualification_urls),
+      titleVoucherFiles: normalizeUploadList(product.title_voucher_url ? [product.title_voucher_url] : []),
+      titleVoucherRemark: product.title_voucher_remark || '',
     } as Partial<ProductFormValues>)
     setIsModalOpen(true)
   }
@@ -782,7 +790,8 @@ export default function ProductsPage() {
     try {
       const imageURLs = await resolveUploadedURLs(values.imageFiles, 'product_image')
       const qualificationURLs = await resolveUploadedURLs(values.qualificationFiles, 'product_qualification')
-      const payload = toPayload(values, imageURLs, qualificationURLs)
+      const titleVoucherURLs = await resolveUploadedURLs(values.titleVoucherFiles, 'title_voucher')
+      const payload = toPayload(values, imageURLs, qualificationURLs, titleVoucherURLs)
       if (editingProduct) {
         await sellerProductService.update(editingProduct.id, payload)
       } else {
@@ -930,6 +939,9 @@ export default function ProductsPage() {
         <div className="max-w-56">
           <Space size={6} wrap>
             <Tag color={statusMeta[status].color}>{statusMeta[status].text}</Tag>
+            <Tag color={record.title_confirmed ? 'green' : 'default'}>
+              {record.title_confirmed ? '仓库确权' : '未确权'}
+            </Tag>
             {status === 'approved' && record.approved_at ? <Text type="secondary">通过于 {record.approved_at}</Text> : null}
           </Space>
           <div className="mt-1 text-xs text-gray-500">{record.review_status_text}</div>
@@ -973,6 +985,7 @@ export default function ProductsPage() {
         <Space direction="vertical" size={0}>
           <Text type="secondary">主图 {record.image_urls.length} 份</Text>
           <Text type="secondary">审核资料 {record.qualification_urls.length} 份</Text>
+          <Text type="secondary">确权凭证 {record.title_confirmed ? 1 : 0} 份</Text>
         </Space>
       ),
     },
@@ -1371,7 +1384,7 @@ export default function ProductsPage() {
         <Form<ProductFormValues>
           form={form}
           layout="vertical"
-          initialValues={{ goodsType: 'spot', imageFiles: [], qualificationFiles: [] }}
+          initialValues={{ goodsType: 'spot', imageFiles: [], qualificationFiles: [], titleVoucherFiles: [] }}
         >
           <Form.Item name="name" label="商品名称" rules={[{ required: true, message: '请输入商品名称' }]}>
             <Input placeholder="例如：Q235B 热轧板卷 3.0*1500*C" />
@@ -1616,6 +1629,20 @@ export default function ProductsPage() {
               <Button icon={<CloudUploadOutlined />}>上传审核资料</Button>
             </Upload>
           </Form.Item>
+          <Form.Item
+            name="titleVoucherFiles"
+            label="货权/仓单监管凭证"
+            valuePropName="fileList"
+            getValueFromEvent={(event) => event?.fileList ?? []}
+            extra="可选。上传后商品会展示“仓库确权”标签；未上传时展示“未确权”，不影响提交审核。"
+          >
+            <Upload beforeUpload={() => false} maxCount={1}>
+              <Button icon={<CloudUploadOutlined />}>上传确权凭证</Button>
+            </Upload>
+          </Form.Item>
+          <Form.Item name="titleVoucherRemark" label="确权备注">
+            <Input placeholder="例如：仓单编号、监管协议编号或确权说明" />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -1769,6 +1796,11 @@ export default function ProductsPage() {
                   {marketplaceVisibilityMeta[drawerProduct.status].text}
                 </Tag>
               </Descriptions.Item>
+              <Descriptions.Item label="是否确权">
+                <Tag color={drawerProduct.title_confirmed ? 'green' : 'default'}>
+                  {drawerProduct.title_confirmed ? '仓库确权' : '未确权'}
+                </Tag>
+              </Descriptions.Item>
               <Descriptions.Item label="卖家 UID">{drawerProduct.seller_uid}</Descriptions.Item>
               <Descriptions.Item label="最近提交时间">{drawerProduct.submitted_at || '-'}</Descriptions.Item>
               <Descriptions.Item label="审核结论">{drawerProduct.review_status_text || '-'}</Descriptions.Item>
@@ -1782,6 +1814,12 @@ export default function ProductsPage() {
               <Space direction="vertical" size="small">
                 <Text>商品主图：{drawerProduct.image_urls.length > 0 ? drawerProduct.image_urls.join('、') : '暂无'}</Text>
                 <Text>审核资料：{drawerProduct.qualification_urls.length > 0 ? drawerProduct.qualification_urls.join('、') : '暂无'}</Text>
+                <Text>
+                  货权/仓单监管凭证：{drawerProduct.title_voucher_url ? (
+                    <a href={drawerProduct.title_voucher_url} target="_blank" rel="noreferrer">查看凭证</a>
+                  ) : '暂无'}
+                </Text>
+                {drawerProduct.title_voucher_remark ? <Text>确权备注：{drawerProduct.title_voucher_remark}</Text> : null}
               </Space>
             </div>
 

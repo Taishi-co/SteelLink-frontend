@@ -16,6 +16,7 @@ export interface WarehouseServiceItem {
   loading_capacity?: string
   business_hours?: string
   pledge_supervision?: boolean
+  finance_certified?: boolean
   outbound_voucher_req?: string
   images?: string[]
   certificates?: string[]
@@ -103,6 +104,8 @@ export const serviceOfferService = {
     api.delete<unknown, ApiResponse<LogisticsServiceItem>>(`/logistics-services/${id}`),
   listFinance: (params?: Record<string, unknown>) =>
     api.get<unknown, ApiResponse<PageResponse<FinanceServiceItem>>>('/finance-services', { params }),
+  listFinanceAvailableForOrder: (orderId: number) =>
+    api.get<unknown, ApiResponse<{ order_id: number; list: FinanceServiceItem[] }>>(`/finance-services/available-for-order/${orderId}`),
   listMyFinance: () =>
     api.get<unknown, ApiResponse<FinanceServiceItem[]>>('/finance-services/mine'),
   createFinance: (payload: Partial<FinanceServiceItem>) =>

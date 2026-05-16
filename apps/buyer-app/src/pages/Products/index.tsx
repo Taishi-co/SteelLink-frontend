@@ -350,6 +350,9 @@ export default function ProductsPage() {
                         {product.availableQty >= product.minOrderQty && product.minOrderQty > 0 ? (
                           <Tag color="green">可立即下单</Tag>
                         ) : null}
+                        <Tag color={product.titleConfirmed ? 'green' : 'default'}>
+                          {product.titleConfirmed ? '仓库确权' : '未确权'}
+                        </Tag>
                       </Space>
                       <Paragraph className="!mb-1 text-xs text-gray-500">编号：{product.productNo || '-'}</Paragraph>
                       <Paragraph className="!mb-1 text-xs text-gray-500">

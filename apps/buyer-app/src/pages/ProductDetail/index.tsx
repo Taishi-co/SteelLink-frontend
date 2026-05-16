@@ -168,6 +168,9 @@ export default function ProductDetailPage() {
                       <Tag color={canQuickOrder ? 'green' : 'red'}>
                         {canQuickOrder ? '可立即下单' : '库存不足起订量'}
                       </Tag>
+                      <Tag color={product.titleConfirmed ? 'green' : 'default'}>
+                        {product.titleConfirmed ? '仓库确权' : '未确权'}
+                      </Tag>
                     </Space>
 
                     <div className="mb-4 rounded bg-gray-50 p-4">
@@ -301,6 +304,12 @@ export default function ProductDetailPage() {
                             <a href={product.qualityCert} target="_blank" rel="noreferrer">查看质保书</a>
                           ) : (
                             <Text type="secondary">暂无质保书</Text>
+                          )}
+                          <Paragraph className="!mb-2 !mt-4 text-gray-500">货权/仓单监管凭证</Paragraph>
+                          {product.titleVoucherUrl ? (
+                            <a href={product.titleVoucherUrl} target="_blank" rel="noreferrer">查看确权凭证</a>
+                          ) : (
+                            <Text type="secondary">暂无确权凭证</Text>
                           )}
                         </Col>
                       </Row>
