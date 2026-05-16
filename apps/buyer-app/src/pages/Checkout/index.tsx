@@ -107,8 +107,8 @@ export default function CheckoutPage() {
             <Paragraph className="mb-2">
               确认下单后，系统将自动锁定对应捆包号库存 24 小时，并生成仓库提货与物流履约待办。
             </Paragraph>
-            <Paragraph className="text-gray-500 text-sm">
-              订单总金额：<Text className="text-red-500 font-bold">¥{finalPrice.toLocaleString()}</Text>
+            <Paragraph className="text-sm text-[#7a847a]">
+              订单总金额：<Text className="font-bold text-[#b45324]">¥{finalPrice.toLocaleString()}</Text>
             </Paragraph>
           </div>
         ),
@@ -141,51 +141,55 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen py-6">
-      <div className="max-w-7xl mx-auto px-6">
+    <div className="reco-shell py-8">
+      <div className="mx-auto max-w-7xl px-6 md:px-10">
         <div className="mb-6">
           <Link to="/cart">
-            <Button icon={<ArrowLeftOutlined />}>
+            <Button icon={<ArrowLeftOutlined />} className="rounded-full border-[#d0b991] bg-white">
               返回采购清单
             </Button>
           </Link>
         </div>
 
-        <Title level={3} className="!mb-6">确认订单</Title>
+        <div className="mb-6 rounded-[30px] border border-[#eadcc7] bg-[#fffaf1] p-7 shadow-sm">
+          <Text className="text-sm font-bold uppercase tracking-[0.28em] text-[#a4662c]">Checkout</Text>
+          <Title level={3} className="!mb-2 !mt-2 !font-black !text-[#17221b]">确认订单</Title>
+          <Paragraph className="!mb-0 !text-[#5f6b61]">确认商品、收货仓库和物流服务，提交后进入合同签署与履约闭环。</Paragraph>
+        </div>
 
-        <Row gutter={24}>
-          <Col span={16}>
-            <Card title="商品信息" className="mb-6">
+        <Row gutter={[24, 24]}>
+          <Col xs={24} lg={16}>
+            <Card title="商品信息" className="reco-card mb-6 rounded-[30px]">
               {mockCheckoutItems.map((item) => (
-                <div key={item.id} className="mb-4 pb-4 border-b last:border-0">
-                  <Row gutter={16} align="middle">
-                    <Col span={16}>
+                <div key={item.id} className="mb-4 border-b border-[#eadcc7] pb-4 last:border-0">
+                  <Row gutter={[16, 16]} align="middle">
+                    <Col xs={24} md={16}>
                       <div className="mb-2">
                         <Text className="font-medium text-lg">{item.name}</Text>
                       </div>
-                      <div className="text-gray-500 text-sm mb-2">{item.specs}</div>
-                      <div className="text-gray-500 text-sm mb-2">
+                      <div className="mb-2 text-sm text-[#7a847a]">{item.specs}</div>
+                      <div className="mb-2 text-sm text-[#7a847a]">
                         <ShoppingOutlined className="mr-1" />
                         钢厂：{item.mill}
                       </div>
-                      <div className="text-gray-500 text-sm mb-2">
+                      <div className="mb-2 text-sm text-[#7a847a]">
                         <EnvironmentOutlined className="mr-1" />
                         仓库：{item.warehouse}
                       </div>
-                      <div className="text-gray-500 text-sm">
+                      <div className="text-sm text-[#7a847a]">
                         捆包号：
                         {item.bundleNos.map((no, idx) => (
-                          <span key={idx} className="inline-block bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded mr-1 mb-1">
+                          <span key={idx} className="mb-1 mr-1 inline-block rounded-full bg-[#edf6ef] px-2 py-1 text-xs text-[#2f6b49]">
                             {no}
                           </span>
                         ))}
                       </div>
                     </Col>
-                    <Col span={8} className="text-right">
-                      <div className="text-gray-500 text-sm mb-1">数量</div>
+                    <Col xs={24} md={8} className="text-left md:text-right">
+                      <div className="mb-1 text-sm text-[#7a847a]">数量</div>
                       <div className="font-medium mb-2">{item.quantity} 吨</div>
-                      <div className="text-gray-500 text-sm mb-1">单价</div>
-                      <div className="font-mono font-bold text-red-500">
+                      <div className="mb-1 text-sm text-[#7a847a]">单价</div>
+                      <div className="font-mono font-bold text-[#b45324]">
                         ¥{item.price.toLocaleString()}/吨
                       </div>
                     </Col>
@@ -194,7 +198,7 @@ export default function CheckoutPage() {
               ))}
             </Card>
 
-            <Card title="物流与仓储服务" className="mb-6">
+            <Card title="物流与仓储服务" className="reco-card mb-6 rounded-[30px]">
               <Space direction="vertical" size="middle" className="w-full">
                 <Alert
                   type={hasWarehouseBinding ? 'success' : 'warning'}
@@ -233,34 +237,34 @@ export default function CheckoutPage() {
                       key={carrier.id}
                       type="button"
                       onClick={() => setSelectedLogistics(carrier.id)}
-                      className={`rounded-lg border p-4 text-left transition ${
-                        selectedLogistics === carrier.id ? 'border-blue-400 bg-blue-50' : 'border-gray-100 bg-white hover:border-blue-200'
+                      className={`rounded-[22px] border p-4 text-left transition ${
+                        selectedLogistics === carrier.id ? 'border-[#2f6b49] bg-[#edf6ef]' : 'border-[#eadcc7] bg-white hover:border-[#d0a56e]'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <Text strong>{carrier.name}</Text>
                         <Tag color={carrier.status === 2 ? 'green' : 'gold'}>{carrier.status === 2 ? '可接单' : '待确认'}</Tag>
                       </div>
-                      <div className="mt-2 text-sm text-gray-500">{carrier.service_scope}</div>
+                      <div className="mt-2 text-sm text-[#7a847a]">{carrier.service_scope}</div>
                       <div className="mt-3 flex items-center justify-between text-sm">
                         <span>{carrier.vehicle_type}</span>
-                        <span className="font-mono text-red-600">{carrier.price_rule}</span>
+                        <span className="font-mono text-[#b45324]">{carrier.price_rule}</span>
                       </div>
                     </button>
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <Link to="/service-market">
-                    <Button icon={<TruckOutlined />}>去物流平台找物流</Button>
+                    <Button icon={<TruckOutlined />} className="rounded-full border-[#d0b991] bg-white">去物流平台找物流</Button>
                   </Link>
                   <Link to="/dashboard/logistics">
-                    <Button>进入物流工作台发单</Button>
+                    <Button className="rounded-full border-[#d0b991] bg-white">进入物流工作台发单</Button>
                   </Link>
                 </div>
               </Space>
             </Card>
 
-            <Card title="收货信息" className="mb-6">
+            <Card title="收货信息" className="reco-card mb-6 rounded-[30px]">
               <Form form={form} layout="vertical">
                 <Row gutter={16}>
                   <Col span={12}>
@@ -293,7 +297,7 @@ export default function CheckoutPage() {
                           <Option key={warehouse.id} value={warehouse.id}>
                             <div>
                               <div className="font-medium">{warehouse.warehouse_name}</div>
-                              <div className="text-gray-500 text-xs">{warehouse.address}</div>
+                              <div className="text-xs text-[#7a847a]">{warehouse.address}</div>
                             </div>
                           </Option>
                         ))}
@@ -321,7 +325,7 @@ export default function CheckoutPage() {
                               <div className="text-gray-500 text-xs">
                                 企业ID: {warehouse.enterprise_id} | {warehouse.address}
                               </div>
-                              <div className="text-gray-400 text-xs mt-1">
+                              <div className="mt-1 text-xs text-[#7a847a]">
                                 可用库容: {Number(warehouse.available_capacity || 0).toLocaleString()} 吨
                               </div>
                             </div>
@@ -348,7 +352,7 @@ export default function CheckoutPage() {
                           <Option key={log.id} value={log.id}>
                             <div className="flex justify-between">
                               <span>{log.name}</span>
-                              <span className="text-gray-500">{log.price_rule}</span>
+                              <span className="text-[#7a847a]">{log.price_rule}</span>
                             </div>
                           </Option>
                         ))}
@@ -363,10 +367,10 @@ export default function CheckoutPage() {
               </Form>
             </Card>
 
-            <Card title="重要提示">
+            <Card title="重要提示" className="reco-card rounded-[30px]">
               <Space direction="vertical" className="w-full">
                 <div className="flex items-start gap-2">
-                  <SafetyCertificateOutlined className="text-blue-500 mt-0.5" />
+                  <SafetyCertificateOutlined className="mt-0.5 text-[#2f6b49]" />
                   <div>
                     <Text className="font-medium">库存锁定</Text>
                     <Text type="secondary" className="text-sm block">
@@ -375,7 +379,7 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <SafetyCertificateOutlined className="text-blue-500 mt-0.5" />
+                  <SafetyCertificateOutlined className="mt-0.5 text-[#2f6b49]" />
                   <div>
                     <Text className="font-medium">合同签署</Text>
                     <Text type="secondary" className="text-sm block">
@@ -384,7 +388,7 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <SafetyCertificateOutlined className="text-blue-500 mt-0.5" />
+                  <SafetyCertificateOutlined className="mt-0.5 text-[#2f6b49]" />
                   <div>
                     <Text className="font-medium">支付凭证</Text>
                     <Text type="secondary" className="text-sm block">
@@ -396,8 +400,8 @@ export default function CheckoutPage() {
             </Card>
           </Col>
 
-          <Col span={8}>
-            <Card className="sticky top-24">
+          <Col xs={24} lg={8}>
+            <Card className="reco-card sticky top-24 rounded-[30px]">
               <Title level={5} className="!mb-4">订单汇总</Title>
 
               <Descriptions column={1} size="small" className="mb-4">
@@ -415,11 +419,11 @@ export default function CheckoutPage() {
                 </Descriptions.Item>
               </Descriptions>
 
-              <Divider className="!my-4" />
+              <Divider className="!my-4 border-[#eadcc7]" />
 
               <div className="flex justify-between items-center mb-6">
                 <Text className="text-lg font-medium">应付总额</Text>
-                <Text className="text-2xl font-bold text-red-600 font-mono">
+                <Text className="font-mono text-2xl font-bold text-[#b45324]">
                   ¥{finalPrice.toLocaleString()}
                 </Text>
               </div>
@@ -430,7 +434,7 @@ export default function CheckoutPage() {
                 block
                 onClick={handleSubmit}
                 loading={loading}
-                className="h-12 text-lg"
+                className="reco-primary-button h-12 rounded-full text-lg"
               >
                 确认下单
               </Button>

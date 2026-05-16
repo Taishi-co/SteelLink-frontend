@@ -103,6 +103,72 @@ a {
   z-index: 1;
 }
 
+.reco-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(196, 123, 52, 0.12), transparent 30%),
+    linear-gradient(180deg, #fffaf1 0%, #f4efe6 44%, #efe3d1 100%);
+}
+
+.reco-card.ant-card,
+.mall-product-card.ant-card {
+  border-color: #eadcc7;
+  background: #fffaf1;
+  box-shadow: 0 12px 32px rgba(64, 44, 25, 0.06);
+}
+
+.reco-card.ant-card > .ant-card-head {
+  border-bottom-color: #eadcc7;
+  color: #17221b;
+  font-weight: 800;
+}
+
+.mall-product-card {
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.mall-product-card:hover {
+  transform: translateY(-5px);
+  border-color: #d0a56e !important;
+  box-shadow: 0 22px 48px rgba(64, 44, 25, 0.14) !important;
+}
+
+.reco-primary-button.ant-btn-primary {
+  background: #214332;
+  border-color: #214332;
+  box-shadow: 0 10px 24px rgba(33, 67, 50, 0.16);
+}
+
+.reco-primary-button.ant-btn-primary:not(:disabled):hover {
+  background: #2d5a43 !important;
+  border-color: #2d5a43 !important;
+}
+
+.reco-soft-table .ant-table,
+.reco-soft-table .ant-table-container,
+.reco-soft-table .ant-table-cell {
+  background: transparent;
+}
+
+.reco-soft-table .ant-table-thead > tr > th {
+  background: #f8f0e4 !important;
+  color: #38463b;
+  font-weight: 800;
+}
+
+.reco-soft-table .ant-table-tbody > tr > td {
+  border-bottom-color: #eadcc7;
+}
+
+.reco-soft-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn,
+.reco-soft-tabs .ant-tabs-tab:hover {
+  color: #9f5f23 !important;
+}
+
+.reco-soft-tabs .ant-tabs-ink-bar {
+  background: #c47b34;
+}
+
 @keyframes home-rise {
   from {
     opacity: 0;

@@ -41,11 +41,11 @@ export default function FavoritesPage() {
       key: 'image',
       width: 100,
       render: (_: unknown, record: Favorite) => (
-        <div className="w-20 h-20 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
+        <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-[#efe3d1]">
           {record.image ? (
-            <img src={record.image} alt={record.productName} className="w-full h-full object-cover" />
+            <img src={record.image} alt={record.productName} className="h-full w-full object-cover" />
           ) : (
-            <ShoppingCartOutlined className="text-gray-400 text-2xl" />
+            <ShoppingCartOutlined className="text-2xl text-[#214332]" />
           )}
         </div>
       ),
@@ -58,7 +58,7 @@ export default function FavoritesPage() {
         <div>
           <Row gutter={12} align="middle">
             <Col span={24}>
-              <Link to={`/products/${record.productId}`} className="text-gray-800 hover:text-primary-600 font-medium">
+              <Link to={`/products/${record.productId}`} className="font-semibold text-[#17221b] hover:text-[#9f5f23]">
                 {name}
               </Link>
             </Col>
@@ -88,7 +88,7 @@ export default function FavoritesPage() {
       width: 140,
       render: (price: number) => (
         <div className="text-right">
-          <Text className="text-red-500 font-bold font-mono">¥{price.toLocaleString()}</Text>
+          <Text className="font-mono font-bold text-[#b45324]">¥{price.toLocaleString()}</Text>
           <Text type="secondary" className="text-xs block">元/吨</Text>
         </div>
       ),
@@ -123,8 +123,8 @@ export default function FavoritesPage() {
 
   if (isLoading && items.length === 0) {
     return (
-      <div className="bg-gray-50 min-h-screen py-6">
-        <div className="max-w-7xl mx-auto px-6 flex justify-center items-center h-64">
+      <div className="reco-shell py-8">
+        <div className="mx-auto flex h-64 max-w-7xl items-center justify-center px-6">
           <Spin size="large" />
         </div>
       </div>
@@ -132,41 +132,52 @@ export default function FavoritesPage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen py-6">
-      <div className="max-w-7xl mx-auto px-6">
-        <Title level={3} className="!mb-6 flex items-center gap-2">
-          <HeartOutlined className="text-red-500" />
-          我的收藏
-        </Title>
+    <div className="reco-shell py-8">
+      <div className="mx-auto max-w-7xl px-6 md:px-10">
+        <div className="mb-6 rounded-[30px] border border-[#eadcc7] bg-[#fffaf1] p-7 shadow-sm">
+          <Text className="text-sm font-bold uppercase tracking-[0.28em] text-[#a4662c]">Favorites</Text>
+          <div className="mt-2 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+            <div>
+              <Title level={3} className="!mb-2 flex items-center gap-2 !font-black !text-[#17221b]">
+                <HeartOutlined className="text-[#b45324]" />
+                我的收藏
+              </Title>
+              <Text className="text-[#5f6b61]">集中管理关注商品，方便后续比价和下单。</Text>
+            </div>
+            <Link to="/products" className="font-semibold text-[#9f5f23]">返回商品列表</Link>
+          </div>
+        </div>
 
         {notLoggedIn ? (
-          <Card>
+          <Card className="reco-card rounded-[30px]">
             <Empty
               description="请先登录查看收藏"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             >
-              <Button type="primary" onClick={handleLogin}>
+              <Button type="primary" onClick={handleLogin} className="reco-primary-button rounded-full px-7">
                 去登录
               </Button>
             </Empty>
           </Card>
         ) : items.length > 0 ? (
-          <Card>
+          <Card className="reco-card rounded-[30px]">
             <Table
+              className="reco-soft-table"
               columns={columns}
               dataSource={items}
               rowKey="id"
               pagination={{ pageSize: 10 }}
+              scroll={{ x: 820 }}
             />
           </Card>
         ) : (
-          <Card>
+          <Card className="reco-card rounded-[30px]">
             <Empty
               description="收藏列表是空的"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             >
               <Link to="/products">
-                <Button type="primary">去商城选购</Button>
+                <Button type="primary" className="reco-primary-button rounded-full px-7">去商城选购</Button>
               </Link>
             </Empty>
           </Card>

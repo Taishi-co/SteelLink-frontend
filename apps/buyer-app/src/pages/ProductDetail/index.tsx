@@ -120,33 +120,33 @@ export default function ProductDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6">
-      <div className="mx-auto max-w-7xl px-6">
-        <div className="mb-4 text-gray-500">
-          <Link to="/">首页</Link>
-          <span className="mx-2">/</span>
-          <Link to="/products">商品列表</Link>
-          <span className="mx-2">/</span>
-          <span className="text-gray-700">{product?.name || `商品 ${productId}`}</span>
+    <div className="reco-shell py-8">
+      <div className="mx-auto max-w-7xl px-6 md:px-10">
+        <div className="mb-5 text-sm font-medium text-[#7a847a]">
+          <Link to="/" className="text-[#9f5f23]">首页</Link>
+          <span className="mx-2 text-[#c7b596]">/</span>
+          <Link to="/products" className="text-[#9f5f23]">商品列表</Link>
+          <span className="mx-2 text-[#c7b596]">/</span>
+          <span className="text-[#38463b]">{product?.name || `商品 ${productId}`}</span>
         </div>
 
         <Spin spinning={loading}>
           {product ? (
             <>
-              <Card className="mb-6">
-                <Row gutter={24}>
-                  <Col span={10}>
-                    <div className="flex h-96 items-center justify-center rounded-lg bg-gray-100">
+              <Card className="reco-card mb-6 rounded-[30px]">
+                <Row gutter={[28, 28]}>
+                  <Col xs={24} lg={10}>
+                    <div className="flex h-96 items-center justify-center overflow-hidden rounded-[26px] bg-[#efe3d1]">
                       {previewImage ? (
-                        <img src={previewImage} alt={product.name} className="h-full w-full rounded-lg object-cover" />
+                        <img src={previewImage} alt={product.name} className="h-full w-full object-cover" />
                       ) : (
-                        <span className="text-8xl">钢</span>
+                        <span className="text-8xl font-black text-[#214332]">钢</span>
                       )}
                     </div>
                     {product.images?.length > 1 ? (
                       <div className="mt-3 grid grid-cols-4 gap-3">
                         {product.images.map((image) => (
-                          <div key={image} className="h-20 overflow-hidden rounded border border-gray-200 bg-white">
+                          <div key={image} className="h-20 overflow-hidden rounded-2xl border border-[#eadcc7] bg-white">
                             <img src={image} alt={product.name} className="h-full w-full object-cover" />
                           </div>
                         ))}
@@ -154,8 +154,8 @@ export default function ProductDetailPage() {
                     ) : null}
                   </Col>
 
-                  <Col span={14}>
-                    <Title level={3} className="!mb-2">
+                  <Col xs={24} lg={14}>
+                    <Title level={3} className="!mb-2 !font-black !text-[#17221b]">
                       {product.name}
                     </Title>
                     <Space wrap className="mb-3">
@@ -173,20 +173,20 @@ export default function ProductDetailPage() {
                       </Tag>
                     </Space>
 
-                    <div className="mb-4 rounded bg-gray-50 p-4">
-                      <Text type="secondary">价格</Text>
-                      <div className="text-3xl font-bold text-red-500">
+                    <div className="mb-4 rounded-[22px] border border-[#eadcc7] bg-[#f8f0e4] p-5">
+                      <Text className="text-sm font-semibold text-[#7a847a]">价格</Text>
+                      <div className="text-3xl font-black text-[#b45324]">
                         ￥{product.unitPrice.toLocaleString()}
-                        <span className="ml-2 text-base text-gray-400">/吨</span>
+                        <span className="ml-2 text-base text-[#7a847a]">/吨</span>
                       </div>
                     </div>
 
-                    <Divider />
+                    <Divider className="border-[#eadcc7]" />
 
                     <Row gutter={[16, 16]} className="mb-6">
-                      <Col span={12}>
-                        <div className="h-full rounded-lg border border-gray-200 bg-white p-4">
-                          <Text strong className="mb-3 block text-gray-800">
+                      <Col xs={24} md={12}>
+                        <div className="h-full rounded-[22px] border border-[#eadcc7] bg-white/70 p-4">
+                          <Text strong className="mb-3 block text-[#17221b]">
                             仓储信息
                           </Text>
                           <Descriptions column={1} size="small" colon={false}>
@@ -206,9 +206,9 @@ export default function ProductDetailPage() {
                         </div>
                       </Col>
 
-                      <Col span={12}>
-                        <div className="h-full rounded-lg border border-gray-200 bg-white p-4">
-                          <Text strong className="mb-3 block text-gray-800">
+                      <Col xs={24} md={12}>
+                        <div className="h-full rounded-[22px] border border-[#eadcc7] bg-white/70 p-4">
+                          <Text strong className="mb-3 block text-[#17221b]">
                             交易信息
                           </Text>
                           <Descriptions column={1} size="small" colon={false}>
@@ -224,7 +224,7 @@ export default function ProductDetailPage() {
                     </Row>
 
                     <div className="mb-6">
-                      <div className={`mb-3 rounded-lg border px-4 py-3 text-sm ${canQuickOrder ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
+                      <div className={`mb-3 rounded-[18px] border px-4 py-3 text-sm ${canQuickOrder ? 'border-[#bfd2c4] bg-[#edf6ef] text-[#2f6b49]' : 'border-[#f0c0ad] bg-[#fff1ec] text-[#b45324]'}`}>
                         {canQuickOrder
                           ? `当前商品可直接下单，最低起订量 ${product.minOrderQty} 吨，当前可售 ${product.availableQty} 吨。`
                           : `当前商品暂不可直接下单，最低起订量 ${product.minOrderQty} 吨，高于当前可售库存 ${product.availableQty} 吨。`}
@@ -239,12 +239,12 @@ export default function ProductDetailPage() {
                           addonAfter="吨"
                         />
                         <Text type="secondary">
-                          小计：<span className="font-bold text-red-500">￥{(safeQuantity * product.unitPrice).toLocaleString()}</span>
+                          小计：<span className="font-bold text-[#b45324]">￥{(safeQuantity * product.unitPrice).toLocaleString()}</span>
                         </Text>
                       </Space>
                     </div>
 
-                    <Space size="large">
+                    <Space size="middle" wrap>
                       <Button
                         type="primary"
                         size="large"
@@ -252,6 +252,7 @@ export default function ProductDetailPage() {
                         loading={submitting}
                         disabled={!canQuickOrder}
                         onClick={() => void handleCreateOrder()}
+                        className="reco-primary-button rounded-full px-7"
                       >
                         立即下单
                       </Button>
@@ -260,6 +261,7 @@ export default function ProductDetailPage() {
                         size="large"
                         icon={<ShoppingCartOutlined />}
                         onClick={handleAddToCart}
+                        className="rounded-full border-[#d0b991] bg-white px-7"
                       >
                         加入购物车
                       </Button>
@@ -269,27 +271,28 @@ export default function ProductDetailPage() {
                         icon={<HeartOutlined />}
                         onClick={handleToggleFavorite}
                         danger={isFavorite}
+                        className="rounded-full px-6"
                       >
                         {isFavorite ? '已收藏' : '收藏'}
                       </Button>
-                      <Button size="large" icon={<ShareAltOutlined />}>
+                      <Button size="large" icon={<ShareAltOutlined />} className="rounded-full px-6">
                         分享
                       </Button>
                     </Space>
 
-                    <Divider />
+                    <Divider className="border-[#eadcc7]" />
 
-                    <div className="rounded-lg bg-gray-50 p-4">
-                      <Text strong className="mb-3 block text-gray-800">
+                    <div className="rounded-[22px] border border-[#eadcc7] bg-[#f8f0e4] p-4">
+                      <Text strong className="mb-3 block text-[#17221b]">
                         图文资料
                       </Text>
                       <Row gutter={[12, 12]}>
                         <Col span={product.images?.length ? 16 : 24}>
-                          <Paragraph className="!mb-2 text-gray-500">多图预览</Paragraph>
+                          <Paragraph className="!mb-2 text-[#7a847a]">多图预览</Paragraph>
                           {product.images?.length ? (
                             <div className="grid grid-cols-3 gap-3">
                               {product.images.map((image) => (
-                                <div key={image} className="h-28 overflow-hidden rounded border border-gray-200 bg-white">
+                                <div key={image} className="h-28 overflow-hidden rounded-2xl border border-[#eadcc7] bg-white">
                                   <img src={image} alt={product.name} className="h-full w-full object-cover" />
                                 </div>
                               ))}
@@ -299,13 +302,13 @@ export default function ProductDetailPage() {
                           )}
                         </Col>
                         <Col span={product.images?.length ? 8 : 24}>
-                          <Paragraph className="!mb-2 text-gray-500">质保资料</Paragraph>
+                          <Paragraph className="!mb-2 text-[#7a847a]">质保资料</Paragraph>
                           {product.qualityCert ? (
                             <a href={product.qualityCert} target="_blank" rel="noreferrer">查看质保书</a>
                           ) : (
                             <Text type="secondary">暂无质保书</Text>
                           )}
-                          <Paragraph className="!mb-2 !mt-4 text-gray-500">货权/仓单监管凭证</Paragraph>
+                          <Paragraph className="!mb-2 !mt-4 text-[#7a847a]">货权/仓单监管凭证</Paragraph>
                           {product.titleVoucherUrl ? (
                             <a href={product.titleVoucherUrl} target="_blank" rel="noreferrer">查看确权凭证</a>
                           ) : (
@@ -318,8 +321,9 @@ export default function ProductDetailPage() {
                 </Row>
               </Card>
 
-              <Card>
+              <Card className="reco-card rounded-[30px]">
                 <Tabs
+                  className="reco-soft-tabs"
                   activeKey={activeTab}
                   onChange={setActiveTab}
                   items={[
@@ -359,13 +363,13 @@ export default function ProductDetailPage() {
                     {
                       key: 'description',
                       label: '商品描述',
-                      children: <Paragraph className="text-gray-600">{product.description}</Paragraph>,
+                      children: <Paragraph className="text-[#5f6b61]">{product.description}</Paragraph>,
                     },
                     {
                       key: 'shipping',
                       label: '交易说明',
                       children: (
-                        <div className="text-gray-600">
+                        <div className="text-[#5f6b61]">
                           <Paragraph>1. 仅审核通过商品会进入买家可见范围。</Paragraph>
                           <Paragraph>2. 提交订单后会生成唯一订单号，并同步扣减可售库存。</Paragraph>
                           <Paragraph>3. 当前页面已接入真实后端接口，可直接用于本地联调。</Paragraph>

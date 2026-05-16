@@ -42,10 +42,16 @@ export default function Header() {
   ]
 
   return (
-    <AntHeader className="bg-white shadow-sm flex items-center px-6 h-16">
+    <AntHeader className="flex h-20 items-center border-b border-[#eadcc7] bg-[#fffdf8]/95 px-6 shadow-[0_10px_30px_rgba(64,44,25,.06)] backdrop-blur-xl">
       <div className="flex items-center gap-8 flex-1">
-        <Link to="/" className="text-xl font-bold text-primary-600 no-underline">
-          RecoLink
+        <Link to="/" className="flex items-center gap-3 no-underline">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#214332] text-lg font-black text-[#f3c17c]">
+            R
+          </span>
+          <span className="leading-tight">
+            <span className="block text-[15px] font-black tracking-[-0.02em] text-[#17221b]">锐联产业协同平台</span>
+            <span className="block text-xs font-bold tracking-[0.08em] text-[#a4662c]">RecoLink</span>
+          </span>
         </Link>
 
         <Menu
@@ -81,9 +87,9 @@ export default function Header() {
 
           {isLoggedIn ? (
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-              <div className="flex items-center gap-2 cursor-pointer px-3 py-1 rounded-lg hover:bg-gray-50">
-                <Avatar size="small" icon={<UserOutlined />} />
-                <span className="text-sm text-gray-700">{user?.username || user?.mobile || '用户'}</span>
+              <div className="flex cursor-pointer items-center gap-2 rounded-full border border-[#dfd0ba] bg-white/70 px-3 py-2 shadow-sm hover:bg-white">
+                <Avatar size="small" icon={<UserOutlined />} className="bg-[#c47b34]" />
+                <span className="text-sm font-semibold text-[#17221b]">{user?.username || user?.mobile || '用户'}</span>
               </div>
             </Dropdown>
           ) : (
@@ -92,7 +98,7 @@ export default function Header() {
                 <Button type="default" icon={<UserOutlined />}>登录</Button>
               </Link>
               <Link to="/login">
-                <Button type="primary">注册</Button>
+                <Button type="primary" className="reco-primary-button rounded-full">注册</Button>
               </Link>
             </Space>
           )}

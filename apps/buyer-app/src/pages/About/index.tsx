@@ -67,7 +67,7 @@ const newsItems = [
 
 const contactItems = [
   { icon: <PhoneOutlined />, label: '客服热线', value: '400-888-8888' },
-  { icon: <MailOutlined />, label: '商务合作', value: 'contact@steellink.com' },
+  { icon: <MailOutlined />, label: '商务合作', value: 'contact@recolink.com' },
   { icon: <CustomerServiceOutlined />, label: '服务时间', value: '工作日 9:00-18:00' },
   { icon: <EnvironmentOutlined />, label: '服务范围', value: '全国主要钢铁产业集群' },
 ]

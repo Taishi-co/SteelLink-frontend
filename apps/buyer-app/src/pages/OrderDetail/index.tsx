@@ -985,8 +985,8 @@ export default function OrderDetailPage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen py-6">
-      <div className="max-w-6xl mx-auto px-6">
+    <div className="reco-shell py-8">
+      <div className="mx-auto max-w-6xl px-6 md:px-10">
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/orders')}>
           返回订单列表
         </Button>
@@ -996,12 +996,12 @@ export default function OrderDetailPage() {
             <Spin size="large" />
           </div>
         ) : !order || !item ? (
-          <Card className="mt-6">
+          <Card className="reco-card mt-6 rounded-[28px]">
             <Empty description="订单不存在或无权查看" />
           </Card>
         ) : (
           <>
-            <Card className="mt-6">
+            <Card className="reco-card mt-6 rounded-[28px]">
               <div className="flex justify-between items-start">
                 <div>
                   <Title level={3} className="!mb-2">
@@ -1017,11 +1017,11 @@ export default function OrderDetailPage() {
               </div>
             </Card>
 
-            <Card className="mt-6">
+            <Card className="reco-card mt-6 rounded-[28px]">
               <Steps current={getCurrentStep(order.status)} items={orderSteps} />
             </Card>
 
-            <Card title="订单时间线" className="mt-6">
+            <Card title="订单时间线" className="reco-card mt-6 rounded-[28px]">
               <Timeline
                 items={(order.timeline || []).map((item) => ({
                   color: timelineColor(item.status),
@@ -1043,12 +1043,12 @@ export default function OrderDetailPage() {
             <Alert
               type={statusNotice.type}
               showIcon
-              className="mt-6"
+              className="reco-card mt-6 rounded-[28px]"
               message={statusNotice.title}
               description={statusNotice.message}
             />
 
-            <Card title="订单商品" className="mt-6">
+            <Card title="订单商品" className="reco-card mt-6 rounded-[28px]">
               <Descriptions bordered column={2}>
                 <Descriptions.Item label="商品名称">{item.product_name}</Descriptions.Item>
                 <Descriptions.Item label="商品编号">{item.product_no}</Descriptions.Item>
@@ -1066,7 +1066,7 @@ export default function OrderDetailPage() {
             </Card>
 
             {order.delivery_info && (
-              <Card title="订单仓库快照" className="mt-6">
+              <Card title="订单仓库快照" className="reco-card mt-6 rounded-[28px]">
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="提货仓库">
                     {pickupWarehouseName || '-'}
@@ -1098,7 +1098,7 @@ export default function OrderDetailPage() {
               </Card>
             )}
 
-            <Card title="交易双方" className="mt-6">
+            <Card title="交易双方" className="reco-card mt-6 rounded-[28px]">
               <Descriptions bordered column={2}>
                 <Descriptions.Item label="买家企业">{order.buyer_name}</Descriptions.Item>
                 <Descriptions.Item label="卖家企业">{order.seller_name}</Descriptions.Item>
@@ -1114,7 +1114,7 @@ export default function OrderDetailPage() {
             </Card>
 
             {order.contract_info && (
-              <Card title="合同信息" className="mt-6">
+              <Card title="合同信息" className="reco-card mt-6 rounded-[28px]">
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="合同编号">
                     {order.contract_info.contract_no || '-'}
@@ -1147,7 +1147,7 @@ export default function OrderDetailPage() {
             )}
 
             {order.payment_info && (
-              <Card title="支付信息" className="mt-6">
+              <Card title="支付信息" className="reco-card mt-6 rounded-[28px]">
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="支付方式">
                     {order.payment_info.payment_method}
@@ -1191,7 +1191,7 @@ export default function OrderDetailPage() {
             )}
 
             {order.status >= 5 && (
-              <Card title="提货信息" className="mt-6">
+              <Card title="提货信息" className="reco-card mt-6 rounded-[28px]">
                 {order.delivery_info ? (
                   <Descriptions bordered column={2}>
                     <Descriptions.Item label="司机姓名">
@@ -1254,7 +1254,7 @@ export default function OrderDetailPage() {
               </Card>
             )}
 
-            <Card title="物流仓储履约" className="mt-6">
+            <Card title="物流仓储履约" className="reco-card mt-6 rounded-[28px]">
               <Space direction="vertical" size="middle" className="w-full">
                 <Alert
                   showIcon
@@ -1330,12 +1330,12 @@ export default function OrderDetailPage() {
                       return (
                         <div
                           key={step.key}
-                          className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                          className="rounded-[20px] border border-[#eadcc7] bg-[#f8f0e4] p-3"
                         >
                           <div className="mb-2 flex items-start justify-between gap-3">
                             <div>
-                              <div className="text-xs text-slate-500">节点 {index + 1}</div>
-                              <div className="text-sm font-medium text-slate-900">{step.title}</div>
+                              <div className="text-xs text-[#7a847a]">节点 {index + 1}</div>
+                              <div className="text-sm font-semibold text-[#17221b]">{step.title}</div>
                             </div>
                             <Tag color={tagColor}>
                               {stepState === 'completed'
@@ -1345,17 +1345,17 @@ export default function OrderDetailPage() {
                                   : '待处理'}
                             </Tag>
                           </div>
-                          <div className="space-y-1 text-xs text-slate-600">
+                          <div className="space-y-1 text-xs text-[#5f6b61]">
                             <div>
-                              <span className="font-medium text-slate-700">责任方：</span>
+                              <span className="font-semibold text-[#38463b]">责任方：</span>
                               {step.owner}
                             </div>
                             <div>
-                              <span className="font-medium text-slate-700">凭证：</span>
+                              <span className="font-semibold text-[#38463b]">凭证：</span>
                               {step.proofHint}
                             </div>
                             <div>
-                              <span className="font-medium text-slate-700">时间：</span>
+                              <span className="font-semibold text-[#38463b]">时间：</span>
                               {getFulfillmentStepDescription(step.key, logisticsOrder)}
                             </div>
                           </div>
@@ -1459,7 +1459,7 @@ export default function OrderDetailPage() {
             </Card>
 
             {order.financing_info && (
-              <Card title="融资信息" className="mt-6">
+              <Card title="融资信息" className="reco-card mt-6 rounded-[28px]">
                 <Space direction="vertical" size="middle" className="w-full">
                   <Descriptions bordered column={2}>
                     <Descriptions.Item label="融资状态">
@@ -1520,12 +1520,12 @@ export default function OrderDetailPage() {
                       return (
                         <div
                           key={step.key}
-                          className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                          className="rounded-[20px] border border-[#eadcc7] bg-[#f8f0e4] p-3"
                         >
                           <div className="mb-2 flex items-start justify-between gap-3">
                             <div>
-                              <div className="text-xs text-slate-500">节点 {index + 1}</div>
-                              <div className="text-sm font-medium text-slate-900">{step.title}</div>
+                              <div className="text-xs text-[#7a847a]">节点 {index + 1}</div>
+                              <div className="text-sm font-semibold text-[#17221b]">{step.title}</div>
                             </div>
                             <Tag color={tagColor}>
                               {stepState === 'completed'
@@ -1535,13 +1535,13 @@ export default function OrderDetailPage() {
                                   : '待处理'}
                             </Tag>
                           </div>
-                          <div className="space-y-1 text-xs text-slate-600">
+                          <div className="space-y-1 text-xs text-[#5f6b61]">
                             <div>
-                              <span className="font-medium text-slate-700">责任方：</span>
+                              <span className="font-semibold text-[#38463b]">责任方：</span>
                               {step.owner}
                             </div>
                             <div>
-                              <span className="font-medium text-slate-700">说明：</span>
+                              <span className="font-semibold text-[#38463b]">说明：</span>
                               {step.hint}
                             </div>
                           </div>
@@ -1554,7 +1554,7 @@ export default function OrderDetailPage() {
             )}
 
             {(order.receipt_voucher || order.receipt_at || order.status === 8) && (
-              <Card title="签收信息" className="mt-6">
+              <Card title="签收信息" className="reco-card mt-6 rounded-[28px]">
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="签收时间">
                     {order.receipt_at ? new Date(order.receipt_at).toLocaleString() : '-'}
@@ -1585,7 +1585,7 @@ export default function OrderDetailPage() {
               </Card>
             )}
 
-            <Card className="mt-6">
+            <Card className="reco-card mt-6 rounded-[28px]">
               <Title level={5}>订单操作</Title>
               <Space wrap>
                 {(order.status === 14 || order.status === 15) && (
@@ -2137,7 +2137,7 @@ export default function OrderDetailPage() {
                               className="w-full"
                               disabled={order.status === 16}
                             >
-                              <Card className="w-full" hoverable={order.status === 17}>
+                              <Card className="reco-card w-full rounded-[22px]" hoverable={order.status === 17}>
                                 <div className="flex justify-between items-start">
                                   <div className="flex-1">
                                     <div className="font-medium text-gray-900">
@@ -2162,7 +2162,7 @@ export default function OrderDetailPage() {
                                     )}
                                   </div>
                                   <div className="text-right">
-                                    <div className="text-xl font-bold text-blue-600">
+                                    <div className="text-xl font-bold text-[#b45324]">
                                       ¥{quote.amount.toLocaleString()}
                                     </div>
                                     <div className="text-xs text-gray-500 mt-1">

@@ -67,15 +67,15 @@ export default function HomeHeader() {
   }))
 
   return (
-    <AntHeader className="fixed left-0 right-0 top-0 z-50 h-20 border-b border-[#2a362c]/10 bg-[#fffaf1]/88 px-4 shadow-[0_14px_36px_rgba(32,24,14,.08)] backdrop-blur-xl md:px-8">
+    <AntHeader className="fixed left-0 right-0 top-0 z-50 h-20 border-b border-[#eadcc7] bg-[#fffdf8]/95 px-4 shadow-[0_10px_30px_rgba(64,44,25,.06)] backdrop-blur-xl md:px-8">
       <div className="mx-auto flex h-full w-full max-w-7xl items-center justify-between gap-5">
-        <Link to="/" className="group flex flex-shrink-0 items-center gap-3 no-underline">
-          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#17221b] text-lg font-black text-[#efb56f] shadow-[0_12px_28px_rgba(23,34,27,.24)]">
+        <Link to="/" className="group flex min-w-0 flex-shrink-0 items-center gap-3 no-underline">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#214332] text-lg font-black text-[#f3c17c] shadow-[0_10px_24px_rgba(33,67,50,.18)]">
             R
           </span>
-          <span>
-            <span className="block text-xl font-black tracking-[-0.03em] text-[#17221b]">RecoLink</span>
-            <span className="hidden text-[11px] font-bold uppercase tracking-[0.2em] text-[#9f6a36] sm:block">Steel Network</span>
+          <span className="min-w-0 leading-tight">
+            <span className="block truncate text-[15px] font-black tracking-[-0.02em] text-[#17221b] sm:text-[17px]">锐联产业协同平台</span>
+            <span className="block text-[12px] font-bold tracking-[0.08em] text-[#a4662c]">RecoLink</span>
           </span>
         </Link>
 
@@ -96,7 +96,7 @@ export default function HomeHeader() {
                 type="primary"
                 icon={<DashboardOutlined />}
                 onClick={() => navigate('/dashboard')}
-                className="rounded-full bg-[#17221b] px-5 font-semibold hover:!bg-[#253628]"
+                className="rounded-full bg-[#214332] px-5 font-semibold hover:!bg-[#2d5a43]"
               >
                 个人工作台
               </Button>
@@ -106,7 +106,7 @@ export default function HomeHeader() {
               <NotificationBell />
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
                 <div className="flex cursor-pointer items-center gap-2 rounded-full border border-[#dfd0ba] bg-white/70 px-3 py-2 shadow-sm transition-colors hover:bg-white">
-                  <Avatar size="small" icon={<UserOutlined />} className="bg-[#d08a3c]" />
+                  <Avatar size="small" icon={<UserOutlined />} className="bg-[#c47b34]" />
                   <span className="max-w-[120px] truncate text-sm font-semibold text-[#17221b]">{user?.realName || user?.username || user?.mobile || '用户'}</span>
                 </div>
               </Dropdown>
@@ -114,17 +114,17 @@ export default function HomeHeader() {
           ) : (
             <>
               <Link to="/login">
-                <Button type="primary" className="rounded-full bg-[#17221b] px-5 font-semibold hover:!bg-[#253628]">登录 / 注册</Button>
+                <Button type="primary" className="rounded-full bg-[#214332] px-5 font-semibold hover:!bg-[#2d5a43]">登录 / 注册</Button>
               </Link>
               <Link to="/dashboard/enterprise">
-                <Button icon={<TeamOutlined />} className="rounded-full border-[#d0b991] bg-white/60">企业入驻</Button>
+                <Button icon={<TeamOutlined />} className="rounded-full border-[#d0b991] bg-white">企业入驻</Button>
               </Link>
             </>
           )}
         </Space>
 
         <Dropdown menu={{ items: mobileMenuItems }} placement="bottomRight">
-          <Button className="inline-flex rounded-full md:hidden" icon={<MenuOutlined />} />
+          <Button className="inline-flex rounded-full lg:hidden" icon={<MenuOutlined />} />
         </Dropdown>
       </div>
     </AntHeader>
