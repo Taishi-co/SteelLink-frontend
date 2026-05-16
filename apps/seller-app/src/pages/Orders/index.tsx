@@ -558,14 +558,18 @@ export default function OrdersPage() {
   const showCompleted = (title: string, next: string, detail?: SellerOrderInfo) => {
     Modal.success({
       title,
+      closable: true,
+      maskClosable: true,
       content: (
         <Space direction="vertical" size={8}>
           <Text>已完成：{title.replace('已完成', '')}</Text>
           <Text type="secondary">下一步：{next}</Text>
-          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+          <Text type="secondary">可留在当前列表继续处理，也可打开订单详情核对链路状态。</Text>
         </Space>
       ),
-      okText: '回订单工作台',
+      okCancel: true,
+      okText: detail ? '查看订单详情' : '知道了',
+      cancelText: '留在列表',
       onOk: () => {
         if (detail) {
           setSelectedOrder(detail)

@@ -690,18 +690,26 @@ export default function OrderDetailPage() {
     setFinanceOpen(true)
   }
 
-  const showCompleted = (title: string, next: string) => {
+  const showCompleted = (
+    title: string,
+    next: string,
+    action: { label?: string; onClick?: () => void } = {}
+  ) => {
     Modal.success({
       title,
+      closable: true,
+      maskClosable: true,
       content: (
         <Space direction="vertical" size={8}>
           <Text>已完成：{title.replace('已完成', '')}</Text>
           <Text type="secondary">下一步：{next}</Text>
-          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+          <Text type="secondary">可留在当前详情页核对状态，或按推荐动作继续处理。</Text>
         </Space>
       ),
-      okText: '回工作台看订单',
-      onOk: () => navigate('/orders'),
+      okCancel: true,
+      okText: action.label || '查看订单列表',
+      cancelText: '留在当前页',
+      onOk: action.onClick || (() => navigate('/orders')),
     })
   }
 
@@ -861,7 +869,10 @@ export default function OrderDetailPage() {
     try {
       setSigning(true)
       await orderService.signContract(Number(id))
-      showCompleted('合同签署已完成', '等待对方签署；双方签署后进入支付节点。')
+      showCompleted('合同签署已完成', '等待对方签署；双方签署后进入支付节点。', {
+        label: '留在详情跟进',
+        onClick: () => undefined,
+      })
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
     } catch (error: unknown) {
@@ -882,7 +893,10 @@ export default function OrderDetailPage() {
         finance_service_id: selectedFinanceServiceId,
         requested_amount: order?.tax_total_amount || order?.total_amount,
       })
-      showCompleted('融资申请已提交', '等待资金方完成风控审批。')
+      showCompleted('融资申请已提交', '等待资金方完成风控审批。', {
+        label: '查看订单列表',
+        onClick: () => navigate('/orders'),
+      })
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       setFinanceOpen(false)
@@ -903,6 +917,9 @@ export default function OrderDetailPage() {
       showCompleted(
         confirmed ? '融资方案确认已完成' : '已放弃融资',
         confirmed ? '等待资金方生成债务质押合同。' : '订单已恢复为待支付，可直接上传支付凭证。',
+        confirmed
+          ? { label: '留在详情跟进', onClick: () => undefined }
+          : { label: '继续上传支付凭证', onClick: () => undefined },
       )
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
@@ -925,7 +942,10 @@ export default function OrderDetailPage() {
       await orderService.buyerSignDebtAndPayFee(Number(id), {
         fee_voucher_url: uploaded.url,
       })
-      showCompleted('融资合同签署已完成', '等待资金方放款。')
+      showCompleted('融资合同签署已完成', '等待资金方放款。', {
+        label: '留在详情跟进',
+        onClick: () => undefined,
+      })
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       setDebtSigningOpen(false)
@@ -949,7 +969,10 @@ export default function OrderDetailPage() {
         try {
           setCancelling(true)
           await orderService.cancel(Number(id))
-          showCompleted('订单取消已完成', '订单已回到工作台记录，库存已释放。')
+          showCompleted('订单取消已完成', '订单已回到工作台记录，库存已释放。', {
+            label: '查看订单列表',
+            onClick: () => navigate('/orders'),
+          })
           await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
           await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
         } catch (error: unknown) {
@@ -1573,7 +1596,10 @@ export default function OrderDetailPage() {
                         await orderService.buyerConfirm(Number(id), {
                           confirm_note: '买方确认订单',
                         })
-                        showCompleted('买方确认已完成', '进入合同签署节点，请签署交易合同。')
+                        showCompleted('买方确认已完成', '进入合同签署节点，请签署交易合同。', {
+                          label: '留在详情签合同',
+                          onClick: () => undefined,
+                        })
                         await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
                       } catch (error: unknown) {
                         message.error(getErrorMessage(error, '确认失败'))

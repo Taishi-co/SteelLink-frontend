@@ -142,14 +142,18 @@ function App() {
   const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
     Modal.success({
       title,
+      closable: true,
+      maskClosable: true,
       content: (
         <Space direction="vertical" size={8}>
           <Text>已完成：{title.replace('已完成', '')}</Text>
           <Text type="secondary">下一步：{next}</Text>
-          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+          <Text type="secondary">可留在当前页继续处理，或切到推荐工作区查看后续任务。</Text>
         </Space>
       ),
-      okText: '回工作台看订单',
+      okCancel: true,
+      okText: '查看推荐工作区',
+      cancelText: '留在当前页',
       onOk: () => setActiveTab(targetTab),
     })
   }
