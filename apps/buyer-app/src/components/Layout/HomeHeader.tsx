@@ -53,7 +53,7 @@ export default function HomeHeader() {
     <AntHeader className="bg-white shadow-sm flex items-center px-8 h-16 fixed top-0 left-0 right-0 z-50">
       <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
         <Link to="/" className="text-2xl font-bold text-primary-600 no-underline flex-shrink-0">
-          SteelLink
+          RecoLink
         </Link>
 
         <Menu

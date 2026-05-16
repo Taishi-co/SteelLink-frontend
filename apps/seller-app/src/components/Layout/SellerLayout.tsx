@@ -122,7 +122,7 @@ export default function SellerLayout() {
     <Layout className="min-h-screen min-w-0">
       <Sider width={220} className="bg-white shadow-sm shrink-0">
         <div className="h-16 flex items-center justify-center border-b">
-          <Text className="text-xl font-bold text-primary-600">SteelLink</Text>
+          <Text className="text-xl font-bold text-primary-600">RecoLink</Text>
         </div>
         {!ready && (
           <div className="px-4 py-3 mx-3 mt-3 bg-orange-50 rounded-lg border border-orange-100">

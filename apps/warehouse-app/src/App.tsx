@@ -504,7 +504,7 @@ function App() {
         >
           <Space>
             <BankOutlined style={{ color: '#16a34a' }} />
-            <Text strong>SteelLink 仓储</Text>
+            <Text strong>RecoLink 仓储</Text>
           </Space>
         </div>
         <div style={{ padding: 16 }}>

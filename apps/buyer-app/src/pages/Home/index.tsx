@@ -101,7 +101,7 @@ export default function HomePage() {
           <Row gutter={48} align="middle">
             <Col span={14}>
               <Title className="!text-white !text-5xl !mb-6">
-                专业B2B钢材交易平台
+                专业产业资源协同平台
               </Title>
               <Paragraph className="!text-white/90 text-xl mb-8">
                 现货直购 · 供求信息 · AI采购 · 竞价交易 · 一站式钢铁供应链解决方案
@@ -144,7 +144,7 @@ export default function HomePage() {
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-8">
           <div className="text-center mb-16">
-            <Title level={2}>为什么选择 SteelLink</Title>
+            <Title level={2}>为什么选择 RecoLink</Title>
             <Paragraph className="text-gray-500 text-lg">
               专业、高效、安全的钢材交易服务
             </Paragraph>
@@ -250,7 +250,7 @@ export default function HomePage() {
             开启您的钢铁采购之旅
           </Title>
           <Paragraph className="!text-white/90 text-xl mb-8">
-            加入 SteelLink，享受专业、高效、安全的钢材交易服务
+            加入 RecoLink，享受专业、高效、安全的钢材交易服务
           </Paragraph>
           <div className="flex justify-center gap-4">
             <Link to="/mall">

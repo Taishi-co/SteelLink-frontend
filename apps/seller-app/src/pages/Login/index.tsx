@@ -110,7 +110,7 @@ export default function LoginPage() {
       <div className="w-full max-w-[1080px] grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8 items-center">
         <section className="text-slate-900">
           <div className="inline-flex items-center rounded-full border border-white/70 bg-white/70 px-4 py-1 text-sm font-medium text-sky-700 shadow-sm">
-            SteelLink 卖家工作台
+            RecoLink 卖家工作台
           </div>
           <h1 className="mt-6 text-4xl font-black leading-tight text-slate-900">
             提报商品、跟踪审核、协同订单

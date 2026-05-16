@@ -12,9 +12,9 @@ export default function HomeFooter() {
       <div className="max-w-7xl mx-auto px-8">
         <Row gutter={[48, 48]}>
           <Col span={8}>
-            <Text className="text-white text-2xl font-bold">SteelLink</Text>
+            <Text className="text-white text-2xl font-bold">RecoLink</Text>
             <p className="text-gray-400 mt-4">
-              专业B2B钢材交易平台，为钢铁行业提供现货交易、竞价采购、集采服务等一站式解决方案。
+              专业产业资源协同平台，为钢铁行业提供现货交易、竞价采购、集采服务等一站式解决方案。
             </p>
           </Col>
           <Col span={4}>
@@ -53,7 +53,7 @@ export default function HomeFooter() {
           </Col>
         </Row>
         <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-500">
-          <p>© 2024 SteelLink. All rights reserved. | B2B钢材交易平台</p>
+          <p>© 2024 RecoLink. All rights reserved. | 产业资源协同平台</p>
         </div>
       </div>
     </AntFooter>

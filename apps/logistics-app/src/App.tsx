@@ -493,7 +493,7 @@ function App() {
         >
           <Space>
             <RocketOutlined style={{ color: '#1677ff' }} />
-            <Text strong>SteelLink 物流</Text>
+            <Text strong>RecoLink 物流</Text>
           </Space>
         </div>
         <div style={{ padding: 16 }}>

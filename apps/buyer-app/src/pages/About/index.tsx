@@ -48,7 +48,7 @@ const newsItems = [
   {
     date: '2026-04-26',
     tag: '产品更新',
-    title: 'SteelLink 上线 AI采购工作流',
+    title: 'RecoLink 上线 AI采购工作流',
     summary: '买家可通过对话描述采购需求，平台自动完成指令解析、商品匹配、订单草稿和融资方案推荐。',
   },
   {
@@ -81,9 +81,9 @@ export default function AboutPage() {
             <Tag color="blue" className="mb-5 w-fit px-3 py-1 text-sm">
               平台介绍
             </Tag>
-            <Title className="!mb-5 !text-5xl !leading-tight">SteelLink 钢铁供应链数字交易平台</Title>
+            <Title className="!mb-5 !text-5xl !leading-tight">RecoLink 钢铁供应链数字交易平台</Title>
             <Paragraph className="!mb-8 text-lg !leading-8 text-gray-600">
-              SteelLink 面向钢材采购、销售、仓储、物流和金融协同场景，提供现货交易、供求信息、AI采购、
+              RecoLink 面向钢材采购、销售、仓储、物流和金融协同场景，提供现货交易、供求信息、AI采购、
               竞价交易、集采大厅和供应链金融服务，帮助企业把采购线索、交易订单与履约服务连接成完整闭环。
             </Paragraph>
             <Space size="middle">
@@ -102,7 +102,7 @@ export default function AboutPage() {
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(59,130,246,0.35),transparent_32%),linear-gradient(135deg,#0f172a_0%,#1e3a8a_45%,#111827_100%)]" />
               <div className="relative flex h-full flex-col justify-between">
                 <div>
-                  <Text className="text-white/70">SteelLink Operating Network</Text>
+                  <Text className="text-white/70">RecoLink Operating Network</Text>
                   <Title level={2} className="!mt-3 !text-white">
                     交易、金融、履约一体化
                   </Title>
@@ -126,7 +126,7 @@ export default function AboutPage() {
           <Title level={2}>平台简介</Title>
           <Paragraph className="max-w-4xl text-base !leading-8 text-gray-600">
             平台以企业认证和商品审核为基础，以现货商城和供求信息为流量入口，以竞价、集采和AI采购提升采购效率，
-            并通过仓储物流服务商和金融服务能力完善交易履约。SteelLink 的目标不是只做信息展示，而是让买家能更快找到货、
+            并通过仓储物流服务商和金融服务能力完善交易履约。RecoLink 的目标不是只做信息展示，而是让买家能更快找到货、
             卖家能更稳定获客、平台能围绕真实订单沉淀信用与风控数据。
           </Paragraph>
         </div>

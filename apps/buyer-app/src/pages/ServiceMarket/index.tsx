@@ -23,10 +23,14 @@ import {
 import { serviceFulfillmentService } from '@/services/serviceFulfillmentService'
 import type { CreateLogisticsOrderPayload, CreateWarehouseStoragePayload } from '@/services/serviceFulfillmentService'
 import { getBuyerToken } from '@/services/auth'
+import { certificationService } from '@/services/certificationService'
 
 const { Title, Paragraph, Text } = Typography
 
 type ResourceType = 'warehouse' | 'logistics'
+type ProviderService = 'warehouse' | 'logistics' | 'finance'
+
+const providerServices = new Set<ProviderService>(['warehouse', 'logistics', 'finance'])
 
 interface ServiceResourceRow {
   key: string
@@ -114,6 +118,11 @@ export default function ServiceMarketPage() {
     queryKey: ['service-market-logistics'],
     queryFn: () => serviceOfferService.listLogistics({ page_size: 12 }),
   })
+  const { data: serviceOverview } = useQuery({
+    queryKey: ['service-market-enterprise-services'],
+    queryFn: () => certificationService.getMyServices(),
+    enabled: isLoggedIn,
+  })
 
   const warehouses = useMemo(() => warehouseData?.data.list ?? [], [warehouseData?.data.list])
   const logistics = useMemo(() => logisticsData?.data.list ?? [], [logisticsData?.data.list])
@@ -129,6 +138,21 @@ export default function ServiceMarketPage() {
 
   const totalWarehouseCapacity = warehouses.reduce((sum, item) => sum + (item.available_capacity || 0), 0)
   const totalLogisticsCapacity = logistics.reduce((sum, item) => sum + (item.load_capacity || 0), 0)
+  const approvedProviderServices = useMemo(() => {
+    return new Set(
+      (serviceOverview?.data?.permissions ?? [])
+        .filter((item) => providerServices.has(item.service as ProviderService) && item.status === 2)
+        .map((item) => item.service),
+    )
+  }, [serviceOverview?.data?.permissions])
+  const canListWarehouse = approvedProviderServices.has('warehouse')
+  const canListLogistics = approvedProviderServices.has('logistics')
+  const visibleServiceCards = useMemo(() => {
+    return serviceCards.filter((item) => {
+      if (item.key !== 'provider-listing') return true
+      return canListWarehouse || canListLogistics
+    })
+  }, [canListLogistics, canListWarehouse])
   const ensureLoggedIn = () => {
     if (!isLoggedIn) {
       message.warning('请先登录后再提交服务需求')
@@ -296,7 +320,7 @@ export default function ServiceMarketPage() {
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <Row gutter={[16, 16]}>
-          {serviceCards.map((item) => (
+          {visibleServiceCards.map((item) => (
             <Col xs={24} md={8} key={item.title}>
               <Card className="h-full rounded-lg border-slate-200">
                 <Space align="start" size="middle">
@@ -312,8 +336,8 @@ export default function ServiceMarketPage() {
                       {item.key === 'storage-rent' && <Button type="primary" onClick={() => openStorageRequest()}>提交租仓托管</Button>}
                       {item.key === 'provider-listing' && (
                         <Space wrap>
-                          <Button onClick={() => { if (ensureLoggedIn()) setActiveModal('warehouse-listing') }}>上架仓库</Button>
-                          <Button onClick={() => { if (ensureLoggedIn()) setActiveModal('logistics-listing') }}>上架物流</Button>
+                          {canListWarehouse && <Button onClick={() => { if (ensureLoggedIn()) setActiveModal('warehouse-listing') }}>上架仓库</Button>}
+                          {canListLogistics && <Button onClick={() => { if (ensureLoggedIn()) setActiveModal('logistics-listing') }}>上架物流</Button>}
                         </Space>
                       )}
                     </div>
