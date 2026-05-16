@@ -632,11 +632,11 @@ export default function OrderDetailPage() {
       (await serviceOfferService.listFinanceAvailableForOrder(Number(order?.id))).data.list,
     enabled: Boolean(order?.id && financeOpen),
   })
-  const { data: myWarehousesData } = useQuery({
-    queryKey: ['my-warehouse-services'],
-    queryFn: () => serviceOfferService.listMyWarehouses(),
+  const { data: publicWarehousesData } = useQuery({
+    queryKey: ['public-warehouse-services-for-dest'],
+    queryFn: () => serviceOfferService.listWarehouses({ page: 1, page_size: 200, status: 2 }),
   })
-  const myWarehouses = myWarehousesData?.data ?? []
+  const publicWarehouses = publicWarehousesData?.data.list ?? []
   const financeProducts = (financeProductsData || []).slice().sort((left, right) => {
     if (left.id === aiFinanceRecommendation?.finance_service_id) return -1
     if (right.id === aiFinanceRecommendation?.finance_service_id) return 1
@@ -1885,11 +1885,11 @@ export default function OrderDetailPage() {
                     placeholder="请选择已登记的仓储"
                     showSearch
                     optionFilterProp="children"
-                    loading={!myWarehousesData}
+                    loading={!publicWarehousesData}
                   >
-                    {myWarehouses.map((w: WarehouseServiceItem) => (
+                    {publicWarehouses.map((w: WarehouseServiceItem) => (
                       <Select.Option key={w.id} value={w.id}>
-                        {w.warehouse_name}（ID: {w.id}）
+                        {w.warehouse_name}（ID: {w.id}）{w.finance_certified ? ' · 资方认证监管仓' : ''}
                       </Select.Option>
                     ))}
                   </Select>
