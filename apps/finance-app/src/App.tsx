@@ -14,7 +14,7 @@ import {
   ControlOutlined,
 } from '@ant-design/icons'
 import { financeOrderService } from '@/services/orderService'
-import type { CollateralMonitorInfo, OrderInfo } from '@/services/orderService'
+import type { CollateralMonitorInfo, OrderInfo, WarehouseReceiptPledgeInfo } from '@/services/orderService'
 import { financeService, type FinanceServiceItem } from '@/services/financeService'
 import { hasFinanceCapability } from '@/services/auth'
 
@@ -45,12 +45,22 @@ const statusMap: Record<number, { label: string; color: string }> = {
   11: { label: '异常', color: 'red' },
 }
 
-type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'disburse' | 'pledge' | 'collateral-monitor' | 'release-pledge' | 'finance-flow' | 'all'
+type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'disburse' | 'pledge' | 'warehouse-receipt-pledge' | 'collateral-monitor' | 'release-pledge' | 'finance-flow' | 'all'
 const productStatusMap: Record<number, { label: string; color: string }> = {
   1: { label: '待审核', color: 'processing' },
   2: { label: '已通过', color: 'success' },
   3: { label: '已驳回', color: 'error' },
   4: { label: '已下线', color: 'default' },
+}
+
+const warehouseReceiptPledgeStatusMap: Record<string, { label: string; color: string }> = {
+  submitted: { label: '待风控', color: 'processing' },
+  risk_approved: { label: '风控通过', color: 'cyan' },
+  risk_rejected: { label: '已驳回', color: 'red' },
+  agreement_signed: { label: '协议已签', color: 'blue' },
+  disbursed: { label: '已放款', color: 'green' },
+  releasing: { label: '释放中', color: 'purple' },
+  released: { label: '已释放', color: 'default' },
 }
 
 function App() {
@@ -66,6 +76,7 @@ function App() {
   const [debtOrders, setDebtOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
   const [collateralList, setCollateralList] = useState<CollateralMonitorInfo[]>([])
+  const [warehouseReceiptPledges, setWarehouseReceiptPledges] = useState<WarehouseReceiptPledgeInfo[]>([])
   const [loading, setLoading] = useState(false)
 
   const [riskModal, setRiskModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
@@ -98,6 +109,21 @@ function App() {
   const [collateralReceiptModal, setCollateralReceiptModal] = useState<{ visible: boolean; record: CollateralMonitorInfo | null }>({ visible: false, record: null })
   const [collateralReceiptURL, setCollateralReceiptURL] = useState('')
   const [collateralReceiptRemark, setCollateralReceiptRemark] = useState('')
+  const [wrpRiskModal, setWrpRiskModal] = useState<{ visible: boolean; record: WarehouseReceiptPledgeInfo | null }>({ visible: false, record: null })
+  const [wrpRiskApproved, setWrpRiskApproved] = useState(true)
+  const [wrpApprovedAmount, setWrpApprovedAmount] = useState<number>(0)
+  const [wrpTermDays, setWrpTermDays] = useState<number>(30)
+  const [wrpAnnualRate, setWrpAnnualRate] = useState<number>(0)
+  const [wrpRiskRemark, setWrpRiskRemark] = useState('')
+  const [wrpAgreementModal, setWrpAgreementModal] = useState<{ visible: boolean; record: WarehouseReceiptPledgeInfo | null }>({ visible: false, record: null })
+  const [wrpPledgeAgreementURL, setWrpPledgeAgreementURL] = useState('')
+  const [wrpSupervisionAgreementURL, setWrpSupervisionAgreementURL] = useState('')
+  const [wrpDisburseModal, setWrpDisburseModal] = useState<{ visible: boolean; record: WarehouseReceiptPledgeInfo | null }>({ visible: false, record: null })
+  const [wrpDisbursementVoucherURL, setWrpDisbursementVoucherURL] = useState('')
+  const [wrpDisburseRemark, setWrpDisburseRemark] = useState('')
+  const [wrpReleaseModal, setWrpReleaseModal] = useState<{ visible: boolean; record: WarehouseReceiptPledgeInfo | null }>({ visible: false, record: null })
+  const [wrpReleaseVoucherURL, setWrpReleaseVoucherURL] = useState('')
+  const [wrpReleaseRemark, setWrpReleaseRemark] = useState('')
   
   const [expandedFinanceOrders, setExpandedFinanceOrders] = useState<number[]>([])
 
@@ -180,12 +206,25 @@ function App() {
     }
   }
 
+  const fetchWarehouseReceiptPledges = async () => {
+    setLoading(true)
+    try {
+      const result = await financeOrderService.listWarehouseReceiptPledges({ page_size: 100 })
+      setWarehouseReceiptPledges(result.list || [])
+    } catch {
+      message.error('获取仓单质押申请失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (activeTab === 'products') fetchProducts()
     else if (activeTab === 'risk-review') fetchRiskOrders()
     else if (activeTab === 'debt-contract') fetchDebtOrders()
     else if (activeTab === 'disburse') fetchDebtOrders()
     else if (activeTab === 'pledge') fetchAll()
+    else if (activeTab === 'warehouse-receipt-pledge') fetchWarehouseReceiptPledges()
     else if (activeTab === 'collateral-monitor') fetchCollateralMonitor()
     else if (activeTab === 'release-pledge') fetchAll()
     else if (activeTab === 'finance-flow') fetchAll()
@@ -374,6 +413,84 @@ function App() {
       fetchCollateralMonitor()
     } catch {
       message.error('资金方确认收货失败')
+    }
+  }
+
+  const handleWarehouseReceiptPledgeRisk = async () => {
+    const record = wrpRiskModal.record
+    if (!record) return
+    try {
+      await financeOrderService.reviewWarehouseReceiptPledge(record.id, {
+        approved: wrpRiskApproved,
+        approved_amount: wrpRiskApproved ? wrpApprovedAmount : undefined,
+        term_days: wrpRiskApproved ? wrpTermDays : undefined,
+        annual_rate: wrpRiskApproved ? wrpAnnualRate : undefined,
+        risk_remark: wrpRiskRemark || undefined,
+      })
+      showCompleted(wrpRiskApproved ? '仓单质押风控已完成' : '仓单质押驳回已完成', wrpRiskApproved ? '下一步登记仓单质押协议和监管协议。' : '申请已退回给申请企业查看。', 'warehouse-receipt-pledge')
+      setWrpRiskModal({ visible: false, record: null })
+      setWrpRiskApproved(true)
+      setWrpApprovedAmount(0)
+      setWrpTermDays(30)
+      setWrpAnnualRate(0)
+      setWrpRiskRemark('')
+      fetchWarehouseReceiptPledges()
+    } catch {
+      message.error('仓单质押风控提交失败')
+    }
+  }
+
+  const handleWarehouseReceiptPledgeAgreement = async () => {
+    const record = wrpAgreementModal.record
+    if (!record) return
+    try {
+      await financeOrderService.signWarehouseReceiptPledgeAgreement(record.id, {
+        pledge_agreement_url: wrpPledgeAgreementURL,
+        supervision_agreement_url: wrpSupervisionAgreementURL,
+      })
+      showCompleted('仓单质押协议登记已完成', '下一步确认放款并冻结监管仓库存货权。', 'warehouse-receipt-pledge')
+      setWrpAgreementModal({ visible: false, record: null })
+      setWrpPledgeAgreementURL('')
+      setWrpSupervisionAgreementURL('')
+      fetchWarehouseReceiptPledges()
+    } catch {
+      message.error('仓单质押协议登记失败')
+    }
+  }
+
+  const handleWarehouseReceiptPledgeDisburse = async () => {
+    const record = wrpDisburseModal.record
+    if (!record) return
+    try {
+      await financeOrderService.disburseWarehouseReceiptPledge(record.id, {
+        disbursement_voucher_url: wrpDisbursementVoucherURL,
+        remark: wrpDisburseRemark || undefined,
+      })
+      showCompleted('仓单质押放款已完成', '系统会尝试按仓单号匹配监管仓库存快照并标记冻结。', 'warehouse-receipt-pledge')
+      setWrpDisburseModal({ visible: false, record: null })
+      setWrpDisbursementVoucherURL('')
+      setWrpDisburseRemark('')
+      fetchWarehouseReceiptPledges()
+    } catch {
+      message.error('仓单质押放款失败')
+    }
+  }
+
+  const handleWarehouseReceiptPledgeRelease = async () => {
+    const record = wrpReleaseModal.record
+    if (!record) return
+    try {
+      await financeOrderService.releaseWarehouseReceiptPledge(record.id, {
+        release_voucher_url: wrpReleaseVoucherURL || undefined,
+        release_remark: wrpReleaseRemark,
+      })
+      showCompleted('仓单质押货权释放已完成', '申请企业可在资金服务页查看释放结果。', 'warehouse-receipt-pledge')
+      setWrpReleaseModal({ visible: false, record: null })
+      setWrpReleaseVoucherURL('')
+      setWrpReleaseRemark('')
+      fetchWarehouseReceiptPledges()
+    } catch {
+      message.error('仓单质押货权释放失败')
     }
   }
 
@@ -635,12 +752,107 @@ function App() {
     },
   ]
 
+  const warehouseReceiptPledgeColumns: ColumnsType<WarehouseReceiptPledgeInfo> = [
+    { title: '申请号', dataIndex: 'application_no', key: 'application_no', width: 170 },
+    { title: '申请方', dataIndex: 'applicant_role', key: 'applicant_role', width: 90, render: (v: string) => v === 'sales' ? '卖方' : v === 'procurement' ? '买方' : '-' },
+    { title: '资金产品', dataIndex: 'finance_service_name', key: 'finance_service_name', width: 160, render: (v?: string) => v || '-' },
+    {
+      title: '监管仓/仓单',
+      key: 'warehouse_receipt',
+      width: 240,
+      render: (_: unknown, record: WarehouseReceiptPledgeInfo) => (
+        <Space direction="vertical" size={0}>
+          <Text>{record.warehouse_name || '-'}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>仓单：{record.receipt_no || '-'}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: '货物',
+      key: 'goods',
+      width: 180,
+      render: (_: unknown, record: WarehouseReceiptPledgeInfo) => (
+        <Space direction="vertical" size={0}>
+          <Text>{record.goods_name}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>{record.quantity || 0} 吨 {record.quality_grade || ''}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: '金额',
+      key: 'amount',
+      width: 150,
+      render: (_: unknown, record: WarehouseReceiptPledgeInfo) => (
+        <Space direction="vertical" size={0}>
+          <Text>申请 ¥{Number(record.requested_amount || 0).toLocaleString()}</Text>
+          {record.approved_amount ? <Text type="secondary" style={{ fontSize: 12 }}>审批 ¥{Number(record.approved_amount || 0).toLocaleString()}</Text> : null}
+        </Space>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 110,
+      render: (v: string) => {
+        const meta = warehouseReceiptPledgeStatusMap[v] || { label: v || '-', color: 'default' }
+        return <Tag color={meta.color}>{meta.label}</Tag>
+      },
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 280,
+      render: (_: unknown, record: WarehouseReceiptPledgeInfo) => (
+        <Space wrap>
+          <Button
+            size="small"
+            type={record.status === 'submitted' ? 'primary' : 'default'}
+            disabled={record.status !== 'submitted'}
+            onClick={() => {
+              setWrpRiskApproved(true)
+              setWrpApprovedAmount(record.requested_amount || 0)
+              setWrpTermDays(record.term_days || 30)
+              setWrpAnnualRate(record.annual_rate || 0)
+              setWrpRiskModal({ visible: true, record })
+            }}
+          >
+            风控
+          </Button>
+          <Button
+            size="small"
+            disabled={record.status !== 'risk_approved'}
+            onClick={() => setWrpAgreementModal({ visible: true, record })}
+          >
+            协议
+          </Button>
+          <Button
+            size="small"
+            type={record.status === 'agreement_signed' ? 'primary' : 'default'}
+            disabled={record.status !== 'agreement_signed'}
+            onClick={() => setWrpDisburseModal({ visible: true, record })}
+          >
+            放款
+          </Button>
+          <Button
+            size="small"
+            disabled={record.status !== 'disbursed'}
+            onClick={() => setWrpReleaseModal({ visible: true, record })}
+          >
+            释放
+          </Button>
+        </Space>
+      ),
+    },
+  ]
+
   const menuItems = [
     { key: 'products' as TabKey, label: '产品管理', icon: <BankOutlined />, group: 'product' },
     { key: 'risk-review' as TabKey, label: '风控审批', icon: <AuditOutlined />, group: 'approval' },
     { key: 'debt-contract' as TabKey, label: '债务合同', icon: <FileSearchOutlined />, group: 'contract' },
     { key: 'disburse' as TabKey, label: '放款管理', icon: <DollarCircleOutlined />, group: 'contract' },
     { key: 'pledge' as TabKey, label: '货权质押', icon: <SafetyCertificateOutlined />, group: 'pledge' },
+    { key: 'warehouse-receipt-pledge' as TabKey, label: '仓单质押', icon: <SafetyCertificateOutlined />, group: 'pledge' },
     { key: 'collateral-monitor' as TabKey, label: '货权监控', icon: <ControlOutlined />, group: 'pledge' },
     { key: 'release-pledge' as TabKey, label: '质押释放', icon: <EditOutlined />, group: 'pledge' },
     { key: 'finance-flow' as TabKey, label: '融资流程', icon: <DotChartOutlined />, group: 'center' },
@@ -786,6 +998,7 @@ function App() {
               else if (activeTab === 'debt-contract') fetchDebtOrders();
               else if (activeTab === 'disburse') fetchDebtOrders();
               else if (activeTab === 'pledge') fetchAll();
+              else if (activeTab === 'warehouse-receipt-pledge') fetchWarehouseReceiptPledges();
               else if (activeTab === 'collateral-monitor') fetchCollateralMonitor();
               else if (activeTab === 'release-pledge') fetchAll();
               else if (activeTab === 'finance-flow') fetchAll();
@@ -1087,6 +1300,49 @@ function App() {
                 />
               </Spin>
             </Card>
+          )}
+
+          {activeTab === 'warehouse-receipt-pledge' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={6}>
+                  <Card><Typography.Text type="secondary">全部申请</Typography.Text><br /><Title level={3}>{warehouseReceiptPledges.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={6}>
+                  <Card><Typography.Text type="secondary">待风控</Typography.Text><br /><Title level={3}>{warehouseReceiptPledges.filter((item) => item.status === 'submitted').length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={6}>
+                  <Card><Typography.Text type="secondary">待放款</Typography.Text><br /><Title level={3}>{warehouseReceiptPledges.filter((item) => item.status === 'agreement_signed').length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={6}>
+                  <Card><Typography.Text type="secondary">已放款</Typography.Text><br /><Title level={3}>{warehouseReceiptPledges.filter((item) => item.status === 'disbursed').length}</Title></Card>
+                </Col>
+              </Row>
+              <Card title="仓单质押申请" extra={<Tag color="geekblue">监管仓 / 仓单 / 协议 / 释放</Tag>}>
+                <Spin spinning={loading}>
+                  <Table
+                    columns={warehouseReceiptPledgeColumns}
+                    dataSource={warehouseReceiptPledges}
+                    rowKey="id"
+                    pagination={{ pageSize: 10 }}
+                    scroll={{ x: 1400 }}
+                    expandable={{
+                      expandedRowRender: (record) => (
+                        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                          <Text type="secondary">仓单文件：{record.receipt_voucher_url || '--'}</Text>
+                          <Text type="secondary">质押协议：{record.pledge_agreement_url || '--'}</Text>
+                          <Text type="secondary">监管协议：{record.supervision_agreement_url || '--'}</Text>
+                          <Text type="secondary">放款凭证：{record.disbursement_voucher_url || '--'}</Text>
+                          <Text type="secondary">释放凭证：{record.release_voucher_url || '--'}</Text>
+                          <Text type="secondary">备注：{record.risk_remark || record.release_remark || record.remark || '--'}</Text>
+                        </Space>
+                      ),
+                    }}
+                    locale={{ emptyText: '暂无仓单质押申请' }}
+                  />
+                </Spin>
+              </Card>
+            </>
           )}
 
           {activeTab === 'collateral-monitor' && (
@@ -1553,6 +1809,132 @@ function App() {
               <div>
                 <Text>确认备注：</Text>
                 <Input value={collateralReceiptRemark} onChange={(e) => setCollateralReceiptRemark(e.target.value)} placeholder="选填" />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="仓单质押风控"
+            open={wrpRiskModal.visible}
+            onOk={handleWarehouseReceiptPledgeRisk}
+            onCancel={() => {
+              setWrpRiskModal({ visible: false, record: null })
+              setWrpRiskApproved(true)
+              setWrpApprovedAmount(0)
+              setWrpTermDays(30)
+              setWrpAnnualRate(0)
+              setWrpRiskRemark('')
+            }}
+            okText="提交风控"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Paragraph type="secondary">
+                校验仓单真实性、货权归属、监管仓库存和申请企业资信后提交结果。
+              </Paragraph>
+              <div>
+                <Text>审批结果：</Text>
+                <Space>
+                  <Tag color={wrpRiskApproved ? 'green' : 'default'} style={{ cursor: 'pointer' }} onClick={() => setWrpRiskApproved(true)}>通过</Tag>
+                  <Tag color={!wrpRiskApproved ? 'red' : 'default'} style={{ cursor: 'pointer' }} onClick={() => setWrpRiskApproved(false)}>拒绝</Tag>
+                </Space>
+              </div>
+              {wrpRiskApproved && (
+                <>
+                  <div>
+                    <Text>审批金额 (元)：</Text>
+                    <InputNumber style={{ width: '100%' }} min={0} precision={2} value={wrpApprovedAmount} onChange={(v) => setWrpApprovedAmount(v || 0)} />
+                  </div>
+                  <div>
+                    <Text>账期 (天)：</Text>
+                    <InputNumber style={{ width: '100%' }} min={1} precision={0} value={wrpTermDays} onChange={(v) => setWrpTermDays(v || 30)} />
+                  </div>
+                  <div>
+                    <Text>年化费率 (%)：</Text>
+                    <InputNumber style={{ width: '100%' }} min={0} precision={4} value={wrpAnnualRate} onChange={(v) => setWrpAnnualRate(v || 0)} />
+                  </div>
+                </>
+              )}
+              <div>
+                <Text>风控备注：</Text>
+                <Input value={wrpRiskRemark} onChange={(e) => setWrpRiskRemark(e.target.value)} placeholder="选填" />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="登记仓单质押与监管协议"
+            open={wrpAgreementModal.visible}
+            onOk={handleWarehouseReceiptPledgeAgreement}
+            onCancel={() => {
+              setWrpAgreementModal({ visible: false, record: null })
+              setWrpPledgeAgreementURL('')
+              setWrpSupervisionAgreementURL('')
+            }}
+            okText="确认协议已签"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Paragraph type="secondary">
+                申请企业将仓单质押给资方，并和监管仓/资方签署监管协议后登记。
+              </Paragraph>
+              <div>
+                <Text>仓单质押协议 URL：</Text>
+                <Input value={wrpPledgeAgreementURL} onChange={(e) => setWrpPledgeAgreementURL(e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <Text>监管协议 URL：</Text>
+                <Input value={wrpSupervisionAgreementURL} onChange={(e) => setWrpSupervisionAgreementURL(e.target.value)} placeholder="https://..." />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="仓单质押放款"
+            open={wrpDisburseModal.visible}
+            onOk={handleWarehouseReceiptPledgeDisburse}
+            onCancel={() => {
+              setWrpDisburseModal({ visible: false, record: null })
+              setWrpDisbursementVoucherURL('')
+              setWrpDisburseRemark('')
+            }}
+            okText="确认放款"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Paragraph type="secondary">
+                放款后系统会尝试按仓库、货物和仓单号匹配库存快照，并标记质押冻结。
+              </Paragraph>
+              <div>
+                <Text>放款凭证 URL：</Text>
+                <Input value={wrpDisbursementVoucherURL} onChange={(e) => setWrpDisbursementVoucherURL(e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <Text>放款备注：</Text>
+                <Input value={wrpDisburseRemark} onChange={(e) => setWrpDisburseRemark(e.target.value)} placeholder="选填" />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="释放仓单质押货权"
+            open={wrpReleaseModal.visible}
+            onOk={handleWarehouseReceiptPledgeRelease}
+            onCancel={() => {
+              setWrpReleaseModal({ visible: false, record: null })
+              setWrpReleaseVoucherURL('')
+              setWrpReleaseRemark('')
+            }}
+            okText="确认释放"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Paragraph type="secondary">
+                申请企业销售回款并还款后，资方按笔释放对应货权。
+              </Paragraph>
+              <div>
+                <Text>释放凭证 URL：</Text>
+                <Input value={wrpReleaseVoucherURL} onChange={(e) => setWrpReleaseVoucherURL(e.target.value)} placeholder="选填，https://..." />
+              </div>
+              <div>
+                <Text>释放说明：</Text>
+                <Input value={wrpReleaseRemark} onChange={(e) => setWrpReleaseRemark(e.target.value)} placeholder="必填，例如已回款还款，释放本笔仓单货权" />
               </div>
             </Space>
           </Modal>

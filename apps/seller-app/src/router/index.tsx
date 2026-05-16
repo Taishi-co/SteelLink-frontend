@@ -14,6 +14,7 @@ const BiddingPage = lazy(() => import('@/pages/Bidding'))
 const SettingsPage = lazy(() => import('@/pages/Settings'))
 const FulfillmentPage = lazy(() => import('@/pages/Fulfillment'))
 const NotificationsPage = lazy(() => import('@/pages/Notifications'))
+const FinancePage = lazy(() => import('@/pages/Finance'))
 
 function ProtectedRoute() {
   if (!getSellerToken()) {
@@ -67,6 +68,7 @@ export function AppRouter() {
               <Route path="orders" element={lazyPage(<OrdersPage />)} />
               <Route path="notifications" element={lazyPage(<NotificationsPage />)} />
               <Route path="fulfillment" element={lazyPage(<FulfillmentPage />)} />
+              <Route path="finance" element={lazyPage(<FinancePage />)} />
               <Route path="settings" element={lazyPage(<SettingsPage />)} />
             </Route>
           </Route>

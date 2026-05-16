@@ -77,6 +77,7 @@ export default function SellerLayout() {
     items.push({ key: '/notifications', icon: <MailOutlined />, label: '站内信' })
     if (sellerHasService('sales')) {
       items.push({ key: '/fulfillment', icon: <TruckOutlined />, label: '履约核销' })
+      items.push({ key: '/finance', icon: <BankOutlined />, label: '资金服务' })
     }
     items.push({ key: '/enterprise', icon: <TeamOutlined />, label: '企业信息' })
     if (sellerHasService('sales')) {
