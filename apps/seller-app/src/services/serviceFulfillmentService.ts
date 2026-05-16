@@ -28,6 +28,8 @@ export interface TrackingEventInfo {
 export interface LogisticsOrderInfo {
   id: number
   logistics_no: string
+  order_id?: number
+  order_no?: string
   status: string
   current_responsible_party?: string
   handover_note?: string
@@ -44,6 +46,14 @@ export interface LogisticsOrderInfo {
   created_at?: string
   updated_at?: string
   tracking_events?: TrackingEventInfo[]
+  status_requirements?: Array<{
+    status: string
+    label: string
+    actor: string
+    description: string
+    required_doc_types: string[]
+    satisfied: boolean
+  }>
 }
 
 export interface GuaranteeInfo {
@@ -64,4 +74,12 @@ export interface FulfillmentSummary {
 export const sellerServiceFulfillmentService = {
   getOrderFulfillment: (orderId: number) =>
     api.get<unknown, ApiResponse<FulfillmentSummary>>(`/orders/${orderId}/service-fulfillment`),
+  uploadLogisticsDocument: (
+    logisticsOrderId: number,
+    payload: { doc_type: string; file_url: string; remark?: string }
+  ) =>
+    api.post<unknown, ApiResponse<unknown>>(
+      `/logistics/orders/${logisticsOrderId}/documents`,
+      payload
+    ),
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -418,7 +419,11 @@ function App() {
       fetchLogisticsOrders()
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      message.error('节点更新失败，请确认必要单据已上传')
+      message.error(
+        statusModal.nextStatus === 'pickup_scheduled'
+          ? '预约提货失败，请确认卖方已上传提货指令'
+          : '节点更新失败，请确认必要单据已上传'
+      )
     }
   }
 
@@ -956,10 +961,15 @@ function App() {
                       width: 120,
                       render: (_: unknown, record: LogisticsOrder) => {
                         const getNextAction = (status: string) => {
-                          if (status === 'task_created' || status === 'pending') return { label: '接单', next: 'pickup_scheduled' }
+                          if (status === 'task_created' || status === 'pending') {
+                            const ready = record.status_requirements?.find((item) => item.status === 'pickup_scheduled')?.satisfied
+                            return ready
+                              ? { label: '预约提货', next: 'pickup_scheduled' }
+                              : { label: '等待卖方提货指令', next: 'pickup_scheduled', externalAction: true }
+                          }
                           if (status === 'pickup_scheduled' || status === 'accepted') return { label: '等待仓储到场确认', next: 'arrival_signed_in', externalAction: true }
                           if (status === 'arrival_signed_in') return { label: '等待仓储出库确认', next: 'outbound_confirmed', externalAction: true }
-                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed', docs: ['pickup_order'] }
+                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed', docs: ['loading_voucher'] }
                           if (status === 'loading_confirmed') return { label: '发车', next: 'in_transit', docs: ['gps_track'] }
                           if (status === 'in_transit') return { label: '到货确认', next: 'arrival_confirmed', docs: ['delivery_photo'] }
                           if (status === 'arrival_confirmed') return { label: '等待买方验货签收', next: 'receipt_signed', buyerAction: true }
@@ -1428,6 +1438,15 @@ function App() {
             okText="上传并推进"
           >
             <Form form={statusForm} layout="vertical">
+              {statusModal.nextStatus === 'pickup_scheduled' && (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="需先读取卖方提货指令"
+                  description="卖方上传提货单/提货指令后才能预约提货；如果没有文件 URL，请联系卖方补传。"
+                  style={{ marginBottom: 16 }}
+                />
+              )}
               {statusModal.requiredDocs.length === 0 ? (
                 <Paragraph type="secondary">该节点无需补充单据，确认后会直接推进物流状态。</Paragraph>
               ) : (

@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Descriptions,
+  Form,
   Input,
   Modal,
   Radio,
@@ -16,10 +17,12 @@ import {
   Tag,
   Timeline,
   Typography,
+  Upload,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { EyeOutlined, ReloadOutlined, ClockCircleOutlined, TruckOutlined } from '@ant-design/icons'
+import type { UploadFile } from 'antd/es/upload/interface'
+import { EyeOutlined, ReloadOutlined, ClockCircleOutlined, TruckOutlined, UploadOutlined } from '@ant-design/icons'
 import { getErrorMessage, getErrorStatus, timelineColor } from '@steellink/shared/utils'
 import {
   sellerOrderService,
@@ -32,10 +35,19 @@ import {
   type LogisticsOrderInfo,
 } from '@/services/serviceFulfillmentService'
 import { sellerAuthService, updateSellerUser } from '@/services/auth'
+import { uploadService } from '@/services/uploadService'
 import { useNavigate } from 'react-router-dom'
 
 const { Search } = Input
 const { Text, Paragraph } = Typography
+
+function getUploadFile(fileList?: UploadFile[]) {
+  const file = fileList?.[0]?.originFileObj
+  if (!file) {
+    throw new Error('请先选择文件')
+  }
+  return file
+}
 
 const statusMeta: Record<number, { color: string; text: string }> = {
   0: { color: 'default', text: '草稿' },
@@ -371,6 +383,12 @@ function getSellerGuidance(order?: SellerOrderInfo | null) {
       title: '当前状态：物流报价已完成',
       next: '如合同约定卖方承担运费，请确认物流报价。',
     }
+  if (order.status === 18)
+    return {
+      type: 'warning' as const,
+      title: '当前状态：待提货指令',
+      next: '物流合同已签署完成，请上传提货单/提货指令，物流方随后预约提货。',
+    }
   if (order.status === 25)
     return {
       type: 'warning' as const,
@@ -415,6 +433,12 @@ export default function OrdersPage() {
   const [biddingQuoteLoadingMap, setBiddingQuoteLoadingMap] = useState<Record<number, boolean>>({})
   const [fulfillmentSummary, setFulfillmentSummary] = useState<FulfillmentSummary | null>(null)
   const [fulfillmentLoading, setFulfillmentLoading] = useState(false)
+  const [pickupInstructionModal, setPickupInstructionModal] = useState<{
+    visible: boolean
+    order: SellerOrderInfo | null
+    logisticsOrderId: number | null
+  }>({ visible: false, order: null, logisticsOrderId: null })
+  const [pickupInstructionForm] = Form.useForm()
 
   const loadOrders = useCallback(async () => {
     setLoading(true)
@@ -473,6 +497,18 @@ export default function OrdersPage() {
       cancelled = true
     }
   }, [selectedOrder?.id])
+
+  const refreshSelectedFulfillment = async (orderId: number) => {
+    setFulfillmentLoading(true)
+    try {
+      const response = await sellerServiceFulfillmentService.getOrderFulfillment(orderId)
+      setFulfillmentSummary(response.data)
+    } catch {
+      setFulfillmentSummary(null)
+    } finally {
+      setFulfillmentLoading(false)
+    }
+  }
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -951,6 +987,46 @@ export default function OrdersPage() {
   const selectedGuidance = getSellerGuidance(selectedOrder)
   const selectedFulfillmentLogistics = fulfillmentSummary?.logistics_orders?.[0]
   const selectedFulfillmentMovement = fulfillmentSummary?.warehouse_movements?.[0]
+  const pickupInstructionReady = Boolean(
+    selectedFulfillmentLogistics?.status_requirements?.find(
+      (item) => item.status === 'pickup_scheduled'
+    )?.satisfied
+  )
+  const canUploadPickupInstruction = Boolean(
+    selectedOrder &&
+      selectedOrder.status === 18 &&
+      selectedFulfillmentLogistics &&
+      normalizeFulfillmentStatus(selectedFulfillmentLogistics.status) === 'task_created' &&
+      !pickupInstructionReady
+  )
+
+  const handleUploadPickupInstruction = async () => {
+    const order = pickupInstructionModal.order
+    const logisticsOrderId = pickupInstructionModal.logisticsOrderId
+    if (!order || !logisticsOrderId) return
+    try {
+      const values = await pickupInstructionForm.validateFields()
+      setActionLoading(true)
+      const uploaded = await uploadService.upload(
+        getUploadFile(values.pickup_instruction_file),
+        'enterprise_service_document'
+      )
+      await sellerServiceFulfillmentService.uploadLogisticsDocument(logisticsOrderId, {
+        doc_type: 'pickup_instruction',
+        file_url: uploaded.url,
+        remark: values.remark || `订单${order.order_no}卖方提货指令`,
+      })
+      message.success('提货指令已上传，物流方可预约提货')
+      setPickupInstructionModal({ visible: false, order: null, logisticsOrderId: null })
+      pickupInstructionForm.resetFields()
+      await refreshSelectedFulfillment(order.id)
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'errorFields' in error) return
+      message.error(getErrorMessage(error, '上传提货指令失败'))
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   return (
     <div className="min-w-0">
@@ -1344,6 +1420,24 @@ export default function OrdersPage() {
               确认出库
             </Button>
           ) : null,
+          canUploadPickupInstruction ? (
+            <Button
+              key="pickup-instruction"
+              type="primary"
+              icon={<UploadOutlined />}
+              loading={actionLoading}
+              onClick={() => {
+                if (!selectedOrder || !selectedFulfillmentLogistics) return
+                setPickupInstructionModal({
+                  visible: true,
+                  order: selectedOrder,
+                  logisticsOrderId: selectedFulfillmentLogistics.id,
+                })
+              }}
+            >
+              上传提货指令
+            </Button>
+          ) : null,
           selectedOrder?.status === 4 ||
           selectedOrder?.status === 5 ||
           selectedOrder?.status === 25 ? (
@@ -1466,6 +1560,40 @@ export default function OrdersPage() {
                 description={`下一步：${selectedGuidance.next}`}
               />
             </div>
+
+            {selectedFulfillmentLogistics &&
+              normalizeFulfillmentStatus(selectedFulfillmentLogistics.status) === 'task_created' && (
+                <Alert
+                  style={{ marginTop: 16 }}
+                  type={pickupInstructionReady ? 'success' : 'warning'}
+                  showIcon
+                  message={pickupInstructionReady ? '提货指令已上传' : '待上传提货指令'}
+                  description={
+                    pickupInstructionReady
+                      ? '物流方已可查看提货资料并预约提货。'
+                      : '物流合同完成后，需由卖方上传提货单/提货指令，物流方才能预约提货。'
+                  }
+                  action={
+                    !pickupInstructionReady ? (
+                      <Button
+                        size="small"
+                        type="primary"
+                        icon={<UploadOutlined />}
+                        onClick={() => {
+                          if (!selectedOrder || !selectedFulfillmentLogistics) return
+                          setPickupInstructionModal({
+                            visible: true,
+                            order: selectedOrder,
+                            logisticsOrderId: selectedFulfillmentLogistics.id,
+                          })
+                        }}
+                      >
+                        上传
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              )}
 
             <Descriptions bordered column={2} size="middle" style={{ marginTop: 16 }}>
               <Descriptions.Item label="合同编号">
@@ -1875,6 +2003,42 @@ export default function OrdersPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        title="上传提货单/提货指令"
+        open={pickupInstructionModal.visible}
+        onOk={handleUploadPickupInstruction}
+        onCancel={() => {
+          setPickupInstructionModal({ visible: false, order: null, logisticsOrderId: null })
+          pickupInstructionForm.resetFields()
+        }}
+        confirmLoading={actionLoading}
+        okText="上传并开放给物流方"
+      >
+        <Form form={pickupInstructionForm} layout="vertical">
+          <Alert
+            type="info"
+            showIcon
+            message="物流方预约提货前必须先看到卖方提货指令"
+            description="建议包含提货仓库、提货码、货物明细、联系人、预约窗口和装车注意事项。"
+            style={{ marginBottom: 16 }}
+          />
+          <Form.Item
+            name="pickup_instruction_file"
+            label="提货单/提货指令文件"
+            valuePropName="fileList"
+            getValueFromEvent={(event) => event?.fileList ?? []}
+            rules={[{ required: true, message: '请上传提货单或提货指令文件' }]}
+          >
+            <Upload beforeUpload={() => false} maxCount={1}>
+              <Button icon={<UploadOutlined />}>选择文件</Button>
+            </Upload>
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} placeholder="选填，例如提货窗口、联系人或特殊装车要求" />
+          </Form.Item>
+        </Form>
       </Modal>
 
       <Modal
