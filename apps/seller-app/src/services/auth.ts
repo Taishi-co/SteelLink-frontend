@@ -32,10 +32,6 @@ interface ApiResponse<T> {
   data: T
 }
 
-interface SwitchSessionResponse {
-  switch_token: string
-}
-
 export interface SellerLoginPayload {
   account: string
   password: string
@@ -48,20 +44,32 @@ export interface SellerRegisterPayload {
   qq?: string
 }
 
-const TOKEN_KEY = 'token'
-const USER_KEY = 'user'
-const ENTERPRISE_ROLE_KEY = 'enterprise_role'
-const LEGACY_TOKEN_KEYS = ['seller_token', 'buyer_token']
-const LEGACY_USER_KEYS = ['seller_user', 'buyer_user']
-const LEGACY_ENTERPRISE_ROLE_KEYS = ['seller_enterprise_role']
+const TOKEN_KEY = 'seller_token'
+const USER_KEY = 'seller_user'
+const ENTERPRISE_ROLE_KEY = 'seller_enterprise_role'
+const BUYER_TOKEN_KEY = 'buyer_token'
 
 function setCookie(name: string, value: string) {
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; SameSite=Lax`
 }
 
+function getCookie(name: string) {
+  const prefix = `${name}=`
+  const match = document.cookie
+    .split(';')
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(prefix))
+
+  if (!match) {
+    return null
+  }
+
+  return decodeURIComponent(match.slice(prefix.length))
+}
+
 function getStorageItem(keys: string[]) {
   for (const key of keys) {
-    const value = localStorage.getItem(key) || sessionStorage.getItem(key)
+    const value = localStorage.getItem(key) || sessionStorage.getItem(key) || getCookie(key)
     if (value) {
       return value
     }
@@ -77,7 +85,6 @@ export const sellerAuthService = {
   login: (payload: SellerLoginPayload) => api.post<unknown, ApiResponse<LoginResponse>>('/auth/login', payload),
   register: (payload: SellerRegisterPayload) => api.post<unknown, ApiResponse<LoginResponse>>('/auth/register', payload),
   me: () => api.get<unknown, ApiResponse<SellerUser>>('/users/me'),
-  createSwitchSession: () => api.post<unknown, ApiResponse<SwitchSessionResponse>>('/auth/switch-session', { target: 'buyer' }),
   consumeSwitchSession: (switchToken: string) =>
     api.post<unknown, ApiResponse<LoginResponse>>('/auth/switch-session/consume', { switch_token: switchToken, target: 'seller' }),
 }
@@ -108,33 +115,33 @@ export function saveSellerSession(token: string, user: SellerUser) {
     localStorage.removeItem(ENTERPRISE_ROLE_KEY)
     sessionStorage.removeItem(ENTERPRISE_ROLE_KEY)
     removeCookie(ENTERPRISE_ROLE_KEY)
-	}
+  }
 }
 
 export function saveSellerToken(token: string) {
-	localStorage.setItem(TOKEN_KEY, token)
-	sessionStorage.setItem(TOKEN_KEY, token)
-	setCookie(TOKEN_KEY, token)
+  localStorage.setItem(TOKEN_KEY, token)
+  sessionStorage.setItem(TOKEN_KEY, token)
+  setCookie(TOKEN_KEY, token)
 
-	const payload = parseJwtPayload(token)
-	const user = getSellerUser()
-	if (user) {
-		updateSellerUser({
-			...user,
-			role: (payload?.user_type as string) || user.role,
-			enterprise_code: (payload?.enterprise_code as string) || user.enterprise_code || '',
-		})
-	}
+  const payload = parseJwtPayload(token)
+  const user = getSellerUser()
+  if (user) {
+    updateSellerUser({
+      ...user,
+      role: (payload?.user_type as string) || user.role,
+      enterprise_code: (payload?.enterprise_code as string) || user.enterprise_code || '',
+    })
+  }
 
-	if (payload?.enterprise_role) {
-		localStorage.setItem(ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-		sessionStorage.setItem(ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-		setCookie(ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-	} else {
-		localStorage.removeItem(ENTERPRISE_ROLE_KEY)
-		sessionStorage.removeItem(ENTERPRISE_ROLE_KEY)
-		removeCookie(ENTERPRISE_ROLE_KEY)
-	}
+  if (payload?.enterprise_role) {
+    localStorage.setItem(ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+    sessionStorage.setItem(ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+    setCookie(ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
+  } else {
+    localStorage.removeItem(ENTERPRISE_ROLE_KEY)
+    sessionStorage.removeItem(ENTERPRISE_ROLE_KEY)
+    removeCookie(ENTERPRISE_ROLE_KEY)
+  }
 }
 
 export function updateSellerUser(user: SellerUser) {
@@ -153,29 +160,14 @@ export function clearSellerSession() {
   localStorage.removeItem(ENTERPRISE_ROLE_KEY)
   sessionStorage.removeItem(ENTERPRISE_ROLE_KEY)
   removeCookie(ENTERPRISE_ROLE_KEY)
-  LEGACY_TOKEN_KEYS.forEach((key) => {
-    localStorage.removeItem(key)
-    sessionStorage.removeItem(key)
-    removeCookie(key)
-  })
-  LEGACY_USER_KEYS.forEach((key) => {
-    localStorage.removeItem(key)
-    sessionStorage.removeItem(key)
-    removeCookie(key)
-  })
-  LEGACY_ENTERPRISE_ROLE_KEYS.forEach((key) => {
-    localStorage.removeItem(key)
-    sessionStorage.removeItem(key)
-    removeCookie(key)
-  })
 }
 
 export function getSellerToken() {
-  return getStorageItem([TOKEN_KEY, ...LEGACY_TOKEN_KEYS])
+  return getStorageItem([TOKEN_KEY])
 }
 
 export function getSellerUser(): SellerUser | null {
-  const raw = getStorageItem([USER_KEY, ...LEGACY_USER_KEYS])
+  const raw = getStorageItem([USER_KEY])
   if (!raw) {
     return null
   }
@@ -188,7 +180,7 @@ export function getSellerUser(): SellerUser | null {
 }
 
 export function getSellerEnterpriseRole(): string {
-  return getStorageItem([ENTERPRISE_ROLE_KEY, ...LEGACY_ENTERPRISE_ROLE_KEYS]) || ''
+  return getStorageItem([ENTERPRISE_ROLE_KEY]) || ''
 }
 
 export function getSellerEnterpriseID(): number {
@@ -215,7 +207,7 @@ export function isSellerReady(user: SellerUser | null): boolean {
 }
 
 export function hasSavedBuyerSession() {
-  return Boolean(getSellerToken())
+  return Boolean(getStorageItem([BUYER_TOKEN_KEY]))
 }
 
 export function getBuyerCenterHref(path = '/dashboard') {

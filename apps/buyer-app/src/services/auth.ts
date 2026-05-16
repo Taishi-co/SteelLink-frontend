@@ -49,10 +49,9 @@ export interface BuyerRegisterPayload {
   email?: string
 }
 
-const TOKEN_KEY = 'token'
-const USER_KEY = 'user'
-const LEGACY_TOKEN_KEYS = ['buyer_token', 'seller_token']
-const LEGACY_USER_KEYS = ['buyer_user', 'seller_user']
+const TOKEN_KEY = 'buyer_token'
+const USER_KEY = 'buyer_user'
+const SELLER_TOKEN_KEY = 'seller_token'
 export const BUYER_TOKEN_REFRESH_EVENT = 'buyer-token-refreshed'
 let memoryToken: string | null = null
 let memoryUser: User | null = null
@@ -152,7 +151,7 @@ export function updateBuyerSessionUser(profile: BuyerProfile) {
 }
 
 export function getBuyerUser(): User | null {
-  const raw = getStorageItem([USER_KEY, ...LEGACY_USER_KEYS])
+  const raw = getStorageItem([USER_KEY])
   if (!raw) {
     return memoryUser
   }
@@ -167,7 +166,7 @@ export function getBuyerUser(): User | null {
 }
 
 export function getBuyerToken() {
-  const token = getStorageItem([TOKEN_KEY, ...LEGACY_TOKEN_KEYS]) || memoryToken
+  const token = getStorageItem([TOKEN_KEY]) || memoryToken
   if (token) {
     setCookie(TOKEN_KEY, token)
   }
@@ -203,14 +202,6 @@ export function clearBuyerSession() {
   removeStorageItem(USER_KEY)
   removeCookie(TOKEN_KEY)
   removeCookie(USER_KEY)
-  LEGACY_TOKEN_KEYS.forEach((key) => {
-    removeStorageItem(key)
-    removeCookie(key)
-  })
-  LEGACY_USER_KEYS.forEach((key) => {
-    removeStorageItem(key)
-    removeCookie(key)
-  })
 }
 
 export function isEnterpriseToken() {
@@ -229,7 +220,7 @@ export function hasEnterpriseAccess(user: User | null) {
 }
 
 export function hasSavedSellerSession() {
-  return Boolean(getBuyerToken())
+  return Boolean(getStorageItem([SELLER_TOKEN_KEY]))
 }
 
 function getCrossAppBaseURL(port: number) {
