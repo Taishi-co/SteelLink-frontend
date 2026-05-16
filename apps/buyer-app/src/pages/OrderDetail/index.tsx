@@ -579,9 +579,11 @@ export default function OrderDetailPage() {
   const [open, setOpen] = useState(false)
   const [deliveryOpen, setDeliveryOpen] = useState(false)
   const [receiptOpen, setReceiptOpen] = useState(false)
+  const [inspectionSignOpen, setInspectionSignOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [savingDelivery, setSavingDelivery] = useState(false)
   const [confirmingReceipt, setConfirmingReceipt] = useState(false)
+  const [confirmingInspectionSign, setConfirmingInspectionSign] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [signing, setSigning] = useState(false)
   const [warehouseOpen, setWarehouseOpen] = useState(false)
@@ -604,6 +606,7 @@ export default function OrderDetailPage() {
   const [form] = Form.useForm()
   const [deliveryForm] = Form.useForm()
   const [receiptForm] = Form.useForm()
+  const [inspectionSignForm] = Form.useForm()
   const [warehouseForm] = Form.useForm()
 
   const { data, isLoading } = useQuery({
@@ -643,6 +646,7 @@ export default function OrderDetailPage() {
     return Number(left.annual_rate || 0) - Number(right.annual_rate || 0)
   })
   const logisticsOrder = fulfillment?.logistics_orders?.[0]
+  const isFinancingOrder = Boolean(order?.financing_info || order?.logistics_contract?.is_financing_order)
   const latestMovement = fulfillment?.warehouse_movements?.[0]
   const activeGuarantee = fulfillment?.guarantees?.[0]
   const status = statusMap[order?.status || 0] || {
@@ -823,13 +827,33 @@ export default function OrderDetailPage() {
       return
     }
     try {
-      await serviceFulfillmentService.updateLogisticsOrderStatus(logisticsOrder.id, 'receipt_signed')
+      const values = await inspectionSignForm.validateFields()
+      setConfirmingInspectionSign(true)
+      const uploaded = await uploadService.upload(
+        getUploadFile(values.receipt_file),
+        'receipt_voucher'
+      )
+      await serviceFulfillmentService.uploadFulfillmentDocument(logisticsOrder.id, {
+        doc_type: 'receipt_order',
+        file_url: uploaded.url,
+        remark: values.remark || '买方验货签收单',
+      })
+      await serviceFulfillmentService.updateLogisticsOrderStatus(
+        logisticsOrder.id,
+        'receipt_signed',
+        values.remark
+      )
       message.success('验货签收已完成')
+      setInspectionSignOpen(false)
+      inspectionSignForm.resetFields()
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       await queryClient.invalidateQueries({ queryKey: ['order-service-fulfillment', id] })
     } catch (error: unknown) {
+      if (hasFormErrorFields(error)) return
       message.error(getErrorMessage(error, '验货签收失败'))
+    } finally {
+      setConfirmingInspectionSign(false)
     }
   }
 
@@ -1736,11 +1760,14 @@ export default function OrderDetailPage() {
                   </Button>
                 )}
 
-                {logisticsOrder?.status === 'arrival_confirmed' && (
+                {logisticsOrder?.status === 'arrival_confirmed' && isFinancingOrder && (
+                  <Tag color="gold">融资订单待资金方确认监管收货</Tag>
+                )}
+                {logisticsOrder?.status === 'arrival_confirmed' && !isFinancingOrder && (
                   <Button
                     type="primary"
                     icon={<CheckCircleOutlined />}
-                    onClick={handleInspectionSign}
+                    onClick={() => setInspectionSignOpen(true)}
                   >
                     验货签收
                   </Button>
@@ -1964,6 +1991,38 @@ export default function OrderDetailPage() {
                   <Upload beforeUpload={() => false} maxCount={1}>
                     <Button icon={<UploadOutlined />}>选择文件</Button>
                   </Upload>
+                </Form.Item>
+              </Form>
+            </Modal>
+
+            <Modal
+              title="验货签收并上传收货单"
+              open={inspectionSignOpen}
+              onCancel={() => {
+                setInspectionSignOpen(false)
+                inspectionSignForm.resetFields()
+              }}
+              onOk={handleInspectionSign}
+              confirmLoading={confirmingInspectionSign}
+              okText="上传并签收"
+            >
+              <Form form={inspectionSignForm} layout="vertical">
+                <Paragraph type="secondary">
+                  该节点会作为物流履约的验收签收凭证。融资订单由资金方确认，普通订单由买方确认。
+                </Paragraph>
+                <Form.Item
+                  name="receipt_file"
+                  label="收货单/签收凭证"
+                  valuePropName="fileList"
+                  getValueFromEvent={(event) => event?.fileList ?? []}
+                  rules={[{ required: true, message: '请上传收货单或签收凭证' }]}
+                >
+                  <Upload beforeUpload={() => false} maxCount={1}>
+                    <Button icon={<UploadOutlined />}>选择文件</Button>
+                  </Upload>
+                </Form.Item>
+                <Form.Item name="remark" label="签收备注">
+                  <Input.TextArea rows={3} placeholder="选填" />
                 </Form.Item>
               </Form>
             </Modal>

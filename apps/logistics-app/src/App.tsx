@@ -109,6 +109,14 @@ function App() {
   const [quoteRemark, setQuoteRemark] = useState('')
   const [tokenReady, setTokenReady] = useState(false)
   const [expandedLogisticsOrders, setExpandedLogisticsOrders] = useState<number[]>([])
+  const [statusModal, setStatusModal] = useState<{ visible: boolean; order: LogisticsOrder | null; nextStatus: string; label: string; requiredDocs: string[] }>({
+    visible: false,
+    order: null,
+    nextStatus: '',
+    label: '',
+    requiredDocs: [],
+  })
+  const [statusForm] = Form.useForm<Record<string, string>>()
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -379,17 +387,34 @@ function App() {
     }
   }
 
-  const handleUpdateOrderStatus = async (id: number, status: string) => {
+  const openStatusModal = (order: LogisticsOrder, nextStatus: string, label: string, requiredDocs: string[] = []) => {
+    setStatusModal({ visible: true, order, nextStatus, label, requiredDocs })
+    statusForm.resetFields()
+  }
+
+  const handleStatusSubmit = async () => {
+    if (!statusModal.order) return
     try {
-      await logisticsFulfillmentService.updateOrderStatus(id, { status })
-      showCompleted(
-        '物流状态更新已完成',
-        status === 'delivered' ? '等待买方确认收货。' : '继续推进运输履约。',
-        'logistics-flow'
-      )
+      const values = await statusForm.validateFields()
+      for (const docType of statusModal.requiredDocs) {
+        const fileURL = values[`doc_${docType}`]
+        if (fileURL) {
+          await logisticsFulfillmentService.uploadDocument(statusModal.order.id, {
+            doc_type: docType,
+            file_url: fileURL,
+            remark: values.remark,
+          })
+        }
+      }
+      await logisticsFulfillmentService.updateOrderStatus(statusModal.order.id, {
+        status: statusModal.nextStatus,
+      })
+      message.success('物流节点已更新')
+      setStatusModal({ visible: false, order: null, nextStatus: '', label: '', requiredDocs: [] })
       fetchLogisticsOrders()
-    } catch {
-      message.error('操作失败')
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('节点更新失败，请确认必要单据已上传')
     }
   }
 
@@ -928,23 +953,30 @@ function App() {
                       render: (_: unknown, record: LogisticsOrder) => {
                         const getNextAction = (status: string) => {
                           if (status === 'task_created' || status === 'pending') return { label: '接单', next: 'pickup_scheduled' }
-                          if (status === 'pickup_scheduled' || status === 'accepted') return { label: '签到', next: 'arrival_signed_in' }
-                          if (status === 'arrival_signed_in') return { label: '出库确认', next: 'outbound_confirmed' }
-                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed' }
-                          if (status === 'loading_confirmed') return { label: '发车', next: 'in_transit' }
-                          if (status === 'in_transit') return { label: '到货确认', next: 'arrival_confirmed' }
+                          if (status === 'pickup_scheduled' || status === 'accepted') return { label: '等待仓储到场确认', next: 'arrival_signed_in', externalAction: true }
+                          if (status === 'arrival_signed_in') return { label: '等待仓储出库确认', next: 'outbound_confirmed', externalAction: true }
+                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed', docs: ['pickup_order'] }
+                          if (status === 'loading_confirmed') return { label: '发车', next: 'in_transit', docs: ['gps_track'] }
+                          if (status === 'in_transit') return { label: '到货确认', next: 'arrival_confirmed', docs: ['delivery_photo'] }
                           if (status === 'arrival_confirmed') return { label: '等待买方验货签收', next: 'receipt_signed', buyerAction: true }
-                          if (status === 'receipt_signed') return { label: '入库完成', next: 'inbound_completed' }
+                          if (status === 'receipt_signed') return { label: '等待仓储入库', next: 'inbound_completed', externalAction: true }
                           if (status === 'inbound_completed') return { label: '履约完成', next: 'completed' }
                           return null
                         }
                         const nextAction = getNextAction(record.status)
                         if (!nextAction) return null
+                        if (nextAction.externalAction) {
+                          return <Tag color="orange">{nextAction.label}</Tag>
+                        }
                         if (nextAction.buyerAction) {
                           return <Tag color="blue">等待买方签收</Tag>
                         }
                         return (
-                          <Button type="primary" size="small" onClick={() => handleUpdateOrderStatus(record.id, nextAction.next)}>
+                          <Button
+                            type="primary"
+                            size="small"
+                            onClick={() => openStatusModal(record, nextAction.next, nextAction.label, nextAction.docs)}
+                          >
                             {nextAction.label}
                           </Button>
                         )
@@ -1382,6 +1414,34 @@ function App() {
                 />
               </div>
             </Space>
+          </Modal>
+
+          <Modal
+            title={`推进节点：${statusModal.label || '--'}`}
+            open={statusModal.visible}
+            onOk={handleStatusSubmit}
+            onCancel={() => setStatusModal({ visible: false, order: null, nextStatus: '', label: '', requiredDocs: [] })}
+            okText="上传并推进"
+          >
+            <Form form={statusForm} layout="vertical">
+              {statusModal.requiredDocs.length === 0 ? (
+                <Paragraph type="secondary">该节点无需补充单据，确认后会直接推进物流状态。</Paragraph>
+              ) : (
+                statusModal.requiredDocs.map((docType) => (
+                  <Form.Item
+                    key={docType}
+                    name={`doc_${docType}`}
+                    label={`必要单据：${docType}`}
+                    rules={[{ required: true, message: '请输入单据 URL' }]}
+                  >
+                    <Input placeholder="https://..." />
+                  </Form.Item>
+                ))
+              )}
+              <Form.Item name="remark" label="节点备注">
+                <Input.TextArea rows={3} placeholder="选填" />
+              </Form.Item>
+            </Form>
           </Modal>
 
           <Modal

@@ -95,6 +95,9 @@ function App() {
   const [releaseModal, setReleaseModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [releaseReason, setReleaseReason] = useState('')
   const [releaseVoucherURL, setReleaseVoucherURL] = useState('')
+  const [collateralReceiptModal, setCollateralReceiptModal] = useState<{ visible: boolean; record: CollateralMonitorInfo | null }>({ visible: false, record: null })
+  const [collateralReceiptURL, setCollateralReceiptURL] = useState('')
+  const [collateralReceiptRemark, setCollateralReceiptRemark] = useState('')
   
   const [expandedFinanceOrders, setExpandedFinanceOrders] = useState<number[]>([])
 
@@ -345,6 +348,33 @@ function App() {
       fetchAll()
     } catch {
       message.error('释放货权质押失败')
+    }
+  }
+
+  const handleCollateralReceipt = async () => {
+    const record = collateralReceiptModal.record
+    if (!record?.logistics_order_id) return
+    if (!collateralReceiptURL) {
+      message.warning('请填写资金方收货单 URL')
+      return
+    }
+    try {
+      await financeOrderService.uploadFulfillmentDocument(record.logistics_order_id, {
+        doc_type: 'receipt_order',
+        file_url: collateralReceiptURL,
+        remark: collateralReceiptRemark || '资金方监管收货确认',
+      })
+      await financeOrderService.confirmCollateralReceipt(record.logistics_order_id, {
+        receipt_url: collateralReceiptURL,
+        remark: collateralReceiptRemark || '资金方确认监管收货',
+      })
+      message.success('资金方监管收货已确认')
+      setCollateralReceiptModal({ visible: false, record: null })
+      setCollateralReceiptURL('')
+      setCollateralReceiptRemark('')
+      fetchCollateralMonitor()
+    } catch {
+      message.error('资金方确认收货失败')
     }
   }
 
@@ -1219,6 +1249,21 @@ function App() {
                         ellipsis: true,
                         render: (v: string) => v || '--',
                       },
+                      {
+                        title: '监管操作',
+                        key: 'monitor_action',
+                        width: 130,
+                        render: (_: unknown, record: CollateralMonitorInfo) => {
+                          if (!record.logistics_order_id) return <Text type="secondary">无物流单</Text>
+                          if (record.financing_status !== 'pledged') return <Text type="secondary">--</Text>
+                          if (record.logistics_status !== 'arrival_confirmed') return <Text type="secondary">待到货</Text>
+                          return (
+                            <Button size="small" type="primary" onClick={() => setCollateralReceiptModal({ visible: true, record })}>
+                              确认收货
+                            </Button>
+                          )
+                        },
+                      },
                     ]}
                     locale={{ emptyText: '暂无货权监控数据' }}
                   />
@@ -1483,6 +1528,32 @@ function App() {
               <div>
                 <Text>释放凭证 URL：</Text>
                 <Input value={releaseVoucherURL} onChange={(e) => setReleaseVoucherURL(e.target.value)} placeholder="选填，https://..." />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="资金方监管收货确认"
+            open={collateralReceiptModal.visible}
+            onOk={handleCollateralReceipt}
+            onCancel={() => {
+              setCollateralReceiptModal({ visible: false, record: null })
+              setCollateralReceiptURL('')
+              setCollateralReceiptRemark('')
+            }}
+            okText="上传并确认"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Paragraph type="secondary">
+                融资订单到货后由资金方上传收货单并确认监管收货，确认后订单进入已收货节点。
+              </Paragraph>
+              <div>
+                <Text>收货单 URL：</Text>
+                <Input value={collateralReceiptURL} onChange={(e) => setCollateralReceiptURL(e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <Text>确认备注：</Text>
+                <Input value={collateralReceiptRemark} onChange={(e) => setCollateralReceiptRemark(e.target.value)} placeholder="选填" />
               </div>
             </Space>
           </Modal>

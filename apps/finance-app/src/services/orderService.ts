@@ -113,6 +113,7 @@ export interface CollateralMonitorInfo {
   warehouse_service_id: number
   warehouse_name: string
   warehouse_address: string
+  logistics_order_id: number
   logistics_status: string
   last_logistics_event: string
   pledge_voucher_url: string
@@ -183,5 +184,18 @@ export const financeOrderService = {
   async listCollateralMonitor() {
     const response = await api.get<unknown, ApiResponse<{ list: CollateralMonitorInfo[] }>>('/finance/collateral-monitor')
     return response.data.list
+  },
+
+  async confirmCollateralReceipt(logisticsOrderId: number, payload: { receipt_url: string; remark?: string }) {
+    const response = await api.put<unknown, ApiResponse<unknown>>(`/logistics/orders/${logisticsOrderId}/status`, {
+      status: 'receipt_signed',
+      remark: payload.remark,
+    })
+    return response.data
+  },
+
+  async uploadFulfillmentDocument(logisticsOrderId: number, payload: { doc_type: string; file_url: string; remark?: string }) {
+    const response = await api.post<unknown, ApiResponse<unknown>>(`/logistics/orders/${logisticsOrderId}/documents`, payload)
+    return response.data
   },
 }

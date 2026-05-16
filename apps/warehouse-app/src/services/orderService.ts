@@ -108,6 +108,29 @@ export interface WarehouseInventorySnapshotPayload {
   remark?: string
 }
 
+export interface LogisticsOrder {
+  id: number
+  order_id: number
+  order_no: string
+  origin: string
+  destination: string
+  cargo_name: string
+  weight: number
+  status: string
+  current_responsible_party?: string
+  warehouse_service_id: number
+  created_at: string
+}
+
+export interface FulfillmentDocumentPayload {
+  doc_type: string
+  file_url: string
+  remark?: string
+  gps_latitude?: number
+  gps_longitude?: number
+  captured_at?: string
+}
+
 export const warehouseOrderService = {
   async listPending() {
     const response = await api.get<unknown, ApiResponse<{ list: OrderInfo[] }>>(
@@ -198,6 +221,31 @@ export const warehouseInventoryService = {
   async update(id: number, payload: WarehouseInventorySnapshotPayload) {
     const response = await api.put<unknown, ApiResponse<WarehouseInventorySnapshot>>(
       `/warehouse-inventory-snapshots/${id}`,
+      payload
+    )
+    return response.data
+  },
+}
+
+export const warehouseLogisticsService = {
+  async listOrders() {
+    const response = await api.get<unknown, ApiResponse<{ list: LogisticsOrder[] }>>(
+      '/logistics/orders?role=warehouse'
+    )
+    return response.data.list
+  },
+
+  async updateStatus(id: number, payload: { status: string; remark?: string }) {
+    const response = await api.put<unknown, ApiResponse<LogisticsOrder>>(
+      `/logistics/orders/${id}/status`,
+      payload
+    )
+    return response.data
+  },
+
+  async uploadDocument(id: number, payload: FulfillmentDocumentPayload) {
+    const response = await api.post<unknown, ApiResponse<unknown>>(
+      `/logistics/orders/${id}/documents`,
       payload
     )
     return response.data

@@ -73,6 +73,15 @@ export interface LogisticsOrderInfo {
   tracking_events?: TrackingEventInfo[]
 }
 
+export interface UploadFulfillmentDocumentPayload {
+  doc_type: string
+  file_url: string
+  remark?: string
+  gps_latitude?: number
+  gps_longitude?: number
+  captured_at?: string
+}
+
 export interface TrackingEventInfo {
   id: number
   logistics_order_id: number
@@ -207,4 +216,12 @@ export const serviceFulfillmentService = {
       status,
       remark,
     }),
+  uploadFulfillmentDocument: (
+    logisticsOrderId: number,
+    payload: UploadFulfillmentDocumentPayload
+  ) =>
+    api.post<unknown, ApiResponse<unknown>>(
+      `/logistics/orders/${logisticsOrderId}/documents`,
+      payload
+    ),
 }
