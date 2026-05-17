@@ -37,11 +37,9 @@ type ServiceKey = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance
 
 function getWorkbenchHref(port: number, path: string, tab?: string) {
   const params = new URLSearchParams()
-  if (import.meta.env.DEV) {
-    const sharedToken = getBuyerToken()
-    if (sharedToken) {
-      params.set('token', sharedToken)
-    }
+  const sharedToken = getBuyerToken()
+  if (sharedToken) {
+    params.set('token', sharedToken)
   }
   if (tab) {
     params.set('tab', tab)
@@ -67,7 +65,7 @@ const serviceConfig: Record<
     description: string
     enterpriseRole: string
     icon: React.ReactNode
-    actions: Array<{ label: string; href: string }>
+    actions: Array<{ label: string; href: () => string }>
   }
 > = {
   sales: {
@@ -76,8 +74,8 @@ const serviceConfig: Record<
     enterpriseRole: '供应商',
     icon: <ShopOutlined />,
     actions: [
-      { label: '进入卖家中心', href: getSellerCenterHref('/seller/dashboard') },
-      { label: '商品管理', href: getSellerCenterHref('/seller/products') },
+      { label: '进入卖家中心', href: () => getSellerCenterHref('/seller/dashboard') },
+      { label: '商品管理', href: () => getSellerCenterHref('/seller/products') },
     ],
   },
   procurement: {
@@ -86,8 +84,8 @@ const serviceConfig: Record<
     enterpriseRole: '采购商',
     icon: <ShoppingCartOutlined />,
     actions: [
-      { label: 'AI采购', href: '/ai-procurement' },
-      { label: '集采大厅', href: '/procurement' },
+      { label: 'AI采购', href: () => '/ai-procurement' },
+      { label: '集采大厅', href: () => '/procurement' },
     ],
   },
   logistics: {
@@ -96,8 +94,8 @@ const serviceConfig: Record<
     enterpriseRole: '物流方',
     icon: <TruckOutlined />,
     actions: [
-      { label: '进入物流管理中心', href: getWorkbenchHref(5175, '/logistics/') },
-      { label: '运力资源管理', href: getWorkbenchHref(5175, '/logistics/', 'resources') },
+      { label: '进入物流管理中心', href: () => getWorkbenchHref(5175, '/logistics/') },
+      { label: '运力资源管理', href: () => getWorkbenchHref(5175, '/logistics/', 'resources') },
     ],
   },
   warehouse: {
@@ -106,8 +104,8 @@ const serviceConfig: Record<
     enterpriseRole: '仓储方',
     icon: <HomeOutlined />,
     actions: [
-      { label: '进入仓储管理中心', href: getWorkbenchHref(5176, '/warehouse/') },
-      { label: '仓储资源管理', href: getWorkbenchHref(5176, '/warehouse/', 'resources') },
+      { label: '进入仓储管理中心', href: () => getWorkbenchHref(5176, '/warehouse/') },
+      { label: '仓储资源管理', href: () => getWorkbenchHref(5176, '/warehouse/', 'resources') },
     ],
   },
   finance: {
@@ -116,8 +114,8 @@ const serviceConfig: Record<
     enterpriseRole: '资金方',
     icon: <BankOutlined />,
     actions: [
-      { label: '进入资金方工作台', href: getWorkbenchHref(5177, '/finance/') },
-      { label: '金融产品管理', href: getWorkbenchHref(5177, '/finance/', 'products') },
+      { label: '进入资金方工作台', href: () => getWorkbenchHref(5177, '/finance/') },
+      { label: '金融产品管理', href: () => getWorkbenchHref(5177, '/finance/', 'products') },
     ],
   },
 }
@@ -267,7 +265,7 @@ export default function ServiceWorkspace() {
             {status === 2 ? (
               <Space direction="vertical" className="w-full">
                 {config.actions.map((action) => (
-                  <a key={action.href} href={action.href}>
+                  <a key={action.label} href={action.href()}>
                     <Button type="primary" block icon={<CheckCircleOutlined />}>
                       {action.label}
                     </Button>
