@@ -11,11 +11,12 @@ import {
   EditOutlined,
   DeleteOutlined,
   DotChartOutlined,
+  ControlOutlined,
 } from '@ant-design/icons'
 import { financeOrderService } from '@/services/orderService'
-import type { OrderInfo } from '@/services/orderService'
+import type { CollateralMonitorInfo, OrderInfo, WarehouseReceiptPledgeInfo } from '@/services/orderService'
 import { financeService, type FinanceServiceItem } from '@/services/financeService'
-import { hasFinanceCapability } from '@/services/auth'
+import { hasFinanceCapability, saveFinanceToken } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography
@@ -44,12 +45,37 @@ const statusMap: Record<number, { label: string; color: string }> = {
   11: { label: '异常', color: 'red' },
 }
 
-type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'disburse' | 'pledge' | 'release-pledge' | 'finance-flow' | 'all'
+type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'disburse' | 'pledge' | 'warehouse-receipt-pledge' | 'collateral-monitor' | 'release-pledge' | 'finance-flow' | 'all'
+
+function isTabKey(value: string | null): value is TabKey {
+  return Boolean(value && [
+    'products',
+    'risk-review',
+    'debt-contract',
+    'disburse',
+    'pledge',
+    'warehouse-receipt-pledge',
+    'collateral-monitor',
+    'release-pledge',
+    'finance-flow',
+    'all',
+  ].includes(value))
+}
 const productStatusMap: Record<number, { label: string; color: string }> = {
   1: { label: '待审核', color: 'processing' },
   2: { label: '已通过', color: 'success' },
   3: { label: '已驳回', color: 'error' },
   4: { label: '已下线', color: 'default' },
+}
+
+const warehouseReceiptPledgeStatusMap: Record<string, { label: string; color: string }> = {
+  submitted: { label: '待风控', color: 'processing' },
+  risk_approved: { label: '风控通过', color: 'cyan' },
+  risk_rejected: { label: '已驳回', color: 'red' },
+  agreement_signed: { label: '协议已签', color: 'blue' },
+  disbursed: { label: '已放款', color: 'green' },
+  releasing: { label: '释放中', color: 'purple' },
+  released: { label: '已释放', color: 'default' },
 }
 
 function App() {
@@ -64,7 +90,10 @@ function App() {
   const [riskOrders, setRiskOrders] = useState<OrderInfo[]>([])
   const [debtOrders, setDebtOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
+  const [collateralList, setCollateralList] = useState<CollateralMonitorInfo[]>([])
+  const [warehouseReceiptPledges, setWarehouseReceiptPledges] = useState<WarehouseReceiptPledgeInfo[]>([])
   const [loading, setLoading] = useState(false)
+  const [tokenReady, setTokenReady] = useState(false)
 
   const [riskModal, setRiskModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [riskApproved, setRiskApproved] = useState(true)
@@ -93,20 +122,58 @@ function App() {
   const [releaseModal, setReleaseModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [releaseReason, setReleaseReason] = useState('')
   const [releaseVoucherURL, setReleaseVoucherURL] = useState('')
+  const [collateralReceiptModal, setCollateralReceiptModal] = useState<{ visible: boolean; record: CollateralMonitorInfo | null }>({ visible: false, record: null })
+  const [collateralReceiptURL, setCollateralReceiptURL] = useState('')
+  const [collateralReceiptRemark, setCollateralReceiptRemark] = useState('')
+  const [wrpRiskModal, setWrpRiskModal] = useState<{ visible: boolean; record: WarehouseReceiptPledgeInfo | null }>({ visible: false, record: null })
+  const [wrpRiskApproved, setWrpRiskApproved] = useState(true)
+  const [wrpApprovedAmount, setWrpApprovedAmount] = useState<number>(0)
+  const [wrpTermDays, setWrpTermDays] = useState<number>(30)
+  const [wrpAnnualRate, setWrpAnnualRate] = useState<number>(0)
+  const [wrpRiskRemark, setWrpRiskRemark] = useState('')
+  const [wrpAgreementModal, setWrpAgreementModal] = useState<{ visible: boolean; record: WarehouseReceiptPledgeInfo | null }>({ visible: false, record: null })
+  const [wrpPledgeAgreementURL, setWrpPledgeAgreementURL] = useState('')
+  const [wrpSupervisionAgreementURL, setWrpSupervisionAgreementURL] = useState('')
+  const [wrpDisburseModal, setWrpDisburseModal] = useState<{ visible: boolean; record: WarehouseReceiptPledgeInfo | null }>({ visible: false, record: null })
+  const [wrpDisbursementVoucherURL, setWrpDisbursementVoucherURL] = useState('')
+  const [wrpDisburseRemark, setWrpDisburseRemark] = useState('')
+  const [wrpReleaseModal, setWrpReleaseModal] = useState<{ visible: boolean; record: WarehouseReceiptPledgeInfo | null }>({ visible: false, record: null })
+  const [wrpReleaseVoucherURL, setWrpReleaseVoucherURL] = useState('')
+  const [wrpReleaseRemark, setWrpReleaseRemark] = useState('')
   
   const [expandedFinanceOrders, setExpandedFinanceOrders] = useState<number[]>([])
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const token = urlParams.get('token')
+    const tab = urlParams.get('tab')
+    if (token) {
+      saveFinanceToken(token)
+    }
+    if (isTabKey(tab)) {
+      setActiveTab(tab)
+    }
+    if (token || tab) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    setTokenReady(true)
+  }, [])
 
   const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
     Modal.success({
       title,
+      closable: true,
+      maskClosable: true,
       content: (
         <Space direction="vertical" size={8}>
           <Text>已完成：{title.replace('已完成', '')}</Text>
           <Text type="secondary">下一步：{next}</Text>
-          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+          <Text type="secondary">可留在当前页继续处理，或切到推荐工作区查看后续任务。</Text>
         </Space>
       ),
-      okText: '回资金方工作台',
+      okCancel: true,
+      okText: '查看推荐工作区',
+      cancelText: '留在当前页',
       onOk: () => setActiveTab(targetTab),
     })
   }
@@ -159,12 +226,38 @@ function App() {
     }
   }
 
+  const fetchCollateralMonitor = async () => {
+    setLoading(true)
+    try {
+      const list = await financeOrderService.listCollateralMonitor()
+      setCollateralList(list || [])
+    } catch {
+      message.error('获取货权监控失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchWarehouseReceiptPledges = async () => {
+    setLoading(true)
+    try {
+      const result = await financeOrderService.listWarehouseReceiptPledges({ page_size: 100 })
+      setWarehouseReceiptPledges(result.list || [])
+    } catch {
+      message.error('获取仓单质押申请失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (activeTab === 'products') fetchProducts()
     else if (activeTab === 'risk-review') fetchRiskOrders()
     else if (activeTab === 'debt-contract') fetchDebtOrders()
     else if (activeTab === 'disburse') fetchDebtOrders()
     else if (activeTab === 'pledge') fetchAll()
+    else if (activeTab === 'warehouse-receipt-pledge') fetchWarehouseReceiptPledges()
+    else if (activeTab === 'collateral-monitor') fetchCollateralMonitor()
     else if (activeTab === 'release-pledge') fetchAll()
     else if (activeTab === 'finance-flow') fetchAll()
     else if (activeTab === 'all') fetchAll()
@@ -330,6 +423,106 @@ function App() {
       fetchAll()
     } catch {
       message.error('释放货权质押失败')
+    }
+  }
+
+  const handleCollateralReceipt = async () => {
+    const record = collateralReceiptModal.record
+    if (!record?.logistics_order_id) return
+    if (!collateralReceiptURL) {
+      message.warning('请填写资金方收货单 URL')
+      return
+    }
+    try {
+      await financeOrderService.confirmCollateralReceipt(record.logistics_order_id, {
+        receipt_url: collateralReceiptURL,
+        remark: collateralReceiptRemark || '资金方确认监管收货',
+      })
+      message.success('资金方监管收货已确认')
+      setCollateralReceiptModal({ visible: false, record: null })
+      setCollateralReceiptURL('')
+      setCollateralReceiptRemark('')
+      fetchCollateralMonitor()
+    } catch {
+      message.error('资金方确认收货失败')
+    }
+  }
+
+  const handleWarehouseReceiptPledgeRisk = async () => {
+    const record = wrpRiskModal.record
+    if (!record) return
+    try {
+      await financeOrderService.reviewWarehouseReceiptPledge(record.id, {
+        approved: wrpRiskApproved,
+        approved_amount: wrpRiskApproved ? wrpApprovedAmount : undefined,
+        term_days: wrpRiskApproved ? wrpTermDays : undefined,
+        annual_rate: wrpRiskApproved ? wrpAnnualRate : undefined,
+        risk_remark: wrpRiskRemark || undefined,
+      })
+      showCompleted(wrpRiskApproved ? '仓单质押风控已完成' : '仓单质押驳回已完成', wrpRiskApproved ? '下一步登记仓单质押协议和监管协议。' : '申请已退回给申请企业查看。', 'warehouse-receipt-pledge')
+      setWrpRiskModal({ visible: false, record: null })
+      setWrpRiskApproved(true)
+      setWrpApprovedAmount(0)
+      setWrpTermDays(30)
+      setWrpAnnualRate(0)
+      setWrpRiskRemark('')
+      fetchWarehouseReceiptPledges()
+    } catch {
+      message.error('仓单质押风控提交失败')
+    }
+  }
+
+  const handleWarehouseReceiptPledgeAgreement = async () => {
+    const record = wrpAgreementModal.record
+    if (!record) return
+    try {
+      await financeOrderService.signWarehouseReceiptPledgeAgreement(record.id, {
+        pledge_agreement_url: wrpPledgeAgreementURL,
+        supervision_agreement_url: wrpSupervisionAgreementURL,
+      })
+      showCompleted('仓单质押协议登记已完成', '下一步确认放款并冻结监管仓库存货权。', 'warehouse-receipt-pledge')
+      setWrpAgreementModal({ visible: false, record: null })
+      setWrpPledgeAgreementURL('')
+      setWrpSupervisionAgreementURL('')
+      fetchWarehouseReceiptPledges()
+    } catch {
+      message.error('仓单质押协议登记失败')
+    }
+  }
+
+  const handleWarehouseReceiptPledgeDisburse = async () => {
+    const record = wrpDisburseModal.record
+    if (!record) return
+    try {
+      await financeOrderService.disburseWarehouseReceiptPledge(record.id, {
+        disbursement_voucher_url: wrpDisbursementVoucherURL,
+        remark: wrpDisburseRemark || undefined,
+      })
+      showCompleted('仓单质押放款已完成', '系统会尝试按仓单号匹配监管仓库存快照并标记冻结。', 'warehouse-receipt-pledge')
+      setWrpDisburseModal({ visible: false, record: null })
+      setWrpDisbursementVoucherURL('')
+      setWrpDisburseRemark('')
+      fetchWarehouseReceiptPledges()
+    } catch {
+      message.error('仓单质押放款失败')
+    }
+  }
+
+  const handleWarehouseReceiptPledgeRelease = async () => {
+    const record = wrpReleaseModal.record
+    if (!record) return
+    try {
+      await financeOrderService.releaseWarehouseReceiptPledge(record.id, {
+        release_voucher_url: wrpReleaseVoucherURL || undefined,
+        release_remark: wrpReleaseRemark,
+      })
+      showCompleted('仓单质押货权释放已完成', '申请企业可在资金服务页查看释放结果。', 'warehouse-receipt-pledge')
+      setWrpReleaseModal({ visible: false, record: null })
+      setWrpReleaseVoucherURL('')
+      setWrpReleaseRemark('')
+      fetchWarehouseReceiptPledges()
+    } catch {
+      message.error('仓单质押货权释放失败')
     }
   }
 
@@ -591,16 +784,120 @@ function App() {
     },
   ]
 
+  const warehouseReceiptPledgeColumns: ColumnsType<WarehouseReceiptPledgeInfo> = [
+    { title: '申请号', dataIndex: 'application_no', key: 'application_no', width: 170 },
+    { title: '申请方', dataIndex: 'applicant_role', key: 'applicant_role', width: 90, render: (v: string) => v === 'sales' ? '卖方' : v === 'procurement' ? '买方' : '-' },
+    { title: '资金产品', dataIndex: 'finance_service_name', key: 'finance_service_name', width: 160, render: (v?: string) => v || '-' },
+    {
+      title: '监管仓/仓单',
+      key: 'warehouse_receipt',
+      width: 240,
+      render: (_: unknown, record: WarehouseReceiptPledgeInfo) => (
+        <Space direction="vertical" size={0}>
+          <Text>{record.warehouse_name || '-'}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>仓单：{record.receipt_no || '-'}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: '货物',
+      key: 'goods',
+      width: 180,
+      render: (_: unknown, record: WarehouseReceiptPledgeInfo) => (
+        <Space direction="vertical" size={0}>
+          <Text>{record.goods_name}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>{record.quantity || 0} 吨 {record.quality_grade || ''}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: '金额',
+      key: 'amount',
+      width: 150,
+      render: (_: unknown, record: WarehouseReceiptPledgeInfo) => (
+        <Space direction="vertical" size={0}>
+          <Text>申请 ¥{Number(record.requested_amount || 0).toLocaleString()}</Text>
+          {record.approved_amount ? <Text type="secondary" style={{ fontSize: 12 }}>审批 ¥{Number(record.approved_amount || 0).toLocaleString()}</Text> : null}
+        </Space>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 110,
+      render: (v: string) => {
+        const meta = warehouseReceiptPledgeStatusMap[v] || { label: v || '-', color: 'default' }
+        return <Tag color={meta.color}>{meta.label}</Tag>
+      },
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 280,
+      render: (_: unknown, record: WarehouseReceiptPledgeInfo) => (
+        <Space wrap>
+          <Button
+            size="small"
+            type={record.status === 'submitted' ? 'primary' : 'default'}
+            disabled={record.status !== 'submitted'}
+            onClick={() => {
+              setWrpRiskApproved(true)
+              setWrpApprovedAmount(record.requested_amount || 0)
+              setWrpTermDays(record.term_days || 30)
+              setWrpAnnualRate(record.annual_rate || 0)
+              setWrpRiskModal({ visible: true, record })
+            }}
+          >
+            风控
+          </Button>
+          <Button
+            size="small"
+            disabled={record.status !== 'risk_approved'}
+            onClick={() => setWrpAgreementModal({ visible: true, record })}
+          >
+            协议
+          </Button>
+          <Button
+            size="small"
+            type={record.status === 'agreement_signed' ? 'primary' : 'default'}
+            disabled={record.status !== 'agreement_signed'}
+            onClick={() => setWrpDisburseModal({ visible: true, record })}
+          >
+            放款
+          </Button>
+          <Button
+            size="small"
+            disabled={record.status !== 'disbursed'}
+            onClick={() => setWrpReleaseModal({ visible: true, record })}
+          >
+            释放
+          </Button>
+        </Space>
+      ),
+    },
+  ]
+
   const menuItems = [
     { key: 'products' as TabKey, label: '产品管理', icon: <BankOutlined />, group: 'product' },
     { key: 'risk-review' as TabKey, label: '风控审批', icon: <AuditOutlined />, group: 'approval' },
     { key: 'debt-contract' as TabKey, label: '债务合同', icon: <FileSearchOutlined />, group: 'contract' },
     { key: 'disburse' as TabKey, label: '放款管理', icon: <DollarCircleOutlined />, group: 'contract' },
     { key: 'pledge' as TabKey, label: '货权质押', icon: <SafetyCertificateOutlined />, group: 'pledge' },
+    { key: 'warehouse-receipt-pledge' as TabKey, label: '仓单质押', icon: <SafetyCertificateOutlined />, group: 'pledge' },
+    { key: 'collateral-monitor' as TabKey, label: '货权监控', icon: <ControlOutlined />, group: 'pledge' },
     { key: 'release-pledge' as TabKey, label: '质押释放', icon: <EditOutlined />, group: 'pledge' },
     { key: 'finance-flow' as TabKey, label: '融资流程', icon: <DotChartOutlined />, group: 'center' },
     { key: 'all' as TabKey, label: '订单中心', icon: <FileSearchOutlined />, group: 'center' },
   ]
+
+  if (!tokenReady) {
+    return (
+      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin size="large" />
+      </Layout>
+    )
+  }
 
   if (!hasFinanceCapability()) {
     return (
@@ -617,10 +914,13 @@ function App() {
   return (
     <Layout className="service-shell">
       <Sider width={232} theme="light">
-        <div style={{ height: 64, display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: '1px solid #edf0f5' }}>
+        <div style={{ height: 78, display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: '1px solid #eadcc7', background: 'linear-gradient(135deg, rgba(255,253,248,.92), rgba(248,240,228,.72))' }}>
           <Space>
-            <DollarCircleOutlined style={{ color: '#7c3aed' }} />
-            <Text strong>RecoLink 资金</Text>
+            <span style={{ display: 'inline-grid', width: 36, height: 36, placeItems: 'center', borderRadius: 16, background: '#214332', color: '#f3c17c', fontWeight: 900 }}>R</span>
+            <span>
+              <Text strong style={{ display: 'block', color: '#17221b' }}>锐联资金</Text>
+              <Text style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', color: '#a4662c' }}>RecoLink</Text>
+            </span>
           </Space>
         </div>
         <div style={{ padding: 16 }}>
@@ -631,12 +931,13 @@ function App() {
             {menuItems.filter((item) => item.group === 'product').map((item) => (
               <List.Item
                 key={item.key}
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                className="service-nav-item"
+                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                   </Text>
                 </Space>
@@ -651,12 +952,13 @@ function App() {
             {menuItems.filter((item) => item.group === 'approval').map((item) => (
               <List.Item
                 key={item.key}
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                className="service-nav-item"
+                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                     {item.key === 'risk-review' && riskOrders.length > 0 && (
                       <Badge count={riskOrders.length} style={{ marginLeft: 8 }} />
@@ -674,12 +976,13 @@ function App() {
             {menuItems.filter((item) => item.group === 'contract').map((item) => (
               <List.Item
                 key={item.key}
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                className="service-nav-item"
+                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                     {item.key === 'debt-contract' && debtOrders.length > 0 && (
                       <Badge count={debtOrders.length} style={{ marginLeft: 8 }} />
@@ -697,12 +1000,13 @@ function App() {
             {menuItems.filter((item) => item.group === 'pledge').map((item) => (
               <List.Item
                 key={item.key}
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                className="service-nav-item"
+                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                   </Text>
                 </Space>
@@ -717,12 +1021,13 @@ function App() {
             {menuItems.filter((item) => item.group === 'center').map((item) => (
               <List.Item
                 key={item.key}
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                className="service-nav-item"
+                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                   </Text>
                 </Space>
@@ -732,8 +1037,11 @@ function App() {
         </div>
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text strong>资金服务方工作台</Text>
+        <Header style={{ background: 'rgba(255,253,248,.92)', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <Text strong style={{ display: 'block', color: '#17221b', fontSize: 16 }}>资金服务方工作台</Text>
+            <Text style={{ color: '#7a847a', fontSize: 12 }}>金融产品、风控审批、债务合同、放款与质押监控</Text>
+          </div>
           <Space>
             <Button icon={<AuditOutlined />} onClick={() => { 
               if (activeTab === 'products') fetchProducts(); 
@@ -741,6 +1049,8 @@ function App() {
               else if (activeTab === 'debt-contract') fetchDebtOrders();
               else if (activeTab === 'disburse') fetchDebtOrders();
               else if (activeTab === 'pledge') fetchAll();
+              else if (activeTab === 'warehouse-receipt-pledge') fetchWarehouseReceiptPledges();
+              else if (activeTab === 'collateral-monitor') fetchCollateralMonitor();
               else if (activeTab === 'release-pledge') fetchAll();
               else if (activeTab === 'finance-flow') fetchAll();
               else fetchAll(); 
@@ -1043,6 +1353,231 @@ function App() {
             </Card>
           )}
 
+          {activeTab === 'warehouse-receipt-pledge' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={6}>
+                  <Card><Typography.Text type="secondary">全部申请</Typography.Text><br /><Title level={3}>{warehouseReceiptPledges.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={6}>
+                  <Card><Typography.Text type="secondary">待风控</Typography.Text><br /><Title level={3}>{warehouseReceiptPledges.filter((item) => item.status === 'submitted').length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={6}>
+                  <Card><Typography.Text type="secondary">待放款</Typography.Text><br /><Title level={3}>{warehouseReceiptPledges.filter((item) => item.status === 'agreement_signed').length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={6}>
+                  <Card><Typography.Text type="secondary">已放款</Typography.Text><br /><Title level={3}>{warehouseReceiptPledges.filter((item) => item.status === 'disbursed').length}</Title></Card>
+                </Col>
+              </Row>
+              <Card title="仓单质押申请" extra={<Tag color="geekblue">监管仓 / 仓单 / 协议 / 释放</Tag>}>
+                <Spin spinning={loading}>
+                  <Table
+                    columns={warehouseReceiptPledgeColumns}
+                    dataSource={warehouseReceiptPledges}
+                    rowKey="id"
+                    pagination={{ pageSize: 10 }}
+                    scroll={{ x: 1400 }}
+                    expandable={{
+                      expandedRowRender: (record) => (
+                        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                          <Text type="secondary">仓单文件：{record.receipt_voucher_url || '--'}</Text>
+                          <Text type="secondary">质押协议：{record.pledge_agreement_url || '--'}</Text>
+                          <Text type="secondary">监管协议：{record.supervision_agreement_url || '--'}</Text>
+                          <Text type="secondary">放款凭证：{record.disbursement_voucher_url || '--'}</Text>
+                          <Text type="secondary">释放凭证：{record.release_voucher_url || '--'}</Text>
+                          <Text type="secondary">备注：{record.risk_remark || record.release_remark || record.remark || '--'}</Text>
+                        </Space>
+                      ),
+                    }}
+                    locale={{ emptyText: '暂无仓单质押申请' }}
+                  />
+                </Spin>
+              </Card>
+            </>
+          )}
+
+          {activeTab === 'collateral-monitor' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">监控订单</Typography.Text><br /><Title level={3}>{collateralList.length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">已质押</Typography.Text><br /><Title level={3}>{collateralList.filter((item) => item.financing_status === 'pledged').length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card><Typography.Text type="secondary">已释放</Typography.Text><br /><Title level={3}>{collateralList.filter((item) => item.financing_status === 'released').length}</Title></Card>
+                </Col>
+              </Row>
+              <Card title="货权监控看板" extra={<Tag color="geekblue">仓库 / 物流 / 单据</Tag>}>
+                <Spin spinning={loading}>
+                  <Table
+                    rowKey="financing_request_id"
+                    dataSource={collateralList}
+                    pagination={{ pageSize: 10 }}
+                    scroll={{ x: 1280 }}
+                    expandable={{
+                      expandedRowRender: (record) => (
+                        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                          <Card size="small" title="库存快照">
+                            <Table
+                              size="small"
+                              rowKey="id"
+                              dataSource={record.inventory_snapshots || []}
+                              pagination={false}
+                              columns={[
+                                { title: '快照号', dataIndex: 'snapshot_no', key: 'snapshot_no', width: 150 },
+                                { title: '商品', dataIndex: 'product_name', key: 'product_name', width: 120 },
+                                { title: '批次', dataIndex: 'batch_no', key: 'batch_no', width: 100, render: (v: string) => v || '--' },
+                                { title: '库位', dataIndex: 'location_code', key: 'location_code', width: 100, render: (v: string) => v || '--' },
+                                { title: '库存', dataIndex: 'quantity', key: 'quantity', width: 90, render: (v: number) => `${Number(v || 0).toLocaleString()} 吨` },
+                                { title: '冻结', dataIndex: 'frozen_quantity', key: 'frozen_quantity', width: 90, render: (v: number) => `${Number(v || 0).toLocaleString()} 吨` },
+                                { title: '质检', dataIndex: 'quality_status', key: 'quality_status', width: 90 },
+                                { title: '质押', dataIndex: 'pledge_status', key: 'pledge_status', width: 90 },
+                                { title: '同步', dataIndex: 'sync_status', key: 'sync_status', width: 90 },
+                              ]}
+                              locale={{ emptyText: '暂无库存快照' }}
+                            />
+                          </Card>
+                          <Card size="small" title="履约单据">
+                            <List
+                              size="small"
+                              dataSource={record.fulfillment_docs || []}
+                              locale={{ emptyText: '暂无履约单据' }}
+                              renderItem={(doc) => (
+                                <List.Item>
+                                  <List.Item.Meta
+                                    title={
+                                      <Space>
+                                        <Tag>{doc.doc_type}</Tag>
+                                        <Text>{doc.uploaded_role || '--'}</Text>
+                                      </Space>
+                                    }
+                                    description={
+                                      <Space direction="vertical" size={2}>
+                                        <Text type="secondary">{doc.remark || '无备注'}</Text>
+                                        <Text type="secondary">{doc.file_url || '--'}</Text>
+                                      </Space>
+                                    }
+                                  />
+                                </List.Item>
+                              )}
+                            />
+                          </Card>
+                        </Space>
+                      ),
+                    }}
+                    columns={[
+                      {
+                        title: '订单号',
+                        dataIndex: 'order_no',
+                        key: 'order_no',
+                        width: 160,
+                        render: (v: string) => <Text strong>{v}</Text>,
+                      },
+                      {
+                        title: '审批金额',
+                        dataIndex: 'approved_amount',
+                        key: 'approved_amount',
+                        width: 120,
+                        render: (v: number) => (v ? `¥${v.toLocaleString()}` : '--'),
+                      },
+                      {
+                        title: '融资状态',
+                        dataIndex: 'financing_status',
+                        key: 'financing_status',
+                        width: 130,
+                        render: (v: string) => {
+                          const map: Record<string, { label: string; color: string }> = {
+                            disbursed: { label: '已放款', color: 'green' },
+                            pledged: { label: '已质押', color: 'geekblue' },
+                            released: { label: '已释放', color: 'success' },
+                          }
+                          const meta = map[v] || { label: v || '--', color: 'default' }
+                          return <Tag color={meta.color}>{meta.label}</Tag>
+                        },
+                      },
+                      {
+                        title: '订单状态',
+                        dataIndex: 'order_status',
+                        key: 'order_status',
+                        width: 120,
+                        render: (v: number) => {
+                          const meta = statusMap[v] || { label: `状态${v}`, color: 'default' }
+                          return <Tag color={meta.color}>{meta.label}</Tag>
+                        },
+                      },
+                      {
+                        title: '监管仓库',
+                        key: 'warehouse',
+                        width: 220,
+                        render: (_: unknown, record: CollateralMonitorInfo) => (
+                          <Space direction="vertical" size={0}>
+                            <Text>{record.warehouse_name || '非平台监管仓'}</Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>{record.warehouse_address || '--'}</Text>
+                          </Space>
+                        ),
+                      },
+                      {
+                        title: '物流状态',
+                        dataIndex: 'logistics_status',
+                        key: 'logistics_status',
+                        width: 130,
+                        render: (v: string) => <Tag color={v ? 'processing' : 'default'}>{v || '未创建'}</Tag>,
+                      },
+                      {
+                        title: '最近物流事件',
+                        dataIndex: 'last_logistics_event',
+                        key: 'last_logistics_event',
+                        width: 180,
+                        ellipsis: true,
+                        render: (v: string) => v || '--',
+                      },
+                      {
+                        title: '库存/单据',
+                        key: 'assets',
+                        width: 120,
+                        render: (_: unknown, record: CollateralMonitorInfo) =>
+                          `${record.inventory_snapshots?.length || 0} 快照 / ${record.fulfillment_docs?.length || 0} 单据`,
+                      },
+                      {
+                        title: '质押凭证',
+                        key: 'pledge_voucher',
+                        width: 120,
+                        render: (_: unknown, record: CollateralMonitorInfo) =>
+                          record.pledge_voucher_url ? <Tag color="cyan">已上传</Tag> : <Tag>未上传</Tag>,
+                      },
+                      {
+                        title: '释放条件',
+                        dataIndex: 'release_condition',
+                        key: 'release_condition',
+                        width: 180,
+                        ellipsis: true,
+                        render: (v: string) => v || '--',
+                      },
+                      {
+                        title: '监管操作',
+                        key: 'monitor_action',
+                        width: 130,
+                        render: (_: unknown, record: CollateralMonitorInfo) => {
+                          if (!record.logistics_order_id) return <Text type="secondary">无物流单</Text>
+                          if (record.financing_status !== 'pledged') return <Text type="secondary">--</Text>
+                          if (record.logistics_status !== 'inbound_completed') return <Text type="secondary">待收货仓入库</Text>
+                          return (
+                            <Button size="small" type="primary" onClick={() => setCollateralReceiptModal({ visible: true, record })}>
+                              确认收货
+                            </Button>
+                          )
+                        },
+                      },
+                    ]}
+                    locale={{ emptyText: '暂无货权监控数据' }}
+                  />
+                </Spin>
+              </Card>
+            </>
+          )}
+
           {activeTab === 'finance-flow' && (
             <Card title="融资流程总览">
               <Spin spinning={loading}>
@@ -1299,6 +1834,158 @@ function App() {
               <div>
                 <Text>释放凭证 URL：</Text>
                 <Input value={releaseVoucherURL} onChange={(e) => setReleaseVoucherURL(e.target.value)} placeholder="选填，https://..." />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="资金方监管收货确认"
+            open={collateralReceiptModal.visible}
+            onOk={handleCollateralReceipt}
+            onCancel={() => {
+              setCollateralReceiptModal({ visible: false, record: null })
+              setCollateralReceiptURL('')
+              setCollateralReceiptRemark('')
+            }}
+            okText="上传并确认"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Paragraph type="secondary">
+                收货仓完成验货入库并上传封条照片、入库单、收货单后，资金方确认监管收货。
+              </Paragraph>
+              <div>
+                <Text>收货单 URL：</Text>
+                <Input value={collateralReceiptURL} onChange={(e) => setCollateralReceiptURL(e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <Text>确认备注：</Text>
+                <Input value={collateralReceiptRemark} onChange={(e) => setCollateralReceiptRemark(e.target.value)} placeholder="选填" />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="仓单质押风控"
+            open={wrpRiskModal.visible}
+            onOk={handleWarehouseReceiptPledgeRisk}
+            onCancel={() => {
+              setWrpRiskModal({ visible: false, record: null })
+              setWrpRiskApproved(true)
+              setWrpApprovedAmount(0)
+              setWrpTermDays(30)
+              setWrpAnnualRate(0)
+              setWrpRiskRemark('')
+            }}
+            okText="提交风控"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Paragraph type="secondary">
+                校验仓单真实性、货权归属、监管仓库存和申请企业资信后提交结果。
+              </Paragraph>
+              <div>
+                <Text>审批结果：</Text>
+                <Space>
+                  <Tag color={wrpRiskApproved ? 'green' : 'default'} style={{ cursor: 'pointer' }} onClick={() => setWrpRiskApproved(true)}>通过</Tag>
+                  <Tag color={!wrpRiskApproved ? 'red' : 'default'} style={{ cursor: 'pointer' }} onClick={() => setWrpRiskApproved(false)}>拒绝</Tag>
+                </Space>
+              </div>
+              {wrpRiskApproved && (
+                <>
+                  <div>
+                    <Text>审批金额 (元)：</Text>
+                    <InputNumber style={{ width: '100%' }} min={0} precision={2} value={wrpApprovedAmount} onChange={(v) => setWrpApprovedAmount(v || 0)} />
+                  </div>
+                  <div>
+                    <Text>账期 (天)：</Text>
+                    <InputNumber style={{ width: '100%' }} min={1} precision={0} value={wrpTermDays} onChange={(v) => setWrpTermDays(v || 30)} />
+                  </div>
+                  <div>
+                    <Text>年化费率 (%)：</Text>
+                    <InputNumber style={{ width: '100%' }} min={0} precision={4} value={wrpAnnualRate} onChange={(v) => setWrpAnnualRate(v || 0)} />
+                  </div>
+                </>
+              )}
+              <div>
+                <Text>风控备注：</Text>
+                <Input value={wrpRiskRemark} onChange={(e) => setWrpRiskRemark(e.target.value)} placeholder="选填" />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="登记仓单质押与监管协议"
+            open={wrpAgreementModal.visible}
+            onOk={handleWarehouseReceiptPledgeAgreement}
+            onCancel={() => {
+              setWrpAgreementModal({ visible: false, record: null })
+              setWrpPledgeAgreementURL('')
+              setWrpSupervisionAgreementURL('')
+            }}
+            okText="确认协议已签"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Paragraph type="secondary">
+                申请企业将仓单质押给资方，并和监管仓/资方签署监管协议后登记。
+              </Paragraph>
+              <div>
+                <Text>仓单质押协议 URL：</Text>
+                <Input value={wrpPledgeAgreementURL} onChange={(e) => setWrpPledgeAgreementURL(e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <Text>监管协议 URL：</Text>
+                <Input value={wrpSupervisionAgreementURL} onChange={(e) => setWrpSupervisionAgreementURL(e.target.value)} placeholder="https://..." />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="仓单质押放款"
+            open={wrpDisburseModal.visible}
+            onOk={handleWarehouseReceiptPledgeDisburse}
+            onCancel={() => {
+              setWrpDisburseModal({ visible: false, record: null })
+              setWrpDisbursementVoucherURL('')
+              setWrpDisburseRemark('')
+            }}
+            okText="确认放款"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Paragraph type="secondary">
+                放款后系统会尝试按仓库、货物和仓单号匹配库存快照，并标记质押冻结。
+              </Paragraph>
+              <div>
+                <Text>放款凭证 URL：</Text>
+                <Input value={wrpDisbursementVoucherURL} onChange={(e) => setWrpDisbursementVoucherURL(e.target.value)} placeholder="https://..." />
+              </div>
+              <div>
+                <Text>放款备注：</Text>
+                <Input value={wrpDisburseRemark} onChange={(e) => setWrpDisburseRemark(e.target.value)} placeholder="选填" />
+              </div>
+            </Space>
+          </Modal>
+
+          <Modal
+            title="释放仓单质押货权"
+            open={wrpReleaseModal.visible}
+            onOk={handleWarehouseReceiptPledgeRelease}
+            onCancel={() => {
+              setWrpReleaseModal({ visible: false, record: null })
+              setWrpReleaseVoucherURL('')
+              setWrpReleaseRemark('')
+            }}
+            okText="确认释放"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Paragraph type="secondary">
+                申请企业销售回款并还款后，资方按笔释放对应货权。
+              </Paragraph>
+              <div>
+                <Text>释放凭证 URL：</Text>
+                <Input value={wrpReleaseVoucherURL} onChange={(e) => setWrpReleaseVoucherURL(e.target.value)} placeholder="选填，https://..." />
+              </div>
+              <div>
+                <Text>释放说明：</Text>
+                <Input value={wrpReleaseRemark} onChange={(e) => setWrpReleaseRemark(e.target.value)} placeholder="必填，例如已回款还款，释放本笔仓单货权" />
               </div>
             </Space>
           </Modal>

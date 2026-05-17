@@ -1,6 +1,17 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Button, Space, Dropdown, Avatar } from 'antd'
-import { TeamOutlined, UserOutlined, LogoutOutlined, ShoppingCartOutlined, OrderedListOutlined, SafetyCertificateOutlined, BankOutlined, DashboardOutlined, ShopOutlined } from '@ant-design/icons'
+import {
+  BankOutlined,
+  DashboardOutlined,
+  LogoutOutlined,
+  MenuOutlined,
+  OrderedListOutlined,
+  SafetyCertificateOutlined,
+  ShopOutlined,
+  ShoppingCartOutlined,
+  TeamOutlined,
+  UserOutlined,
+} from '@ant-design/icons'
 import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
 import { getIdentityStatusLabel } from '@/services/certificationService'
 import { useUserStore } from '@/stores'
@@ -49,11 +60,23 @@ export default function HomeHeader() {
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, danger: true, onClick: handleLogout },
   ]
 
+  const mobileMenuItems = navItems.map(item => ({
+    key: item.key,
+    label: item.label,
+    onClick: () => navigate(item.key),
+  }))
+
   return (
-    <AntHeader className="bg-white shadow-sm flex items-center px-8 h-16 fixed top-0 left-0 right-0 z-50">
-      <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
-        <Link to="/" className="text-2xl font-bold text-primary-600 no-underline flex-shrink-0">
-          RecoLink
+    <AntHeader className="fixed left-0 right-0 top-0 z-50 h-20 border-b border-[#eadcc7] bg-[#fffdf8]/95 px-4 shadow-[0_10px_30px_rgba(64,44,25,.06)] backdrop-blur-xl md:px-8">
+      <div className="mx-auto flex h-full w-full max-w-7xl items-center justify-between gap-5">
+        <Link to="/" className="group flex min-w-0 flex-shrink-0 items-center gap-3 no-underline">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#214332] text-lg font-black text-[#f3c17c] shadow-[0_10px_24px_rgba(33,67,50,.18)]">
+            R
+          </span>
+          <span className="min-w-0 leading-tight">
+            <span className="block truncate text-[15px] font-black tracking-[-0.02em] text-[#17221b] sm:text-[17px]">锐联产业协同平台</span>
+            <span className="block text-[12px] font-bold tracking-[0.08em] text-[#a4662c]">RecoLink</span>
+          </span>
         </Link>
 
         <Menu
@@ -61,44 +84,48 @@ export default function HomeHeader() {
           selectedKeys={[selectedKey]}
           items={navItems.map(item => ({
             key: item.key,
-            label: <Link to={item.key}>{item.label}</Link>
+            label: <Link to={item.key}>{item.label}</Link>,
           }))}
-          className="border-none flex-1 justify-center"
-          style={{ minWidth: 560 }}
+          className="home-nav hidden min-w-[560px] flex-1 justify-center border-none bg-transparent lg:flex"
         />
 
-        <Space size="middle" className="flex-shrink-0">
+        <Space size="middle" className="hidden flex-shrink-0 md:flex">
           {isLoggedIn ? (
             <>
               <Button
                 type="primary"
                 icon={<DashboardOutlined />}
                 onClick={() => navigate('/dashboard')}
+                className="rounded-full bg-[#214332] px-5 font-semibold hover:!bg-[#2d5a43]"
               >
                 个人工作台
               </Button>
               {hasEnterpriseAccess(user) && (
-                <Button icon={<ShopOutlined />} onClick={switchToSellerCenter}>卖家中心</Button>
+                <Button className="rounded-full" icon={<ShopOutlined />} onClick={switchToSellerCenter}>卖家中心</Button>
               )}
               <NotificationBell />
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-                <div className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <Avatar size="small" icon={<UserOutlined />} className="bg-blue-500" />
-                  <span className="text-sm text-gray-700">{user?.realName || user?.username || user?.mobile || '用户'}</span>
+                <div className="flex cursor-pointer items-center gap-2 rounded-full border border-[#dfd0ba] bg-white/70 px-3 py-2 shadow-sm transition-colors hover:bg-white">
+                  <Avatar size="small" icon={<UserOutlined />} className="bg-[#c47b34]" />
+                  <span className="max-w-[120px] truncate text-sm font-semibold text-[#17221b]">{user?.realName || user?.username || user?.mobile || '用户'}</span>
                 </div>
               </Dropdown>
             </>
           ) : (
             <>
               <Link to="/login">
-                <Button type="primary">登录 / 注册</Button>
+                <Button type="primary" className="rounded-full bg-[#214332] px-5 font-semibold hover:!bg-[#2d5a43]">登录 / 注册</Button>
               </Link>
               <Link to="/dashboard/enterprise">
-                <Button icon={<TeamOutlined />}>企业入驻</Button>
+                <Button icon={<TeamOutlined />} className="rounded-full border-[#d0b991] bg-white">企业入驻</Button>
               </Link>
             </>
           )}
         </Space>
+
+        <Dropdown menu={{ items: mobileMenuItems }} placement="bottomRight">
+          <Button className="inline-flex rounded-full lg:hidden" icon={<MenuOutlined />} />
+        </Dropdown>
       </div>
     </AntHeader>
   )

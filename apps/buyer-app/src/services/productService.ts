@@ -44,6 +44,8 @@ interface BackendProduct {
   status: number
   enterprise_id: number
   quality_cert?: string
+  title_voucher_url?: string
+  title_voucher_remark?: string
   images: string[]
   description?: string
   delivery_days: number
@@ -77,6 +79,9 @@ function mapProduct(product: BackendProduct): Product {
     status: product.status,
     enterpriseId: product.enterprise_id,
     qualityCert: product.quality_cert,
+    titleVoucherUrl: product.title_voucher_url,
+    titleVoucherRemark: product.title_voucher_remark,
+    titleConfirmed: Boolean(product.title_voucher_url),
     images: product.images || [],
     description: product.description,
     deliveryDays: product.delivery_days,

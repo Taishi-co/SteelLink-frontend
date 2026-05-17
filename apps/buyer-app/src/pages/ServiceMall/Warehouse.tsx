@@ -106,6 +106,9 @@ export default function WarehouseMallPage() {
                           <Tag color="blue">资源 #{item.id}</Tag>
                           <Tag color="blue">可用库容 {item.available_capacity || 0}</Tag>
                           <Tag>总库容 {item.capacity || 0}</Tag>
+                          <Tag color={item.finance_certified ? 'purple' : 'default'}>
+                            {item.finance_certified ? '资方认证监管仓' : '普通仓'}
+                          </Tag>
                           {item.price_rule && <Tag>{item.price_rule}</Tag>}
                           {item.service_types?.map((service) => <Tag key={service}>{service}</Tag>)}
                         </Space>

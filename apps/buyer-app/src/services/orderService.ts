@@ -286,8 +286,6 @@ export const orderService = {
       transaction_no?: string
       payer_account?: string
       payee_account?: string
-      title_voucher_url: string
-      title_remark?: string
       captured_at?: string
       gps_latitude?: number
       gps_longitude?: number

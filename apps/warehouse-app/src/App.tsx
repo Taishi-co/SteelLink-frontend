@@ -29,7 +29,6 @@ import {
   HomeOutlined,
   InboxOutlined,
   SafetyCertificateOutlined,
-  BankOutlined,
   CalendarOutlined,
   ExclamationCircleOutlined,
   PlusOutlined,
@@ -38,8 +37,8 @@ import {
   AppstoreOutlined,
   DashboardOutlined,
 } from '@ant-design/icons'
-import { warehouseOrderService, warehouseMovementService } from '@/services/orderService'
-import type { OrderEventInfo, OrderInfo, WarehouseMovement } from '@/services/orderService'
+import { warehouseOrderService, warehouseMovementService, warehouseInventoryService, warehouseLogisticsService } from '@/services/orderService'
+import type { LogisticsOrder, OrderEventInfo, OrderInfo, WarehouseInventorySnapshot, WarehouseMovement } from '@/services/orderService'
 import { warehouseResourceService } from '@/services/warehouseResourceService'
 import type {
   WarehouseResource,
@@ -84,18 +83,27 @@ const resourceStatusMap: Record<number, { label: string; color: string }> = {
   4: { label: '已下线', color: 'default' },
 }
 
-type TabKey = 'dashboard' | 'pending' | 'movements' | 'resources' | 'all'
+type TabKey = 'dashboard' | 'pending' | 'movements' | 'logistics' | 'inventory' | 'resources' | 'all'
+
+function isTabKey(value: string | null): value is TabKey {
+  return Boolean(value && ['dashboard', 'pending', 'movements', 'logistics', 'inventory', 'resources', 'all'].includes(value))
+}
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
   const [pendingOrders, setPendingOrders] = useState<OrderInfo[]>([])
   const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
   const [movements, setMovements] = useState<WarehouseMovement[]>([])
+  const [logisticsOrders, setLogisticsOrders] = useState<LogisticsOrder[]>([])
+  const [inventorySnapshots, setInventorySnapshots] = useState<WarehouseInventorySnapshot[]>([])
   const [resources, setResources] = useState<WarehouseResource[]>([])
   const [resourceLoading, setResourceLoading] = useState(false)
   const [resourceModalVisible, setResourceModalVisible] = useState(false)
   const [editingResource, setEditingResource] = useState<WarehouseResource | null>(null)
   const [resourceForm] = Form.useForm<WarehouseResourcePayload>()
+  const [inventoryForm] = Form.useForm()
+  const [inventoryModalVisible, setInventoryModalVisible] = useState(false)
+  const [editingInventory, setEditingInventory] = useState<WarehouseInventorySnapshot | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirmModal, setConfirmModal] = useState<{ visible: boolean; orderId: number | null }>({
     visible: false,
@@ -108,12 +116,26 @@ function App() {
   const [selectedOrder, setSelectedOrder] = useState<OrderInfo | null>(null)
   const [orderEvents, setOrderEvents] = useState<OrderEventInfo[]>([])
   const [tokenReady, setTokenReady] = useState(false)
+  const [logisticsModal, setLogisticsModal] = useState<{ visible: boolean; order: LogisticsOrder | null; nextStatus: string; label: string; requiredDocs: string[] }>({
+    visible: false,
+    order: null,
+    nextStatus: '',
+    label: '',
+    requiredDocs: [],
+  })
+  const [logisticsForm] = Form.useForm<Record<string, string>>()
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const token = urlParams.get('token')
+    const tab = urlParams.get('tab')
     if (token) {
       saveWarehouseToken(token)
+    }
+    if (isTabKey(tab)) {
+      setActiveTab(tab)
+    }
+    if (token || tab) {
       window.history.replaceState({}, '', window.location.pathname)
     }
     setTokenReady(true)
@@ -129,14 +151,18 @@ function App() {
   const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
     Modal.success({
       title,
+      closable: true,
+      maskClosable: true,
       content: (
         <Space direction="vertical" size={8}>
           <Text>已完成：{title.replace('已完成', '')}</Text>
           <Text type="secondary">下一步：{next}</Text>
-          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+          <Text type="secondary">可留在当前页继续处理，或切到推荐工作区查看后续任务。</Text>
         </Space>
       ),
-      okText: '回工作台看订单',
+      okCancel: true,
+      okText: '查看推荐工作区',
+      cancelText: '留在当前页',
       onOk: () => setActiveTab(targetTab),
     })
   }
@@ -172,6 +198,30 @@ function App() {
       setMovements(list || [])
     } catch {
       message.error('获取出入库记录失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchLogisticsOrders = async () => {
+    setLoading(true)
+    try {
+      const list = await warehouseLogisticsService.listOrders()
+      setLogisticsOrders(list || [])
+    } catch {
+      message.error('获取物流履约单失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchInventory = async () => {
+    setLoading(true)
+    try {
+      const list = await warehouseInventoryService.list()
+      setInventorySnapshots(list || [])
+    } catch {
+      message.error('获取库存快照失败')
     } finally {
       setLoading(false)
     }
@@ -216,6 +266,43 @@ function App() {
     setResourceModalVisible(true)
   }
 
+  const openCreateInventory = () => {
+    setEditingInventory(null)
+    inventoryForm.resetFields()
+    inventoryForm.setFieldsValue({
+      quantity: 0,
+      frozen_quantity: 0,
+      quality_status: 'unchecked',
+      pledge_status: 'none',
+      sync_status: 'manual',
+    })
+    setInventoryModalVisible(true)
+  }
+
+  const openEditInventory = (record: WarehouseInventorySnapshot) => {
+    setEditingInventory(record)
+    inventoryForm.setFieldsValue(record)
+    setInventoryModalVisible(true)
+  }
+
+  const handleInventorySubmit = async () => {
+    try {
+      const values = await inventoryForm.validateFields()
+      if (editingInventory) {
+        await warehouseInventoryService.update(editingInventory.id, values)
+        message.success('库存快照已更新')
+      } else {
+        await warehouseInventoryService.create(values)
+        message.success('库存快照已创建')
+      }
+      setInventoryModalVisible(false)
+      fetchInventory()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('保存库存快照失败')
+    }
+  }
+
   const handleResourceSubmit = async () => {
     try {
       const values = await resourceForm.validateFields()
@@ -252,17 +339,21 @@ function App() {
     })
   }
 
-  useEffect(() => {
-    if (activeTab === 'dashboard') {
-      fetchPending()
-      fetchMovements()
-      fetchResources()
-      fetchAll()
-    } else if (activeTab === 'pending') fetchPending()
-    else if (activeTab === 'all') fetchAll()
-    else if (activeTab === 'movements') fetchMovements()
-    else if (activeTab === 'resources') fetchResources()
-  }, [activeTab])
+	useEffect(() => {
+		if (activeTab === 'dashboard') {
+			fetchPending()
+			fetchMovements()
+			fetchLogisticsOrders()
+			fetchInventory()
+			fetchResources()
+			fetchAll()
+		} else if (activeTab === 'pending') fetchPending()
+		else if (activeTab === 'all') fetchAll()
+		else if (activeTab === 'movements') fetchMovements()
+		else if (activeTab === 'logistics') fetchLogisticsOrders()
+		else if (activeTab === 'inventory') fetchInventory()
+		else if (activeTab === 'resources') fetchResources()
+	}, [activeTab])
 
   const handleWarehouseConfirm = async () => {
     if (!confirmModal.orderId) return
@@ -299,6 +390,38 @@ function App() {
       fetchMovements()
     } catch {
       message.error('操作失败')
+    }
+  }
+
+  const openLogisticsModal = (order: LogisticsOrder, nextStatus: string, label: string, requiredDocs: string[] = []) => {
+    setLogisticsModal({ visible: true, order, nextStatus, label, requiredDocs })
+    logisticsForm.resetFields()
+  }
+
+  const handleLogisticsNodeSubmit = async () => {
+    if (!logisticsModal.order) return
+    try {
+      const values = await logisticsForm.validateFields()
+      for (const docType of logisticsModal.requiredDocs) {
+        const fileURL = values[`doc_${docType}`]
+        if (fileURL) {
+          await warehouseLogisticsService.uploadDocument(logisticsModal.order.id, {
+            doc_type: docType,
+            file_url: fileURL,
+            remark: values.remark,
+          })
+        }
+      }
+      await warehouseLogisticsService.updateStatus(logisticsModal.order.id, {
+        status: logisticsModal.nextStatus,
+        remark: values.remark,
+      })
+      message.success('物流仓储节点已更新')
+      setLogisticsModal({ visible: false, order: null, nextStatus: '', label: '', requiredDocs: [] })
+      fetchLogisticsOrders()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('更新物流节点失败，请确认必要单据已上传')
     }
   }
 
@@ -457,6 +580,8 @@ function App() {
     { key: 'dashboard' as TabKey, label: '工作台概览', icon: <DashboardOutlined /> },
     { key: 'pending' as TabKey, label: '待确认订单', icon: <ExclamationCircleOutlined /> },
     { key: 'movements' as TabKey, label: '出入库管理', icon: <DatabaseOutlined /> },
+    { key: 'logistics' as TabKey, label: '物流履约协同', icon: <SafetyCertificateOutlined /> },
+    { key: 'inventory' as TabKey, label: '库存快照', icon: <SafetyCertificateOutlined /> },
     { key: 'resources' as TabKey, label: '仓库资源管理', icon: <AppstoreOutlined /> },
     { key: 'all' as TabKey, label: '全部订单', icon: <InboxOutlined /> },
   ]
@@ -495,16 +620,22 @@ function App() {
       <Sider width={232} theme="light">
         <div
           style={{
-            height: 64,
+            height: 78,
             display: 'flex',
             alignItems: 'center',
             padding: '0 24px',
-            borderBottom: '1px solid #edf0f5',
+            borderBottom: '1px solid #eadcc7',
+            background: 'linear-gradient(135deg, rgba(255,253,248,.92), rgba(248,240,228,.72))',
           }}
         >
           <Space>
-            <BankOutlined style={{ color: '#16a34a' }} />
-            <Text strong>RecoLink 仓储</Text>
+            <span style={{ display: 'inline-grid', width: 36, height: 36, placeItems: 'center', borderRadius: 16, background: '#214332', color: '#f3c17c', fontWeight: 900 }}>
+              R
+            </span>
+            <span>
+              <Text strong style={{ display: 'block', color: '#17221b' }}>锐联仓储</Text>
+              <Text style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', color: '#a4662c' }}>RecoLink</Text>
+            </span>
           </Space>
         </div>
         <div style={{ padding: 16 }}>
@@ -513,18 +644,21 @@ function App() {
             dataSource={menuItems}
             renderItem={(item) => (
               <List.Item
+                className="service-nav-item"
                 style={{
                   border: 0,
-                  padding: '10px 12px',
-                  borderRadius: 8,
+                  padding: '11px 12px',
+                  borderRadius: 14,
                   cursor: 'pointer',
-                  background: activeTab === item.key ? '#eaf8ee' : 'transparent',
+                  marginBottom: 6,
+                  background: activeTab === item.key ? '#214332' : 'transparent',
+                  color: activeTab === item.key ? '#fffaf1' : '#5f6b61',
                 }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                     {item.key === 'pending' && pendingOrders.length > 0 && (
                       <Badge count={pendingOrders.length} style={{ marginLeft: 8 }} />
@@ -547,7 +681,10 @@ function App() {
             justifyContent: 'space-between',
           }}
         >
-          <Text strong>仓储方工作台</Text>
+          <div>
+            <Text strong style={{ display: 'block', color: '#17221b', fontSize: 16 }}>仓储方工作台</Text>
+            <Text style={{ color: '#7a847a', fontSize: 12 }}>仓库资源、出入库、库存快照与物流履约协同</Text>
+          </div>
           <Space>
             <Button
               icon={<CalendarOutlined />}
@@ -555,10 +692,13 @@ function App() {
                 if (activeTab === 'dashboard') {
                   fetchPending()
                   fetchMovements()
+                  fetchLogisticsOrders()
                   fetchResources()
                   fetchAll()
                 } else if (activeTab === 'pending') fetchPending()
                 else if (activeTab === 'movements') fetchMovements()
+                else if (activeTab === 'logistics') fetchLogisticsOrders()
+                else if (activeTab === 'inventory') fetchInventory()
                 else if (activeTab === 'resources') fetchResources()
                 else fetchAll()
               }}
@@ -597,9 +737,9 @@ function App() {
                 </Col>
                 <Col xs={24} sm={12} lg={6}>
                   <Card>
-                    <Typography.Text type="secondary">全部订单</Typography.Text>
+                    <Typography.Text type="secondary">物流协同单</Typography.Text>
                     <br />
-                    <Title level={3}>{allOrders.length}</Title>
+                    <Title level={3}>{logisticsOrders.length}</Title>
                   </Card>
                 </Col>
               </Row>
@@ -625,6 +765,12 @@ function App() {
                           description: `${movements.filter((item) => item.status === 'in_progress').length} 笔作业正在处理`,
                           icon: <CalendarOutlined />,
                           tab: 'movements' as TabKey,
+                        },
+                        {
+                          title: '物流到场/出入库协同',
+                          description: `${logisticsOrders.filter((item) => ['pickup_scheduled', 'arrival_signed_in', 'arrival_confirmed'].includes(item.status)).length} 单待仓储协同`,
+                          icon: <SafetyCertificateOutlined />,
+                          tab: 'logistics' as TabKey,
                         },
                         {
                           title: '已审核仓库',
@@ -668,6 +814,13 @@ function App() {
                         onClick={() => setActiveTab('movements')}
                       >
                         进入出入库管理
+                      </Button>
+                      <Button
+                        block
+                        icon={<SafetyCertificateOutlined />}
+                        onClick={() => setActiveTab('logistics')}
+                      >
+                        处理物流履约协同
                       </Button>
                       <Button
                         block
@@ -736,6 +889,107 @@ function App() {
                   pagination={false}
                   scroll={{ x: 720 }}
                   locale={{ emptyText: '暂无出入库记录' }}
+                />
+              </Spin>
+            </Card>
+          )}
+
+          {activeTab === 'logistics' && (
+            <Card title="物流履约协同" extra={<Tag color="green">到场 / 出库 / 入库</Tag>}>
+              <Spin spinning={loading}>
+                <Table
+                  rowKey="id"
+                  dataSource={logisticsOrders}
+                  pagination={{ pageSize: 10 }}
+                  scroll={{ x: 980 }}
+                  columns={[
+                    { title: '物流单号', dataIndex: 'order_no', key: 'order_no', width: 160 },
+                    { title: '起始地', dataIndex: 'origin', key: 'origin', width: 180, ellipsis: true },
+                    { title: '目的地', dataIndex: 'destination', key: 'destination', width: 180, ellipsis: true },
+                    { title: '货物', dataIndex: 'cargo_name', key: 'cargo_name', width: 120 },
+                    {
+                      title: '状态',
+                      dataIndex: 'status',
+                      key: 'status',
+                      width: 130,
+                      render: (v: string) => <Tag>{v}</Tag>,
+                    },
+                    {
+                      title: '操作',
+                      key: 'action',
+                      width: 220,
+                      render: (_: unknown, record: LogisticsOrder) => {
+                        if (record.status === 'pickup_scheduled') {
+                          return <Button size="small" type="primary" onClick={() => openLogisticsModal(record, 'arrival_signed_in', '确认车辆到场')}>确认到场</Button>
+                        }
+                        if (record.status === 'arrival_signed_in') {
+                          return (
+                            <Button
+                              size="small"
+                              type="primary"
+                              onClick={() => openLogisticsModal(record, 'outbound_confirmed', '确认出库', ['outbound_order', 'seal_photo'])}
+                            >
+                              上传出库/封条并确认
+                            </Button>
+                          )
+                        }
+                        if (record.status === 'arrival_confirmed') {
+                          return (
+                            <Button
+                              size="small"
+                              type="primary"
+                              onClick={() => openLogisticsModal(record, 'inbound_completed', '收货仓验货入库', ['seal_photo', 'inbound_order', 'receipt_order'])}
+                            >
+                              上传封条/入库/收货单
+                            </Button>
+                          )
+                        }
+                        return <Text type="secondary">等待其他方</Text>
+                      },
+                    },
+                  ]}
+                  locale={{ emptyText: '暂无需要仓储协同的物流单' }}
+                />
+              </Spin>
+            </Card>
+          )}
+
+          {activeTab === 'inventory' && (
+            <Card
+              title="库存快照"
+              extra={
+                <Button type="primary" icon={<PlusOutlined />} onClick={openCreateInventory}>
+                  新增库存快照
+                </Button>
+              }
+            >
+              <Spin spinning={loading}>
+                <Table
+                  rowKey="id"
+                  dataSource={inventorySnapshots}
+                  pagination={{ pageSize: 10 }}
+                  scroll={{ x: 1200 }}
+                  columns={[
+                    { title: '快照号', dataIndex: 'snapshot_no', key: 'snapshot_no', width: 160 },
+                    { title: '商品', dataIndex: 'product_name', key: 'product_name', width: 140 },
+                    { title: '批次', dataIndex: 'batch_no', key: 'batch_no', width: 100, render: (v: string) => v || '--' },
+                    { title: '库位', dataIndex: 'location_code', key: 'location_code', width: 100, render: (v: string) => v || '--' },
+                    { title: '库存', dataIndex: 'quantity', key: 'quantity', width: 90, render: (v: number) => `${Number(v || 0).toLocaleString()} 吨` },
+                    { title: '冻结', dataIndex: 'frozen_quantity', key: 'frozen_quantity', width: 90, render: (v: number) => `${Number(v || 0).toLocaleString()} 吨` },
+                    { title: '质检', dataIndex: 'quality_status', key: 'quality_status', width: 90 },
+                    { title: '质押', dataIndex: 'pledge_status', key: 'pledge_status', width: 90 },
+                    { title: '同步', dataIndex: 'sync_status', key: 'sync_status', width: 90 },
+                    { title: '外部单号', dataIndex: 'external_ref_no', key: 'external_ref_no', width: 140, render: (v: string) => v || '--' },
+                    {
+                      title: '操作',
+                      key: 'action',
+                      width: 90,
+                      render: (_: unknown, record: WarehouseInventorySnapshot) => (
+                        <Button size="small" onClick={() => openEditInventory(record)}>编辑</Button>
+                      ),
+                    },
+                  ]}
+                  locale={{ emptyText: '暂无库存快照，可先手工录入，后续对接 WMS/MRP 同步' }}
                 />
               </Spin>
             </Card>
@@ -1008,6 +1262,131 @@ function App() {
               </Modal>
             </>
           )}
+
+          <Modal
+            title={editingInventory ? '编辑库存快照' : '新增库存快照'}
+            open={inventoryModalVisible}
+            onOk={handleInventorySubmit}
+            onCancel={() => setInventoryModalVisible(false)}
+            width={720}
+            okText="保存"
+          >
+            <Form form={inventoryForm} layout="vertical">
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="warehouse_service_id" label="仓储资源ID" rules={[{ required: true, message: '请输入仓储资源ID' }]}>
+                    <InputNumber min={1} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="product_name" label="商品名称" rules={[{ required: true, message: '请输入商品名称' }]}>
+                    <Input placeholder="例：热轧卷" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item name="bundle_no" label="捆包号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="batch_no" label="批次号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="location_code" label="库位">
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="quantity" label="当前库存" rules={[{ required: true, message: '请输入库存数量' }]}>
+                    <InputNumber min={0} style={{ width: '100%' }} addonAfter="吨" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="frozen_quantity" label="冻结/质押数量">
+                    <InputNumber min={0} style={{ width: '100%' }} addonAfter="吨" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item name="quality_status" label="质检状态">
+                    <Select options={[
+                      { value: 'unchecked', label: '未质检' },
+                      { value: 'passed', label: '通过' },
+                      { value: 'failed', label: '异常' },
+                    ]} />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="pledge_status" label="质押状态">
+                    <Select options={[
+                      { value: 'none', label: '未质押' },
+                      { value: 'frozen', label: '已冻结' },
+                      { value: 'released', label: '已释放' },
+                    ]} />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="sync_status" label="同步状态">
+                    <Select options={[
+                      { value: 'manual', label: '手工录入' },
+                      { value: 'synced', label: '已同步' },
+                      { value: 'failed', label: '同步失败' },
+                    ]} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="external_system" label="外部系统">
+                    <Input placeholder="例：WMS/MRP" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="external_ref_no" label="外部单号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="remark" label="备注">
+                <TextArea rows={3} />
+              </Form.Item>
+            </Form>
+          </Modal>
+
+          <Modal
+            title={`物流履约节点：${logisticsModal.label || '--'}`}
+            open={logisticsModal.visible}
+            onOk={handleLogisticsNodeSubmit}
+            onCancel={() => setLogisticsModal({ visible: false, order: null, nextStatus: '', label: '', requiredDocs: [] })}
+            okText="上传并确认"
+          >
+            <Form form={logisticsForm} layout="vertical">
+              {logisticsModal.requiredDocs.length === 0 ? (
+                <Paragraph type="secondary">该节点无需上传单据，确认后会推进物流状态。</Paragraph>
+              ) : (
+                logisticsModal.requiredDocs.map((docType) => (
+                  <Form.Item
+                    key={docType}
+                    name={`doc_${docType}`}
+                    label={`必要单据：${docType}`}
+                    rules={[{ required: true, message: '请输入单据 URL' }]}
+                  >
+                    <Input placeholder="https://..." />
+                  </Form.Item>
+                ))
+              )}
+              <Form.Item name="remark" label="节点备注">
+                <TextArea rows={3} placeholder="选填" />
+              </Form.Item>
+            </Form>
+          </Modal>
 
           <Modal
             title={confirmOk ? '确认仓库条件' : '打回仓库条件'}

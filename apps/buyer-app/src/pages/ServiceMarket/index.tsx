@@ -71,7 +71,10 @@ const serviceCards = [
 
 function mapWarehouseResource(item: WarehouseServiceItem): ServiceResourceRow {
   const region = [item.province, item.city, item.district].filter(Boolean).join(' / ') || item.address || '-'
-  const tags = item.service_types?.length ? item.service_types : ['仓储资源']
+  const tags = [
+    ...(item.service_types?.length ? item.service_types : ['仓储资源']),
+    item.finance_certified ? '资方认证监管仓' : undefined,
+  ].filter(Boolean) as string[]
   return {
     key: `warehouse-${item.id}`,
     id: item.id,

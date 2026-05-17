@@ -5,8 +5,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useUserStore } from '@/stores'
 import { certificationService } from '@/services/certificationService'
 import { hasEnterpriseAccess } from '@/services/auth'
+import { getFallbackServicesByEnterpriseRole, type ServiceKey } from '@/pages/Dashboard/serviceAccess'
 
-type Capability = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
+type Capability = ServiceKey
 
 interface DashboardAccessGateProps {
   children: React.ReactNode
@@ -32,6 +33,14 @@ export default function DashboardAccessGate({ children, services = [] }: Dashboa
     )
   }, [data?.data?.permissions])
 
+  const fallbackServices = useMemo(() => {
+    return new Set(getFallbackServicesByEnterpriseRole(user?.enterpriseRole))
+  }, [user?.enterpriseRole])
+
+  const effectiveServices = useMemo(() => {
+    return approvedServices.size > 0 ? approvedServices : fallbackServices
+  }, [approvedServices, fallbackServices])
+
   if (!isEnterprise) {
     return <Navigate to="/dashboard" replace />
   }
@@ -44,7 +53,7 @@ export default function DashboardAccessGate({ children, services = [] }: Dashboa
     )
   }
 
-  if (services.length && !services.some((service) => approvedServices.has(service))) {
+  if (services.length && !services.some((service) => effectiveServices.has(service))) {
     return <Navigate to="/dashboard" replace />
   }
 

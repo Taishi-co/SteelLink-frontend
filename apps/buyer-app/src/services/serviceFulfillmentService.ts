@@ -73,6 +73,15 @@ export interface LogisticsOrderInfo {
   tracking_events?: TrackingEventInfo[]
 }
 
+export interface UploadFulfillmentDocumentPayload {
+  doc_type: string
+  file_url: string
+  remark?: string
+  gps_latitude?: number
+  gps_longitude?: number
+  captured_at?: string
+}
+
 export interface TrackingEventInfo {
   id: number
   logistics_order_id: number
@@ -96,6 +105,65 @@ export interface GuaranteeInfo {
   resolution: string
   created_at: string
   updated_at: string
+}
+
+export type WarehouseReceiptPledgeStatus =
+  | 'submitted'
+  | 'risk_approved'
+  | 'risk_rejected'
+  | 'agreement_signed'
+  | 'disbursed'
+  | 'released'
+  | string
+
+export interface WarehouseReceiptPledgeInfo {
+  id: number
+  application_no: string
+  applicant_enterprise_id: number
+  applicant_user_id: number
+  applicant_role: string
+  finance_service_id: number
+  finance_service_name?: string
+  funding_enterprise_id: number
+  warehouse_service_id: number
+  warehouse_enterprise_id: number
+  warehouse_name: string
+  receipt_no: string
+  receipt_voucher_url: string
+  goods_name: string
+  quantity: number
+  quality_grade?: string
+  requested_amount: number
+  approved_amount?: number
+  term_days?: number
+  annual_rate?: number
+  risk_remark?: string
+  pledge_agreement_url?: string
+  supervision_agreement_url?: string
+  disbursement_voucher_url?: string
+  release_voucher_url?: string
+  release_remark?: string
+  status: WarehouseReceiptPledgeStatus
+  submitted_at?: string
+  risk_reviewed_at?: string
+  agreement_signed_at?: string
+  disbursed_at?: string
+  released_at?: string
+  remark?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateWarehouseReceiptPledgePayload {
+  finance_service_id: number
+  warehouse_service_id: number
+  receipt_no: string
+  receipt_voucher_url: string
+  goods_name: string
+  quantity: number
+  quality_grade?: string
+  requested_amount: number
+  remark?: string
 }
 
 export interface FulfillmentSummary {
@@ -198,6 +266,12 @@ export const serviceFulfillmentService = {
     api.post<unknown, ApiResponse<LogisticsOrderInfo>>('/logistics/orders', payload),
   requestWarehouseStorage: (payload: CreateWarehouseStoragePayload) =>
     api.post<unknown, ApiResponse<WarehouseMovementInfo>>('/warehouse-storage-requests', payload),
+  createWarehouseReceiptPledge: (payload: CreateWarehouseReceiptPledgePayload) =>
+    api.post<unknown, ApiResponse<WarehouseReceiptPledgeInfo>>('/warehouse-receipt-pledges', payload),
+  listMyWarehouseReceiptPledges: (params?: Record<string, unknown>) =>
+    api.get<unknown, ApiResponse<PageResponse<WarehouseReceiptPledgeInfo>>>('/warehouse-receipt-pledges/mine', {
+      params,
+    }),
   createGuarantee: (payload: CreateGuaranteePayload) =>
     api.post<unknown, ApiResponse<GuaranteeInfo>>('/fulfillment-guarantees', payload),
   getOrderFulfillment: (orderId: number) =>
@@ -207,4 +281,12 @@ export const serviceFulfillmentService = {
       status,
       remark,
     }),
+  uploadFulfillmentDocument: (
+    logisticsOrderId: number,
+    payload: UploadFulfillmentDocumentPayload
+  ) =>
+    api.post<unknown, ApiResponse<unknown>>(
+      `/logistics/orders/${logisticsOrderId}/documents`,
+      payload
+    ),
 }

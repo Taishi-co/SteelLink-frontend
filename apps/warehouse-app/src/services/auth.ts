@@ -55,7 +55,14 @@ function getCookie(name: string) {
 }
 
 function getSharedToken() {
-  return localStorage.getItem('token') || sessionStorage.getItem('token') || getCookie('token')
+  return (
+    localStorage.getItem('buyer_token') ||
+    sessionStorage.getItem('buyer_token') ||
+    getCookie('buyer_token') ||
+    localStorage.getItem('token') ||
+    sessionStorage.getItem('token') ||
+    getCookie('token')
+  )
 }
 
 function getSharedPermissions() {

@@ -49,18 +49,18 @@ export default function CartPage() {
       dataIndex: 'productName',
       key: 'name',
       render: (name: string, record: CartItem) => (
-        <div className="flex gap-3 items-start min-w-[320px]">
+        <div className="flex min-w-[320px] items-start gap-3">
           <Image
             src={record.imageUrl}
             alt={name}
             width={72}
             height={72}
-            className="rounded object-cover bg-gray-100"
+            className="rounded-2xl bg-[#efe3d1] object-cover"
             fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Crect width='72' height='72' fill='%23f3f4f6'/%3E%3Cpath d='M18 49h36l-8-13-8 9-6-7-14 11Z' fill='%23cbd5e1'/%3E%3Ccircle cx='26' cy='25' r='5' fill='%23cbd5e1'/%3E%3C/svg%3E"
             preview={false}
           />
           <div className="min-w-0 flex-1">
-            <Link to={`/products/${record.productId}`} className="text-gray-800 hover:text-primary-600 font-medium">
+            <Link to={`/products/${record.productId}`} className="font-semibold text-[#17221b] hover:text-[#9f5f23]">
               {name}
             </Link>
             <Text type="secondary" className="text-xs block mt-1">
@@ -87,7 +87,7 @@ export default function CartPage() {
         return (
           <Space direction="vertical" size={2}>
             <Text className="text-sm font-medium">
-              <ShopOutlined className="mr-1 text-blue-500" />
+              <ShopOutlined className="mr-1 text-[#2f6b49]" />
               {warehouse.warehouse_name}
             </Text>
             {warehouse.warehouse_code ? (
@@ -105,7 +105,7 @@ export default function CartPage() {
       width: 140,
       render: (price: number) => (
         <div className="text-right">
-          <Text className="text-red-500 font-bold font-mono">¥{price.toLocaleString()}</Text>
+          <Text className="font-mono font-bold text-[#b45324]">¥{price.toLocaleString()}</Text>
           <Text type="secondary" className="text-xs block">元/吨</Text>
         </div>
       ),
@@ -131,7 +131,7 @@ export default function CartPage() {
       width: 160,
       render: (_: unknown, record: CartItem) => (
         <div className="text-right">
-          <Text className="text-red-500 font-bold font-mono text-lg">
+          <Text className="font-mono text-lg font-bold text-[#b45324]">
             ¥{(record.price * record.quantity).toLocaleString()}
           </Text>
         </div>
@@ -164,8 +164,8 @@ export default function CartPage() {
 
   if (isLoading && items.length === 0) {
     return (
-      <div className="bg-gray-50 min-h-screen py-6">
-        <div className="max-w-7xl mx-auto px-6 flex justify-center items-center h-64">
+      <div className="reco-shell py-8">
+        <div className="mx-auto flex h-64 max-w-7xl items-center justify-center px-6">
           <Spin size="large" />
         </div>
       </div>
@@ -173,27 +173,38 @@ export default function CartPage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen py-6">
-      <div className="max-w-7xl mx-auto px-6">
-        <Title level={3} className="!mb-6">采购清单</Title>
+    <div className="reco-shell py-8">
+      <div className="mx-auto max-w-7xl px-6 md:px-10">
+        <div className="mb-6 rounded-[30px] border border-[#eadcc7] bg-[#fffaf1] p-7 shadow-sm">
+          <Text className="text-sm font-bold uppercase tracking-[0.28em] text-[#a4662c]">Cart</Text>
+          <div className="mt-2 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+            <div>
+              <Title level={3} className="!mb-2 !font-black !text-[#17221b]">采购清单</Title>
+              <Text className="text-[#5f6b61]">核对商品、仓库、数量和金额后进入订单确认。</Text>
+            </div>
+            <Link to="/products" className="font-semibold text-[#9f5f23]">继续选购</Link>
+          </div>
+        </div>
 
         {items.length > 0 ? (
           <>
-            <Card className="mb-6">
+            <Card className="reco-card mb-6 rounded-[30px]">
               <Table
+                className="reco-soft-table"
                 columns={columns}
                 dataSource={items}
                 rowKey="id"
                 pagination={false}
+                scroll={{ x: 980 }}
               />
             </Card>
 
-            <Card className="sticky bottom-0 z-10 shadow-lg">
-              <Row gutter={24} align="middle">
-                <Col span={12}>
+            <Card className="reco-card sticky bottom-0 z-10 rounded-[28px] shadow-[0_16px_44px_rgba(64,44,25,.12)]">
+              <Row gutter={[24, 16]} align="middle">
+                <Col xs={24} md={12}>
                   <Space size="middle">
                     <Text type="secondary">
-                      共 <Text className="text-primary-600 font-bold">{items.length}</Text> 种商品
+                      共 <Text className="font-bold text-[#2f6b49]">{items.length}</Text> 种商品
                     </Text>
                     <Divider type="vertical" />
                     <Text type="secondary">
@@ -201,11 +212,11 @@ export default function CartPage() {
                     </Text>
                   </Space>
                 </Col>
-                <Col span={12} className="text-right">
+                <Col xs={24} md={12} className="text-left md:text-right">
                   <Space size="middle">
                     <div>
                       <Text type="secondary">应付总额：</Text>
-                      <Text className="text-red-600 font-bold text-3xl font-mono">
+                      <Text className="font-mono text-3xl font-bold text-[#b45324]">
                         ¥{totalPrice.toLocaleString()}
                       </Text>
                     </div>
@@ -214,7 +225,7 @@ export default function CartPage() {
                       size="large"
                       onClick={handleCheckout}
                       disabled={items.length === 0}
-                      className="h-12 px-8 text-lg"
+                      className="reco-primary-button h-12 rounded-full px-8 text-lg"
                     >
                       去结算
                     </Button>
@@ -223,10 +234,10 @@ export default function CartPage() {
               </Row>
             </Card>
 
-            <Card title="重要提示" className="mt-4">
+            <Card title="重要提示" className="reco-card mt-4 rounded-[28px]">
               <Space direction="vertical" className="w-full" size="small">
                 <div className="flex items-start gap-2">
-                  <SafetyCertificateOutlined className="text-blue-500 mt-0.5" />
+                  <SafetyCertificateOutlined className="mt-0.5 text-[#2f6b49]" />
                   <div>
                     <Text className="font-medium text-sm">库存锁定说明</Text>
                     <Text type="secondary" className="text-xs block">
@@ -235,7 +246,7 @@ export default function CartPage() {
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <SafetyCertificateOutlined className="text-blue-500 mt-0.5" />
+                  <SafetyCertificateOutlined className="mt-0.5 text-[#2f6b49]" />
                   <div>
                     <Text className="font-medium text-sm">捆包号说明</Text>
                     <Text type="secondary" className="text-xs block">
@@ -247,13 +258,13 @@ export default function CartPage() {
             </Card>
           </>
         ) : (
-          <Card>
+          <Card className="reco-card rounded-[30px]">
             <Empty
               description="采购清单是空的"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             >
               <Link to="/products">
-                <Button type="primary">去商城选购</Button>
+                <Button type="primary" className="reco-primary-button rounded-full px-7">去商城选购</Button>
               </Link>
             </Empty>
           </Card>

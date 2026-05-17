@@ -58,6 +58,9 @@ export interface SellerProductRecord {
   description: string
   image_urls: string[]
   qualification_urls: string[]
+  title_voucher_url?: string
+  title_voucher_remark?: string
+  title_confirmed: boolean
   status: ProductStatus
   audit_remark?: string
   submitted_at?: string
@@ -142,6 +145,8 @@ interface BackendProductInfo {
   audit_remark?: string
   approved_at?: string
   quality_cert?: string
+  title_voucher_url?: string
+  title_voucher_remark?: string
   images: string[]
   description: string
   delivery_days: number
@@ -198,6 +203,8 @@ export interface UpsertProductPayload {
   min_order_qty: number
   images: string[]
   quality_cert?: string
+  title_voucher_url?: string
+  title_voucher_remark?: string
   description: string
   delivery_days: number
   quote_validity: number
@@ -309,6 +316,9 @@ function toSellerProductRecord(product: BackendProductInfo): SellerProductRecord
     description: product.description,
     image_urls: product.images || [],
     qualification_urls: product.quality_cert ? [product.quality_cert] : [],
+    title_voucher_url: product.title_voucher_url || undefined,
+    title_voucher_remark: product.title_voucher_remark || undefined,
+    title_confirmed: Boolean(product.title_voucher_url),
     status: mappedStatus,
     audit_remark: product.audit_remark || undefined,
     submitted_at: product.created_at,

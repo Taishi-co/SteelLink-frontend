@@ -96,6 +96,14 @@ export interface LogisticsOrder {
   driver_name?: string
   driver_phone?: string
   plate_number?: string
+  status_requirements?: Array<{
+    status: string
+    label: string
+    actor: string
+    description: string
+    required_doc_types: string[]
+    satisfied: boolean
+  }>
   created_at: string
 }
 
@@ -246,6 +254,24 @@ export const logisticsFulfillmentService = {
   async updateOrderStatus(id: number, payload: { status: string }) {
     const response = await api.put<unknown, ApiResponse<LogisticsOrder>>(
       `/logistics/orders/${id}/status`,
+      payload
+    )
+    return response.data
+  },
+
+  async uploadDocument(
+    id: number,
+    payload: {
+      doc_type: string
+      file_url: string
+      remark?: string
+      gps_latitude?: number
+      gps_longitude?: number
+      captured_at?: string
+    }
+  ) {
+    const response = await api.post<unknown, ApiResponse<unknown>>(
+      `/logistics/orders/${id}/documents`,
       payload
     )
     return response.data

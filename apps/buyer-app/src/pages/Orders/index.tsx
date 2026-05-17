@@ -71,42 +71,48 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen py-6">
-      <div className="max-w-6xl mx-auto px-6">
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/products')}>
+    <div className="reco-shell py-8">
+      <div className="mx-auto max-w-6xl px-6 md:px-10">
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/products')} className="rounded-full border-[#d0b991] bg-white">
           返回商品列表
         </Button>
 
-        <Row gutter={16} className="mt-6">
-          <Col span={6}>
-            <Card>
+        <div className="mt-6 rounded-[30px] border border-[#eadcc7] bg-[#fffaf1] p-7 shadow-sm">
+          <Text className="text-sm font-bold uppercase tracking-[0.28em] text-[#a4662c]">Orders</Text>
+          <Title level={3} className="!mb-2 !mt-2 !font-black !text-[#17221b]">我的订单</Title>
+          <Text className="text-[#5f6b61]">跟进合同、支付、物流履约、签收和归档状态。</Text>
+        </div>
+
+        <Row gutter={[16, 16]} className="mt-6">
+          <Col xs={12} md={6}>
+            <Card className="reco-card rounded-[24px]">
               <Text type="secondary">全部订单</Text>
               <Title level={3} className="!mb-0">{stats.all}</Title>
             </Card>
           </Col>
-          <Col span={6}>
-            <Card>
+          <Col xs={12} md={6}>
+            <Card className="reco-card rounded-[24px]">
               <Text type="secondary"><ClockCircleOutlined className="mr-1" /> 待支付</Text>
               <Title level={3} className="!mb-0 text-orange-500">{stats.pendingPayment}</Title>
             </Card>
           </Col>
-          <Col span={6}>
-            <Card>
+          <Col xs={12} md={6}>
+            <Card className="reco-card rounded-[24px]">
               <Text type="secondary"><InboxOutlined className="mr-1" /> 待提货</Text>
               <Title level={3} className="!mb-0 text-cyan-600">{stats.pendingDelivery}</Title>
             </Card>
           </Col>
-          <Col span={6}>
-            <Card>
+          <Col xs={12} md={6}>
+            <Card className="reco-card rounded-[24px]">
               <Text type="secondary"><TruckOutlined className="mr-1" /> 配送中 / 完成</Text>
               <Title level={3} className="!mb-0 text-blue-600">{stats.delivering + stats.completed}</Title>
             </Card>
           </Col>
         </Row>
 
-        <Card className="mt-6" title="我的订单">
+        <Card className="reco-card mt-6 rounded-[30px]" title="订单列表">
           {isLoading ? (
-            <div className="py-16 flex justify-center">
+            <div className="flex justify-center py-16">
               <Spin size="large" />
             </div>
           ) : orders.length === 0 ? (
@@ -119,11 +125,11 @@ export default function OrdersPage() {
                 const status = statusMap[order.status] || { label: `状态${order.status}`, color: 'default' }
                 return (
                   <List.Item
-                    className="hover:bg-gray-50 px-4 rounded"
+                    className="rounded-[22px] px-4 hover:bg-[#f8f0e4]"
                   >
                     <div className="w-full flex justify-between items-start gap-4">
                       <div className="cursor-pointer flex-1" onClick={() => navigate(`/orders/${order.id}`)}>
-                        <Title level={5} className="!mb-1">{order.order_no}</Title>
+                        <Title level={5} className="!mb-1 !text-[#17221b]">{order.order_no}</Title>
                         <Text className="block">{item?.product_name || '-'}</Text>
                         <Text type="secondary">
                           {item?.quantity || 0} 吨 · {order.seller_name}
@@ -134,7 +140,7 @@ export default function OrdersPage() {
                       </div>
                       <div className="text-right">
                         <Tag color={status.color}>{status.label}</Tag>
-                        <div className="mt-2 font-bold text-red-600">¥{order.tax_total_amount.toLocaleString()}</div>
+                        <div className="mt-2 font-bold text-[#b45324]">¥{order.tax_total_amount.toLocaleString()}</div>
                         {order.status === 8 && (
                           <div className="mt-2 text-green-600 text-sm">
                             <CheckCircleOutlined className="mr-1" />

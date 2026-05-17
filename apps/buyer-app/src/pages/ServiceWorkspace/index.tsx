@@ -32,18 +32,25 @@ import {
 } from '@/services/certificationService'
 import { getSellerCenterHref, getBuyerToken } from '@/services/auth'
 import { uploadService } from '@/services/uploadService'
+import { getEffectiveServiceStatus, type ServiceKey } from '@/pages/Dashboard/serviceAccess'
+import { useUserStore } from '@/stores'
 
-type ServiceKey = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
-
-function getWorkbenchHref(port: number, path: string) {
+function getWorkbenchHref(port: number, path: string, tab?: string) {
+  const params = new URLSearchParams()
+  const sharedToken = getBuyerToken()
+  if (sharedToken) {
+    params.set('token', sharedToken)
+  }
+  if (tab) {
+    params.set('tab', tab)
+  }
+  const query = params.toString()
   if (!import.meta.env.DEV) {
-    return path
+    return `${path}${query ? `?${query}` : ''}`
   }
   const protocol = window.location.protocol || 'http:'
   const hostname = window.location.hostname || 'localhost'
-  const sharedToken = getBuyerToken()
-  const tokenParam = sharedToken ? `?token=${encodeURIComponent(sharedToken)}` : ''
-  return `${protocol}//${hostname}:${port}${path}${tokenParam}`
+  return `${protocol}//${hostname}:${port}${path}${query ? `?${query}` : ''}`
 }
 
 const SHARED_PERMISSIONS_KEY = 'enterprise_service_permissions'
@@ -58,7 +65,7 @@ const serviceConfig: Record<
     description: string
     enterpriseRole: string
     icon: React.ReactNode
-    actions: Array<{ label: string; href: string }>
+    actions: Array<{ label: string; href: () => string }>
   }
 > = {
   sales: {
@@ -67,8 +74,9 @@ const serviceConfig: Record<
     enterpriseRole: '供应商',
     icon: <ShopOutlined />,
     actions: [
-      { label: '进入卖家中心', href: getSellerCenterHref('/seller/dashboard') },
-      { label: '商品管理', href: getSellerCenterHref('/seller/products') },
+      { label: '进入卖家中心', href: () => getSellerCenterHref('/seller/dashboard') },
+      { label: '参与竞价', href: () => getSellerCenterHref('/seller/bidding') },
+      { label: '商品管理', href: () => getSellerCenterHref('/seller/products') },
     ],
   },
   procurement: {
@@ -77,8 +85,8 @@ const serviceConfig: Record<
     enterpriseRole: '采购商',
     icon: <ShoppingCartOutlined />,
     actions: [
-      { label: 'AI采购', href: '/ai-procurement' },
-      { label: '集采大厅', href: '/procurement' },
+      { label: 'AI采购', href: () => '/ai-procurement' },
+      { label: '集采大厅', href: () => '/procurement' },
     ],
   },
   logistics: {
@@ -87,8 +95,8 @@ const serviceConfig: Record<
     enterpriseRole: '物流方',
     icon: <TruckOutlined />,
     actions: [
-      { label: '进入物流管理中心', href: getWorkbenchHref(5175, '/logistics/') },
-      { label: '物流资源管理', href: '/dashboard/logistics-resources' },
+      { label: '进入物流管理中心', href: () => getWorkbenchHref(5175, '/logistics/') },
+      { label: '运力资源管理', href: () => getWorkbenchHref(5175, '/logistics/', 'resources') },
     ],
   },
   warehouse: {
@@ -97,8 +105,8 @@ const serviceConfig: Record<
     enterpriseRole: '仓储方',
     icon: <HomeOutlined />,
     actions: [
-      { label: '进入仓储管理中心', href: getWorkbenchHref(5176, '/warehouse/') },
-      { label: '仓储资源管理', href: '/dashboard/warehouse-resources' },
+      { label: '进入仓储管理中心', href: () => getWorkbenchHref(5176, '/warehouse/') },
+      { label: '仓储资源管理', href: () => getWorkbenchHref(5176, '/warehouse/', 'resources') },
     ],
   },
   finance: {
@@ -106,7 +114,10 @@ const serviceConfig: Record<
     description: '资金方发布金融产品，并处理融资风控、债务合同、分佣放款和货权质押。',
     enterpriseRole: '资金方',
     icon: <BankOutlined />,
-    actions: [{ label: '进入资金方工作台', href: getWorkbenchHref(5177, '/finance/') }],
+    actions: [
+      { label: '进入资金方工作台', href: () => getWorkbenchHref(5177, '/finance/') },
+      { label: '金融产品管理', href: () => getWorkbenchHref(5177, '/finance/', 'products') },
+    ],
   },
 }
 
@@ -125,6 +136,7 @@ export default function ServiceWorkspace() {
   const params = useParams()
   const service = isServiceKey(params.service) ? params.service : 'procurement'
   const config = serviceConfig[service]
+  const user = useUserStore((state) => state.user)
   const queryClient = useQueryClient()
   const [documentUrls, setDocumentUrls] = useState<Record<string, string>>({})
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
@@ -144,7 +156,7 @@ export default function ServiceWorkspace() {
   const permission = overview?.permissions?.find((item) => item.service === service) as
     | EnterpriseServicePermission
     | undefined
-  const status = permission?.status ?? 0
+  const status = getEffectiveServiceStatus(service, overview?.permissions ?? [], user?.enterpriseRole)
   const requiredDocuments = useMemo(
     () => overview?.required_documents?.[service] ?? [],
     [overview?.required_documents, service]
@@ -255,7 +267,7 @@ export default function ServiceWorkspace() {
             {status === 2 ? (
               <Space direction="vertical" className="w-full">
                 {config.actions.map((action) => (
-                  <a key={action.href} href={action.href}>
+                  <a key={action.label} href={action.href()}>
                     <Button type="primary" block icon={<CheckCircleOutlined />}>
                       {action.label}
                     </Button>
@@ -328,6 +340,7 @@ export default function ServiceWorkspace() {
 }
 
 export function ServiceOverview() {
+  const user = useUserStore((state) => state.user)
   const { data, isLoading } = useQuery({
     queryKey: ['enterprise-services'],
     queryFn: () => certificationService.getMyServices(),
@@ -338,8 +351,7 @@ export function ServiceOverview() {
     <Card title="企业能力入口" loading={isLoading}>
       <Row gutter={[16, 16]}>
         {(Object.keys(serviceConfig) as ServiceKey[]).map((key) => {
-          const permission = permissions.find((item) => item.service === key)
-          const status = permission?.status ?? 0
+          const status = getEffectiveServiceStatus(key, permissions, user?.enterpriseRole)
           return (
             <Col xs={24} md={12} xl={8} key={key}>
               <Card size="small" className="h-full">

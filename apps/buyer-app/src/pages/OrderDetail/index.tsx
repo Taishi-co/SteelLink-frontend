@@ -107,8 +107,8 @@ const logisticsStatusText: Record<string, string> = {
   loading_confirmed: '已装货确认',
   in_transit: '运输中',
   arrival_confirmed: '已到货确认',
-  receipt_signed: '已验收签收',
-  inbound_completed: '已入库完成',
+  inbound_completed: '收货仓已验货入库',
+  receipt_signed: '已确认收货',
   pending: '待接单',
   accepted: '已接单',
   delivered: '已送达',
@@ -176,23 +176,23 @@ const fulfillmentStepDefinitions = [
   {
     key: 'arrival_confirmed',
     title: '到货确认',
-    owner: '买方负责',
+    owner: '物流方负责',
     pendingText: '待到货',
-    proofHint: '校对到货时间，上传到货照片、卸货回执',
-  },
-  {
-    key: 'receipt_signed',
-    title: '验收签收',
-    owner: '买方负责',
-    pendingText: '待买方签收',
-    proofHint: '上传签收单、质检结果或验收意见',
+    proofHint: '物流方上传到货照片，确认货物到达收货仓',
   },
   {
     key: 'inbound_completed',
-    title: '入库完成',
+    title: '收货仓验货入库',
     owner: '仓储方负责',
-    pendingText: '按需入库',
-    proofHint: '上传入库单、入库磅单、库位回执',
+    pendingText: '待收货仓验货入库',
+    proofHint: '上传封条照片、入库单、收货单',
+  },
+  {
+    key: 'receipt_signed',
+    title: '确认收货',
+    owner: '买方/资金方负责',
+    pendingText: '待确认收货',
+    proofHint: '查看仓储单据后确认收货',
   },
   {
     key: 'completed',
@@ -241,8 +241,8 @@ const fulfillmentStepOrder = [
   'loading_confirmed',
   'in_transit',
   'arrival_confirmed',
-  'receipt_signed',
   'inbound_completed',
+  'receipt_signed',
   'completed',
 ] as const
 
@@ -298,11 +298,11 @@ function getFulfillmentStepDescription(
     case 'receipt_signed':
       return logistics.receipt_signed_at
         ? new Date(logistics.receipt_signed_at).toLocaleString()
-        : '待买方签收'
+        : '待确认收货'
     case 'inbound_completed':
       return logistics.inbound_completed_at
         ? new Date(logistics.inbound_completed_at).toLocaleString()
-        : '按需入库'
+        : '待收货仓验货入库'
     case 'completed':
       return normalizeFulfillmentStatus(logistics.status) === 'completed' ? '已完成' : '未完成'
     default:
@@ -397,7 +397,7 @@ function getStatusNotice(
     return {
       type: 'warning' as const,
       title: '当前状态：待支付/融资',
-      message: '下一步：请上传支付与货权监管凭证，或申请托盘融资。',
+      message: '下一步：请上传支付凭证，或申请托盘融资。',
     }
   }
   if (status === 21) {
@@ -579,9 +579,11 @@ export default function OrderDetailPage() {
   const [open, setOpen] = useState(false)
   const [deliveryOpen, setDeliveryOpen] = useState(false)
   const [receiptOpen, setReceiptOpen] = useState(false)
+  const [inspectionSignOpen, setInspectionSignOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [savingDelivery, setSavingDelivery] = useState(false)
   const [confirmingReceipt, setConfirmingReceipt] = useState(false)
+  const [confirmingInspectionSign, setConfirmingInspectionSign] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [signing, setSigning] = useState(false)
   const [warehouseOpen, setWarehouseOpen] = useState(false)
@@ -604,6 +606,7 @@ export default function OrderDetailPage() {
   const [form] = Form.useForm()
   const [deliveryForm] = Form.useForm()
   const [receiptForm] = Form.useForm()
+  const [inspectionSignForm] = Form.useForm()
   const [warehouseForm] = Form.useForm()
 
   const { data, isLoading } = useQuery({
@@ -627,22 +630,23 @@ export default function OrderDetailPage() {
   const fulfillment = fulfillmentData
   const aiFinanceRecommendation = getAIFinanceRecommendation(order?.remark)
   const { data: financeProductsData, isLoading: financeProductsLoading } = useQuery({
-    queryKey: ['approved-finance-services', order?.id],
+    queryKey: ['available-finance-services', order?.id],
     queryFn: async () =>
-      (await serviceOfferService.listFinance({ page: 1, page_size: 50, status: 2 })).data.list,
+      (await serviceOfferService.listFinanceAvailableForOrder(Number(order?.id))).data.list,
     enabled: Boolean(order?.id && financeOpen),
   })
-  const { data: myWarehousesData } = useQuery({
-    queryKey: ['my-warehouse-services'],
-    queryFn: () => serviceOfferService.listMyWarehouses(),
+  const { data: publicWarehousesData } = useQuery({
+    queryKey: ['public-warehouse-services-for-dest'],
+    queryFn: () => serviceOfferService.listWarehouses({ page: 1, page_size: 200, status: 2 }),
   })
-  const myWarehouses = myWarehousesData?.data ?? []
+  const publicWarehouses = publicWarehousesData?.data.list ?? []
   const financeProducts = (financeProductsData || []).slice().sort((left, right) => {
     if (left.id === aiFinanceRecommendation?.finance_service_id) return -1
     if (right.id === aiFinanceRecommendation?.finance_service_id) return 1
     return Number(left.annual_rate || 0) - Number(right.annual_rate || 0)
   })
   const logisticsOrder = fulfillment?.logistics_orders?.[0]
+  const isFinancingOrder = Boolean(order?.financing_info || order?.logistics_contract?.is_financing_order)
   const latestMovement = fulfillment?.warehouse_movements?.[0]
   const activeGuarantee = fulfillment?.guarantees?.[0]
   const status = statusMap[order?.status || 0] || {
@@ -686,18 +690,26 @@ export default function OrderDetailPage() {
     setFinanceOpen(true)
   }
 
-  const showCompleted = (title: string, next: string) => {
+  const showCompleted = (
+    title: string,
+    next: string,
+    action: { label?: string; onClick?: () => void } = {}
+  ) => {
     Modal.success({
       title,
+      closable: true,
+      maskClosable: true,
       content: (
         <Space direction="vertical" size={8}>
           <Text>已完成：{title.replace('已完成', '')}</Text>
           <Text type="secondary">下一步：{next}</Text>
-          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+          <Text type="secondary">可留在当前详情页核对状态，或按推荐动作继续处理。</Text>
         </Space>
       ),
-      okText: '回工作台看订单',
-      onOk: () => navigate('/orders'),
+      okCancel: true,
+      okText: action.label || '查看订单列表',
+      cancelText: '留在当前页',
+      onOk: action.onClick || (() => navigate('/orders')),
     })
   }
 
@@ -709,19 +721,13 @@ export default function OrderDetailPage() {
         getUploadFile(values.voucher_file),
         'payment_voucher'
       )
-      const titleUploaded = await uploadService.upload(
-        getUploadFile(values.title_voucher_file),
-        'title_voucher'
-      )
       await orderService.directPayment(Number(id), {
         voucher_url: uploaded.url,
         transaction_no: values.transaction_no,
         payer_account: values.payer_account,
         payee_account: values.payee_account,
-        title_voucher_url: titleUploaded.url,
-        title_remark: values.title_remark,
       })
-      showCompleted('支付与货权监管凭证已完成', '等待卖方发起物流竞价。')
+      showCompleted('支付凭证已完成', '等待卖方发起物流竞价。')
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       form.resetFields()
@@ -829,13 +835,33 @@ export default function OrderDetailPage() {
       return
     }
     try {
-      await serviceFulfillmentService.updateLogisticsOrderStatus(logisticsOrder.id, 'receipt_signed')
+      const values = await inspectionSignForm.validateFields()
+      setConfirmingInspectionSign(true)
+      const uploaded = await uploadService.upload(
+        getUploadFile(values.receipt_file),
+        'receipt_voucher'
+      )
+      await serviceFulfillmentService.uploadFulfillmentDocument(logisticsOrder.id, {
+        doc_type: 'receipt_order',
+        file_url: uploaded.url,
+        remark: values.remark || '买方验货签收单',
+      })
+      await serviceFulfillmentService.updateLogisticsOrderStatus(
+        logisticsOrder.id,
+        'receipt_signed',
+        values.remark
+      )
       message.success('验货签收已完成')
+      setInspectionSignOpen(false)
+      inspectionSignForm.resetFields()
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       await queryClient.invalidateQueries({ queryKey: ['order-service-fulfillment', id] })
     } catch (error: unknown) {
+      if (hasFormErrorFields(error)) return
       message.error(getErrorMessage(error, '验货签收失败'))
+    } finally {
+      setConfirmingInspectionSign(false)
     }
   }
 
@@ -843,7 +869,10 @@ export default function OrderDetailPage() {
     try {
       setSigning(true)
       await orderService.signContract(Number(id))
-      showCompleted('合同签署已完成', '等待对方签署；双方签署后进入支付节点。')
+      showCompleted('合同签署已完成', '等待对方签署；双方签署后进入支付节点。', {
+        label: '留在详情跟进',
+        onClick: () => undefined,
+      })
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
     } catch (error: unknown) {
@@ -864,7 +893,10 @@ export default function OrderDetailPage() {
         finance_service_id: selectedFinanceServiceId,
         requested_amount: order?.tax_total_amount || order?.total_amount,
       })
-      showCompleted('融资申请已提交', '等待资金方完成风控审批。')
+      showCompleted('融资申请已提交', '等待资金方完成风控审批。', {
+        label: '查看订单列表',
+        onClick: () => navigate('/orders'),
+      })
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       setFinanceOpen(false)
@@ -885,6 +917,9 @@ export default function OrderDetailPage() {
       showCompleted(
         confirmed ? '融资方案确认已完成' : '已放弃融资',
         confirmed ? '等待资金方生成债务质押合同。' : '订单已恢复为待支付，可直接上传支付凭证。',
+        confirmed
+          ? { label: '留在详情跟进', onClick: () => undefined }
+          : { label: '继续上传支付凭证', onClick: () => undefined },
       )
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
@@ -907,7 +942,10 @@ export default function OrderDetailPage() {
       await orderService.buyerSignDebtAndPayFee(Number(id), {
         fee_voucher_url: uploaded.url,
       })
-      showCompleted('融资合同签署已完成', '等待资金方放款。')
+      showCompleted('融资合同签署已完成', '等待资金方放款。', {
+        label: '留在详情跟进',
+        onClick: () => undefined,
+      })
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       setDebtSigningOpen(false)
@@ -931,7 +969,10 @@ export default function OrderDetailPage() {
         try {
           setCancelling(true)
           await orderService.cancel(Number(id))
-          showCompleted('订单取消已完成', '订单已回到工作台记录，库存已释放。')
+          showCompleted('订单取消已完成', '订单已回到工作台记录，库存已释放。', {
+            label: '查看订单列表',
+            onClick: () => navigate('/orders'),
+          })
           await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
           await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
         } catch (error: unknown) {
@@ -944,8 +985,8 @@ export default function OrderDetailPage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen py-6">
-      <div className="max-w-6xl mx-auto px-6">
+    <div className="reco-shell py-8">
+      <div className="mx-auto max-w-6xl px-6 md:px-10">
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/orders')}>
           返回订单列表
         </Button>
@@ -955,12 +996,12 @@ export default function OrderDetailPage() {
             <Spin size="large" />
           </div>
         ) : !order || !item ? (
-          <Card className="mt-6">
+          <Card className="reco-card mt-6 rounded-[28px]">
             <Empty description="订单不存在或无权查看" />
           </Card>
         ) : (
           <>
-            <Card className="mt-6">
+            <Card className="reco-card mt-6 rounded-[28px]">
               <div className="flex justify-between items-start">
                 <div>
                   <Title level={3} className="!mb-2">
@@ -976,11 +1017,11 @@ export default function OrderDetailPage() {
               </div>
             </Card>
 
-            <Card className="mt-6">
+            <Card className="reco-card mt-6 rounded-[28px]">
               <Steps current={getCurrentStep(order.status)} items={orderSteps} />
             </Card>
 
-            <Card title="订单时间线" className="mt-6">
+            <Card title="订单时间线" className="reco-card mt-6 rounded-[28px]">
               <Timeline
                 items={(order.timeline || []).map((item) => ({
                   color: timelineColor(item.status),
@@ -1002,12 +1043,12 @@ export default function OrderDetailPage() {
             <Alert
               type={statusNotice.type}
               showIcon
-              className="mt-6"
+              className="reco-card mt-6 rounded-[28px]"
               message={statusNotice.title}
               description={statusNotice.message}
             />
 
-            <Card title="订单商品" className="mt-6">
+            <Card title="订单商品" className="reco-card mt-6 rounded-[28px]">
               <Descriptions bordered column={2}>
                 <Descriptions.Item label="商品名称">{item.product_name}</Descriptions.Item>
                 <Descriptions.Item label="商品编号">{item.product_no}</Descriptions.Item>
@@ -1025,7 +1066,7 @@ export default function OrderDetailPage() {
             </Card>
 
             {order.delivery_info && (
-              <Card title="订单仓库快照" className="mt-6">
+              <Card title="订单仓库快照" className="reco-card mt-6 rounded-[28px]">
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="提货仓库">
                     {pickupWarehouseName || '-'}
@@ -1057,7 +1098,7 @@ export default function OrderDetailPage() {
               </Card>
             )}
 
-            <Card title="交易双方" className="mt-6">
+            <Card title="交易双方" className="reco-card mt-6 rounded-[28px]">
               <Descriptions bordered column={2}>
                 <Descriptions.Item label="买家企业">{order.buyer_name}</Descriptions.Item>
                 <Descriptions.Item label="卖家企业">{order.seller_name}</Descriptions.Item>
@@ -1073,7 +1114,7 @@ export default function OrderDetailPage() {
             </Card>
 
             {order.contract_info && (
-              <Card title="合同信息" className="mt-6">
+              <Card title="合同信息" className="reco-card mt-6 rounded-[28px]">
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="合同编号">
                     {order.contract_info.contract_no || '-'}
@@ -1106,7 +1147,7 @@ export default function OrderDetailPage() {
             )}
 
             {order.payment_info && (
-              <Card title="支付信息" className="mt-6">
+              <Card title="支付信息" className="reco-card mt-6 rounded-[28px]">
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="支付方式">
                     {order.payment_info.payment_method}
@@ -1150,7 +1191,7 @@ export default function OrderDetailPage() {
             )}
 
             {order.status >= 5 && (
-              <Card title="提货信息" className="mt-6">
+              <Card title="提货信息" className="reco-card mt-6 rounded-[28px]">
                 {order.delivery_info ? (
                   <Descriptions bordered column={2}>
                     <Descriptions.Item label="司机姓名">
@@ -1213,7 +1254,7 @@ export default function OrderDetailPage() {
               </Card>
             )}
 
-            <Card title="物流仓储履约" className="mt-6">
+            <Card title="物流仓储履约" className="reco-card mt-6 rounded-[28px]">
               <Space direction="vertical" size="middle" className="w-full">
                 <Alert
                   showIcon
@@ -1289,12 +1330,12 @@ export default function OrderDetailPage() {
                       return (
                         <div
                           key={step.key}
-                          className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                          className="rounded-[20px] border border-[#eadcc7] bg-[#f8f0e4] p-3"
                         >
                           <div className="mb-2 flex items-start justify-between gap-3">
                             <div>
-                              <div className="text-xs text-slate-500">节点 {index + 1}</div>
-                              <div className="text-sm font-medium text-slate-900">{step.title}</div>
+                              <div className="text-xs text-[#7a847a]">节点 {index + 1}</div>
+                              <div className="text-sm font-semibold text-[#17221b]">{step.title}</div>
                             </div>
                             <Tag color={tagColor}>
                               {stepState === 'completed'
@@ -1304,17 +1345,17 @@ export default function OrderDetailPage() {
                                   : '待处理'}
                             </Tag>
                           </div>
-                          <div className="space-y-1 text-xs text-slate-600">
+                          <div className="space-y-1 text-xs text-[#5f6b61]">
                             <div>
-                              <span className="font-medium text-slate-700">责任方：</span>
+                              <span className="font-semibold text-[#38463b]">责任方：</span>
                               {step.owner}
                             </div>
                             <div>
-                              <span className="font-medium text-slate-700">凭证：</span>
+                              <span className="font-semibold text-[#38463b]">凭证：</span>
                               {step.proofHint}
                             </div>
                             <div>
-                              <span className="font-medium text-slate-700">时间：</span>
+                              <span className="font-semibold text-[#38463b]">时间：</span>
                               {getFulfillmentStepDescription(step.key, logisticsOrder)}
                             </div>
                           </div>
@@ -1418,7 +1459,7 @@ export default function OrderDetailPage() {
             </Card>
 
             {order.financing_info && (
-              <Card title="融资信息" className="mt-6">
+              <Card title="融资信息" className="reco-card mt-6 rounded-[28px]">
                 <Space direction="vertical" size="middle" className="w-full">
                   <Descriptions bordered column={2}>
                     <Descriptions.Item label="融资状态">
@@ -1479,12 +1520,12 @@ export default function OrderDetailPage() {
                       return (
                         <div
                           key={step.key}
-                          className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                          className="rounded-[20px] border border-[#eadcc7] bg-[#f8f0e4] p-3"
                         >
                           <div className="mb-2 flex items-start justify-between gap-3">
                             <div>
-                              <div className="text-xs text-slate-500">节点 {index + 1}</div>
-                              <div className="text-sm font-medium text-slate-900">{step.title}</div>
+                              <div className="text-xs text-[#7a847a]">节点 {index + 1}</div>
+                              <div className="text-sm font-semibold text-[#17221b]">{step.title}</div>
                             </div>
                             <Tag color={tagColor}>
                               {stepState === 'completed'
@@ -1494,13 +1535,13 @@ export default function OrderDetailPage() {
                                   : '待处理'}
                             </Tag>
                           </div>
-                          <div className="space-y-1 text-xs text-slate-600">
+                          <div className="space-y-1 text-xs text-[#5f6b61]">
                             <div>
-                              <span className="font-medium text-slate-700">责任方：</span>
+                              <span className="font-semibold text-[#38463b]">责任方：</span>
                               {step.owner}
                             </div>
                             <div>
-                              <span className="font-medium text-slate-700">说明：</span>
+                              <span className="font-semibold text-[#38463b]">说明：</span>
                               {step.hint}
                             </div>
                           </div>
@@ -1513,7 +1554,7 @@ export default function OrderDetailPage() {
             )}
 
             {(order.receipt_voucher || order.receipt_at || order.status === 8) && (
-              <Card title="签收信息" className="mt-6">
+              <Card title="签收信息" className="reco-card mt-6 rounded-[28px]">
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="签收时间">
                     {order.receipt_at ? new Date(order.receipt_at).toLocaleString() : '-'}
@@ -1544,7 +1585,7 @@ export default function OrderDetailPage() {
               </Card>
             )}
 
-            <Card className="mt-6">
+            <Card className="reco-card mt-6 rounded-[28px]">
               <Title level={5}>订单操作</Title>
               <Space wrap>
                 {(order.status === 14 || order.status === 15) && (
@@ -1555,7 +1596,10 @@ export default function OrderDetailPage() {
                         await orderService.buyerConfirm(Number(id), {
                           confirm_note: '买方确认订单',
                         })
-                        showCompleted('买方确认已完成', '进入合同签署节点，请签署交易合同。')
+                        showCompleted('买方确认已完成', '进入合同签署节点，请签署交易合同。', {
+                          label: '留在详情签合同',
+                          onClick: () => undefined,
+                        })
                         await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
                       } catch (error: unknown) {
                         message.error(getErrorMessage(error, '确认失败'))
@@ -1572,7 +1616,7 @@ export default function OrderDetailPage() {
                 )}
                 {order.status === 3 && (
                   <Button type="primary" icon={<UploadOutlined />} onClick={() => setOpen(true)}>
-                    上传支付/货权凭证
+                    上传支付凭证
                   </Button>
                 )}
                 {(order.status === 24 || order.status === 25) && (
@@ -1742,11 +1786,17 @@ export default function OrderDetailPage() {
                   </Button>
                 )}
 
+                {logisticsOrder?.status === 'inbound_completed' && isFinancingOrder && (
+                  <Tag color="gold">融资订单待资金方确认监管收货</Tag>
+                )}
                 {logisticsOrder?.status === 'arrival_confirmed' && (
+                  <Tag color="gold">待收货仓验货入库</Tag>
+                )}
+                {logisticsOrder?.status === 'inbound_completed' && !isFinancingOrder && (
                   <Button
                     type="primary"
                     icon={<CheckCircleOutlined />}
-                    onClick={handleInspectionSign}
+                    onClick={() => setInspectionSignOpen(true)}
                   >
                     验货签收
                   </Button>
@@ -1777,7 +1827,7 @@ export default function OrderDetailPage() {
             </Card>
 
             <Modal
-              title="上传支付与货权监管凭证"
+              title="上传支付凭证"
               open={open}
               onCancel={() => setOpen(false)}
               onOk={handleUploadVoucher}
@@ -1795,17 +1845,6 @@ export default function OrderDetailPage() {
                     <Button icon={<UploadOutlined />}>选择文件</Button>
                   </Upload>
                 </Form.Item>
-                <Form.Item
-                  name="title_voucher_file"
-                  label="货权/仓单监管凭证"
-                  valuePropName="fileList"
-                  getValueFromEvent={(event) => event?.fileList ?? []}
-                  rules={[{ required: true, message: '请上传货权/仓单监管凭证' }]}
-                >
-                  <Upload beforeUpload={() => false} maxCount={1}>
-                    <Button icon={<UploadOutlined />}>选择文件</Button>
-                  </Upload>
-                </Form.Item>
                 <Form.Item name="transaction_no" label="交易流水号">
                   <Input />
                 </Form.Item>
@@ -1813,9 +1852,6 @@ export default function OrderDetailPage() {
                   <Input />
                 </Form.Item>
                 <Form.Item name="payee_account" label="收款账户">
-                  <Input />
-                </Form.Item>
-                <Form.Item name="title_remark" label="货权监管备注">
                   <Input />
                 </Form.Item>
               </Form>
@@ -1905,11 +1941,11 @@ export default function OrderDetailPage() {
                     placeholder="请选择已登记的仓储"
                     showSearch
                     optionFilterProp="children"
-                    loading={!myWarehousesData}
+                    loading={!publicWarehousesData}
                   >
-                    {myWarehouses.map((w: WarehouseServiceItem) => (
+                    {publicWarehouses.map((w: WarehouseServiceItem) => (
                       <Select.Option key={w.id} value={w.id}>
-                        {w.warehouse_name}（ID: {w.id}）
+                        {w.warehouse_name}（ID: {w.id}）{w.finance_certified ? ' · 资方认证监管仓' : ''}
                       </Select.Option>
                     ))}
                   </Select>
@@ -1984,6 +2020,38 @@ export default function OrderDetailPage() {
                   <Upload beforeUpload={() => false} maxCount={1}>
                     <Button icon={<UploadOutlined />}>选择文件</Button>
                   </Upload>
+                </Form.Item>
+              </Form>
+            </Modal>
+
+            <Modal
+              title="验货签收并上传收货单"
+              open={inspectionSignOpen}
+              onCancel={() => {
+                setInspectionSignOpen(false)
+                inspectionSignForm.resetFields()
+              }}
+              onOk={handleInspectionSign}
+              confirmLoading={confirmingInspectionSign}
+              okText="上传并签收"
+            >
+              <Form form={inspectionSignForm} layout="vertical">
+                <Paragraph type="secondary">
+                  收货仓完成验货入库并上传封条照片、入库单、收货单后，普通订单由买方确认收货；融资订单由资金方确认。
+                </Paragraph>
+                <Form.Item
+                  name="receipt_file"
+                  label="收货单/签收凭证"
+                  valuePropName="fileList"
+                  getValueFromEvent={(event) => event?.fileList ?? []}
+                  rules={[{ required: true, message: '请上传收货单或签收凭证' }]}
+                >
+                  <Upload beforeUpload={() => false} maxCount={1}>
+                    <Button icon={<UploadOutlined />}>选择文件</Button>
+                  </Upload>
+                </Form.Item>
+                <Form.Item name="remark" label="签收备注">
+                  <Input.TextArea rows={3} placeholder="选填" />
                 </Form.Item>
               </Form>
             </Modal>
@@ -2069,7 +2137,7 @@ export default function OrderDetailPage() {
                               className="w-full"
                               disabled={order.status === 16}
                             >
-                              <Card className="w-full" hoverable={order.status === 17}>
+                              <Card className="reco-card w-full rounded-[22px]" hoverable={order.status === 17}>
                                 <div className="flex justify-between items-start">
                                   <div className="flex-1">
                                     <div className="font-medium text-gray-900">
@@ -2094,7 +2162,7 @@ export default function OrderDetailPage() {
                                     )}
                                   </div>
                                   <div className="text-right">
-                                    <div className="text-xl font-bold text-blue-600">
+                                    <div className="text-xl font-bold text-[#b45324]">
                                       ¥{quote.amount.toLocaleString()}
                                     </div>
                                     <div className="text-xs text-gray-500 mt-1">

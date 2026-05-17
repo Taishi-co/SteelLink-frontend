@@ -60,6 +60,9 @@ export interface Product {
   status: number
   enterpriseId: number
   qualityCert?: string
+  titleVoucherUrl?: string
+  titleVoucherRemark?: string
+  titleConfirmed: boolean
   images: string[]
   description?: string
   deliveryDays: number

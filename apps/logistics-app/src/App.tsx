@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -43,6 +44,13 @@ import type {
   LogisticsResource,
   LogisticsResourcePayload,
 } from '@/services/logisticsResourceService'
+import { fleetService } from '@/services/fleetService'
+import type {
+  LogisticsDriver,
+  LogisticsDriverPayload,
+  LogisticsVehicle,
+  LogisticsVehiclePayload,
+} from '@/services/fleetService'
 import { getLogisticsToken, hasLogisticsCapability, saveLogisticsToken } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
@@ -72,7 +80,11 @@ const logisticsOrderStatusMap: Record<string, { label: string; color: string }> 
   cancelled: { label: '已取消', color: 'error' },
 }
 
-type TabKey = 'dashboard' | 'bidding' | 'logistics-flow' | 'resources'
+type TabKey = 'dashboard' | 'bidding' | 'logistics-flow' | 'resources' | 'fleet'
+
+function isTabKey(value: string | null): value is TabKey {
+  return Boolean(value && ['dashboard', 'bidding', 'logistics-flow', 'resources', 'fleet'].includes(value))
+}
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
@@ -83,6 +95,15 @@ function App() {
   const [resourceModalVisible, setResourceModalVisible] = useState(false)
   const [editingResource, setEditingResource] = useState<LogisticsResource | null>(null)
   const [resourceForm] = Form.useForm<LogisticsResourcePayload>()
+  const [drivers, setDrivers] = useState<LogisticsDriver[]>([])
+  const [vehicles, setVehicles] = useState<LogisticsVehicle[]>([])
+  const [fleetLoading, setFleetLoading] = useState(false)
+  const [driverModalVisible, setDriverModalVisible] = useState(false)
+  const [vehicleModalVisible, setVehicleModalVisible] = useState(false)
+  const [editingDriver, setEditingDriver] = useState<LogisticsDriver | null>(null)
+  const [editingVehicle, setEditingVehicle] = useState<LogisticsVehicle | null>(null)
+  const [driverForm] = Form.useForm<LogisticsDriverPayload>()
+  const [vehicleForm] = Form.useForm<LogisticsVehiclePayload>()
   const [loading, setLoading] = useState(false)
   const [quoteModal, setQuoteModal] = useState<{ visible: boolean; orderId: number | null }>({
     visible: false,
@@ -93,12 +114,26 @@ function App() {
   const [quoteRemark, setQuoteRemark] = useState('')
   const [tokenReady, setTokenReady] = useState(false)
   const [expandedLogisticsOrders, setExpandedLogisticsOrders] = useState<number[]>([])
+  const [statusModal, setStatusModal] = useState<{ visible: boolean; order: LogisticsOrder | null; nextStatus: string; label: string; requiredDocs: string[] }>({
+    visible: false,
+    order: null,
+    nextStatus: '',
+    label: '',
+    requiredDocs: [],
+  })
+  const [statusForm] = Form.useForm<Record<string, string>>()
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const token = urlParams.get('token')
+    const tab = urlParams.get('tab')
     if (token) {
       saveLogisticsToken(token)
+    }
+    if (isTabKey(tab)) {
+      setActiveTab(tab)
+    }
+    if (token || tab) {
       window.history.replaceState({}, '', window.location.pathname)
     }
     setTokenReady(true)
@@ -109,14 +144,18 @@ function App() {
   const showCompleted = (title: string, next: string, targetTab: TabKey = 'logistics-flow') => {
     Modal.success({
       title,
+      closable: true,
+      maskClosable: true,
       content: (
         <Space direction="vertical" size={8}>
           <Text>已完成：{title.replace('已完成', '')}</Text>
           <Text type="secondary">下一步：{next}</Text>
-          <Text type="secondary">管理端可在订单详情中查看本次节点事件记录。</Text>
+          <Text type="secondary">可留在当前页继续处理，或切到推荐工作区查看后续任务。</Text>
         </Space>
       ),
-      okText: '回工作台看订单',
+      okCancel: true,
+      okText: '查看推荐工作区',
+      cancelText: '留在当前页',
       onOk: () => setActiveTab(targetTab),
     })
   }
@@ -154,6 +193,22 @@ function App() {
       message.error('获取运力资源列表失败')
     } finally {
       setResourceLoading(false)
+    }
+  }
+
+  const fetchFleet = async () => {
+    setFleetLoading(true)
+    try {
+      const [driverList, vehicleList] = await Promise.all([
+        fleetService.listDrivers(),
+        fleetService.listVehicles(),
+      ])
+      setDrivers(driverList || [])
+      setVehicles(vehicleList || [])
+    } catch {
+      message.error('获取司机车辆档案失败')
+    } finally {
+      setFleetLoading(false)
     }
   }
 
@@ -215,15 +270,88 @@ function App() {
     })
   }
 
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const token = urlParams.get('token')
-    if (token) {
-      saveLogisticsToken(token)
-      window.history.replaceState({}, '', window.location.pathname)
+  const openCreateDriver = () => {
+    setEditingDriver(null)
+    driverForm.resetFields()
+    driverForm.setFieldsValue({ status: 'active' })
+    setDriverModalVisible(true)
+  }
+
+  const openEditDriver = (record: LogisticsDriver) => {
+    setEditingDriver(record)
+    driverForm.setFieldsValue({
+      name: record.name,
+      phone: record.phone,
+      id_card: record.id_card,
+      license_no: record.license_no,
+      license_expire_at: record.license_expire_at,
+      qualification_no: record.qualification_no,
+      qualification_expire_at: record.qualification_expire_at,
+      status: record.status,
+      remark: record.remark,
+    })
+    setDriverModalVisible(true)
+  }
+
+  const handleDriverSubmit = async () => {
+    try {
+      const values = await driverForm.validateFields()
+      if (editingDriver) {
+        await fleetService.updateDriver(editingDriver.id, values)
+        message.success('司机档案已更新')
+      } else {
+        await fleetService.createDriver(values)
+        message.success('司机档案已创建')
+      }
+      setDriverModalVisible(false)
+      fetchFleet()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('保存司机档案失败')
     }
-    setTokenReady(true)
-  }, [])
+  }
+
+  const openCreateVehicle = () => {
+    setEditingVehicle(null)
+    vehicleForm.resetFields()
+    vehicleForm.setFieldsValue({ status: 'active' })
+    setVehicleModalVisible(true)
+  }
+
+  const openEditVehicle = (record: LogisticsVehicle) => {
+    setEditingVehicle(record)
+    vehicleForm.setFieldsValue({
+      plate_number: record.plate_number,
+      vehicle_type: record.vehicle_type,
+      load_capacity: record.load_capacity,
+      vehicle_license: record.vehicle_license,
+      license_expire_at: record.license_expire_at,
+      insurance_no: record.insurance_no,
+      insurance_expire_at: record.insurance_expire_at,
+      driver_id: record.driver_id,
+      status: record.status,
+      remark: record.remark,
+    })
+    setVehicleModalVisible(true)
+  }
+
+  const handleVehicleSubmit = async () => {
+    try {
+      const values = await vehicleForm.validateFields()
+      if (editingVehicle) {
+        await fleetService.updateVehicle(editingVehicle.id, values)
+        message.success('车辆档案已更新')
+      } else {
+        await fleetService.createVehicle(values)
+        message.success('车辆档案已创建')
+      }
+      setVehicleModalVisible(false)
+      fetchFleet()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('保存车辆档案失败')
+    }
+  }
 
   useEffect(() => {
     if (!tokenReady) return
@@ -232,9 +360,11 @@ function App() {
       fetchBidding()
       fetchLogisticsOrders()
       fetchResources()
+      fetchFleet()
     } else if (activeTab === 'bidding') fetchBidding()
     else if (activeTab === 'logistics-flow') fetchLogisticsOrders()
     else if (activeTab === 'resources') fetchResources()
+    else if (activeTab === 'fleet') fetchFleet()
   }, [activeTab, hasLogisticsSession, tokenReady])
 
   const handleSubmitQuote = async () => {
@@ -262,17 +392,38 @@ function App() {
     }
   }
 
-  const handleUpdateOrderStatus = async (id: number, status: string) => {
+  const openStatusModal = (order: LogisticsOrder, nextStatus: string, label: string, requiredDocs: string[] = []) => {
+    setStatusModal({ visible: true, order, nextStatus, label, requiredDocs })
+    statusForm.resetFields()
+  }
+
+  const handleStatusSubmit = async () => {
+    if (!statusModal.order) return
     try {
-      await logisticsFulfillmentService.updateOrderStatus(id, { status })
-      showCompleted(
-        '物流状态更新已完成',
-        status === 'delivered' ? '等待买方确认收货。' : '继续推进运输履约。',
-        'logistics-flow'
-      )
+      const values = await statusForm.validateFields()
+      for (const docType of statusModal.requiredDocs) {
+        const fileURL = values[`doc_${docType}`]
+        if (fileURL) {
+          await logisticsFulfillmentService.uploadDocument(statusModal.order.id, {
+            doc_type: docType,
+            file_url: fileURL,
+            remark: values.remark,
+          })
+        }
+      }
+      await logisticsFulfillmentService.updateOrderStatus(statusModal.order.id, {
+        status: statusModal.nextStatus,
+      })
+      message.success('物流节点已更新')
+      setStatusModal({ visible: false, order: null, nextStatus: '', label: '', requiredDocs: [] })
       fetchLogisticsOrders()
-    } catch {
-      message.error('操作失败')
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error(
+        statusModal.nextStatus === 'pickup_scheduled'
+          ? '预约提货失败，请确认卖方已上传提货指令'
+          : '节点更新失败，请确认必要单据已上传'
+      )
     }
   }
 
@@ -405,11 +556,11 @@ function App() {
       { key: 'loading_confirmed', title: '装货确认', owner: '物流方', hint: '确认货物装载完毕' },
       { key: 'in_transit', title: '运输中', owner: '物流方', hint: '货物在途运输' },
       { key: 'arrival_confirmed', title: '到货确认', owner: '物流方', hint: '到达目的地确认' },
-      { key: 'receipt_signed', title: '验收签收', owner: '买方', hint: '买方验收并签收' },
-      { key: 'inbound_completed', title: '入库登记', owner: '仓储方', hint: '货物入库登记' },
+      { key: 'inbound_completed', title: '收货仓验货入库', owner: '仓储方', hint: '收货仓验货并上传入库资料' },
+      { key: 'receipt_signed', title: '确认收货', owner: '买方/资金方', hint: '查看入库资料后确认收货' },
       { key: 'completed', title: '履约结束', owner: '系统', hint: '物流履约流程结束' },
     ]
-    const statusOrder = ['task_created', 'pickup_scheduled', 'arrival_signed_in', 'outbound_confirmed', 'loading_confirmed', 'in_transit', 'arrival_confirmed', 'receipt_signed', 'inbound_completed', 'completed']
+    const statusOrder = ['task_created', 'pickup_scheduled', 'arrival_signed_in', 'outbound_confirmed', 'loading_confirmed', 'in_transit', 'arrival_confirmed', 'inbound_completed', 'receipt_signed', 'completed']
     
     let completedStep = statusOrder.indexOf(status)
     if (completedStep === -1) {
@@ -427,7 +578,16 @@ function App() {
     { key: 'bidding' as TabKey, label: '竞价与接单', icon: <DollarCircleOutlined /> },
     { key: 'logistics-flow' as TabKey, label: '物流流程', icon: <CarOutlined /> },
     { key: 'resources' as TabKey, label: '运力资源管理', icon: <AppstoreOutlined /> },
+    { key: 'fleet' as TabKey, label: '司机车辆档案', icon: <SafetyCertificateOutlined /> },
   ]
+
+  if (!tokenReady) {
+    return (
+      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin size="large" />
+      </Layout>
+    )
+  }
 
   if (!hasLogisticsCapability()) {
     return (
@@ -446,14 +606,6 @@ function App() {
             当前账户未开通物流服务商能力，请联系平台管理员申请开通。
           </Paragraph>
         </Card>
-      </Layout>
-    )
-  }
-
-  if (!tokenReady) {
-    return (
-      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size="large" />
       </Layout>
     )
   }
@@ -484,16 +636,22 @@ function App() {
       <Sider width={232} theme="light">
         <div
           style={{
-            height: 64,
+            height: 78,
             display: 'flex',
             alignItems: 'center',
             padding: '0 24px',
-            borderBottom: '1px solid #edf0f5',
+            borderBottom: '1px solid #eadcc7',
+            background: 'linear-gradient(135deg, rgba(255,253,248,.92), rgba(248,240,228,.72))',
           }}
         >
           <Space>
-            <RocketOutlined style={{ color: '#1677ff' }} />
-            <Text strong>RecoLink 物流</Text>
+            <span style={{ display: 'inline-grid', width: 36, height: 36, placeItems: 'center', borderRadius: 16, background: '#214332', color: '#f3c17c', fontWeight: 900 }}>
+              R
+            </span>
+            <span>
+              <Text strong style={{ display: 'block', color: '#17221b' }}>锐联物流</Text>
+              <Text style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', color: '#a4662c' }}>RecoLink</Text>
+            </span>
           </Space>
         </div>
         <div style={{ padding: 16 }}>
@@ -502,18 +660,21 @@ function App() {
             dataSource={menuItems}
             renderItem={(item) => (
               <List.Item
+                className="service-nav-item"
                 style={{
                   border: 0,
-                  padding: '10px 12px',
-                  borderRadius: 8,
+                  padding: '11px 12px',
+                  borderRadius: 14,
                   cursor: 'pointer',
-                  background: activeTab === item.key ? '#e8f3ff' : 'transparent',
+                  marginBottom: 6,
+                  background: activeTab === item.key ? '#214332' : 'transparent',
+                  color: activeTab === item.key ? '#fffaf1' : '#5f6b61',
                 }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                     {item.key === 'bidding' && biddingOrders.length > 0 && (
                       <Badge count={biddingOrders.length} style={{ marginLeft: 8 }} />
@@ -536,7 +697,10 @@ function App() {
             justifyContent: 'space-between',
           }}
         >
-          <Text strong>物流方工作台</Text>
+          <div>
+            <Text strong style={{ display: 'block', color: '#17221b', fontSize: 16 }}>物流方工作台</Text>
+            <Text style={{ color: '#7a847a', fontSize: 12 }}>竞价接单、物流流转、运力资源与司机车辆档案</Text>
+          </div>
           <Space>
             <Button
               icon={<EnvironmentOutlined />}
@@ -545,9 +709,11 @@ function App() {
                   fetchBidding()
                   fetchLogisticsOrders()
                   fetchResources()
+                  fetchFleet()
                 } else if (activeTab === 'bidding') fetchBidding()
                 else if (activeTab === 'logistics-flow') fetchLogisticsOrders()
                 else if (activeTab === 'resources') fetchResources()
+                else if (activeTab === 'fleet') fetchFleet()
               }}
             >
               刷新
@@ -584,9 +750,9 @@ function App() {
                 </Col>
                 <Col xs={24} sm={12} lg={6}>
                   <Card>
-                    <Typography.Text type="secondary">物流订单</Typography.Text>
+                    <Typography.Text type="secondary">司机/车辆</Typography.Text>
                     <br />
-                    <Title level={3}>{logisticsOrders.length}</Title>
+                    <Title level={3}>{drivers.length}/{vehicles.length}</Title>
                   </Card>
                 </Col>
               </Row>
@@ -605,19 +771,25 @@ function App() {
                           title: '待接单物流订单',
                           description: `${logisticsOrders.filter((item) => item.status === 'pending').length} 单等待接单`,
                           icon: <ClockCircleOutlined />,
-                          tab: 'logistics-orders' as TabKey,
+                          tab: 'logistics-flow' as TabKey,
                         },
                         {
                           title: '在途履约',
                           description: `${logisticsOrders.filter((item) => item.status === 'accepted' || item.status === 'in_transit').length} 单正在运输`,
                           icon: <CarOutlined />,
-                          tab: 'logistics-orders' as TabKey,
+                          tab: 'logistics-flow' as TabKey,
                         },
                         {
                           title: '已审核运力',
                           description: `${resources.filter((item) => item.status === 2).length} 条线路可参与匹配`,
                           icon: <CheckCircleOutlined />,
                           tab: 'resources' as TabKey,
+                        },
+                        {
+                          title: '司机车辆主数据',
+                          description: `${drivers.length} 名司机 / ${vehicles.length} 辆车辆`,
+                          icon: <SafetyCertificateOutlined />,
+                          tab: 'fleet' as TabKey,
                         },
                       ]}
                       renderItem={(item) => (
@@ -662,6 +834,13 @@ function App() {
                         onClick={() => setActiveTab('resources')}
                       >
                         管理运力资源
+                      </Button>
+                      <Button
+                        block
+                        icon={<SafetyCertificateOutlined />}
+                        onClick={() => setActiveTab('fleet')}
+                      >
+                        维护司机车辆档案
                       </Button>
                     </Space>
                   </Card>
@@ -794,24 +973,36 @@ function App() {
                       width: 120,
                       render: (_: unknown, record: LogisticsOrder) => {
                         const getNextAction = (status: string) => {
-                          if (status === 'task_created' || status === 'pending') return { label: '接单', next: 'pickup_scheduled' }
-                          if (status === 'pickup_scheduled' || status === 'accepted') return { label: '签到', next: 'arrival_signed_in' }
-                          if (status === 'arrival_signed_in') return { label: '出库确认', next: 'outbound_confirmed' }
-                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed' }
-                          if (status === 'loading_confirmed') return { label: '发车', next: 'in_transit' }
-                          if (status === 'in_transit') return { label: '到货确认', next: 'arrival_confirmed' }
-                          if (status === 'arrival_confirmed') return { label: '等待买方验货签收', next: 'receipt_signed', buyerAction: true }
-                          if (status === 'receipt_signed') return { label: '入库完成', next: 'inbound_completed' }
-                          if (status === 'inbound_completed') return { label: '履约完成', next: 'completed' }
+                          if (status === 'task_created' || status === 'pending') {
+                            const ready = record.status_requirements?.find((item) => item.status === 'pickup_scheduled')?.satisfied
+                            return ready
+                              ? { label: '预约提货', next: 'pickup_scheduled' }
+                              : { label: '等待卖方提货指令', next: 'pickup_scheduled', externalAction: true }
+                          }
+                          if (status === 'pickup_scheduled' || status === 'accepted') return { label: '等待仓储到场确认', next: 'arrival_signed_in', externalAction: true }
+                          if (status === 'arrival_signed_in') return { label: '等待仓储出库确认', next: 'outbound_confirmed', externalAction: true }
+                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed', docs: ['loading_voucher'] }
+                          if (status === 'loading_confirmed') return { label: '发车', next: 'in_transit', docs: ['gps_track'] }
+                          if (status === 'in_transit') return { label: '到货确认', next: 'arrival_confirmed', docs: ['delivery_photo'] }
+                          if (status === 'arrival_confirmed') return { label: '等待收货仓验货入库', next: 'inbound_completed', externalAction: true }
+                          if (status === 'inbound_completed') return { label: '等待买方/资金方确认收货', next: 'receipt_signed', buyerAction: true }
+                          if (status === 'receipt_signed') return { label: '履约完成', next: 'completed' }
                           return null
                         }
                         const nextAction = getNextAction(record.status)
                         if (!nextAction) return null
+                        if (nextAction.externalAction) {
+                          return <Tag color="orange">{nextAction.label}</Tag>
+                        }
                         if (nextAction.buyerAction) {
-                          return <Tag color="blue">等待买方签收</Tag>
+                          return <Tag color="blue">{nextAction.label}</Tag>
                         }
                         return (
-                          <Button type="primary" size="small" onClick={() => handleUpdateOrderStatus(record.id, nextAction.next)}>
+                          <Button
+                            type="primary"
+                            size="small"
+                            onClick={() => openStatusModal(record, nextAction.next, nextAction.label, nextAction.docs)}
+                          >
                             {nextAction.label}
                           </Button>
                         )
@@ -1046,6 +1237,167 @@ function App() {
             </>
           )}
 
+          {activeTab === 'fleet' && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} sm={8}>
+                  <Card>
+                    <Typography.Text type="secondary">司机档案</Typography.Text>
+                    <br />
+                    <Title level={3}>{drivers.length}</Title>
+                  </Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card>
+                    <Typography.Text type="secondary">车辆档案</Typography.Text>
+                    <br />
+                    <Title level={3}>{vehicles.length}</Title>
+                  </Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card>
+                    <Typography.Text type="secondary">可用车辆</Typography.Text>
+                    <br />
+                    <Title level={3}>{vehicles.filter((item) => item.status !== 'inactive').length}</Title>
+                  </Card>
+                </Col>
+              </Row>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} xl={11}>
+                  <Card
+                    title="司机档案"
+                    extra={
+                      <Button type="primary" icon={<PlusOutlined />} onClick={openCreateDriver}>
+                        新增司机
+                      </Button>
+                    }
+                  >
+                    <Spin spinning={fleetLoading}>
+                      <Table
+                        rowKey="id"
+                        dataSource={drivers}
+                        pagination={{ pageSize: 8 }}
+                        scroll={{ x: 760 }}
+                        columns={[
+                          { title: '姓名', dataIndex: 'name', key: 'name', width: 100 },
+                          { title: '电话', dataIndex: 'phone', key: 'phone', width: 130 },
+                          {
+                            title: '驾驶证',
+                            dataIndex: 'license_no',
+                            key: 'license_no',
+                            width: 140,
+                            render: (v: string) => v || '--',
+                          },
+                          {
+                            title: '从业资格',
+                            dataIndex: 'qualification_no',
+                            key: 'qualification_no',
+                            width: 140,
+                            render: (v: string) => v || '--',
+                          },
+                          {
+                            title: '状态',
+                            dataIndex: 'status',
+                            key: 'status',
+                            width: 90,
+                            render: (v: string) => (
+                              <Tag color={v === 'inactive' ? 'default' : 'success'}>
+                                {v === 'inactive' ? '停用' : '可用'}
+                              </Tag>
+                            ),
+                          },
+                          {
+                            title: '操作',
+                            key: 'action',
+                            width: 90,
+                            render: (_: unknown, record: LogisticsDriver) => (
+                              <Button size="small" onClick={() => openEditDriver(record)}>
+                                编辑
+                              </Button>
+                            ),
+                          },
+                        ]}
+                        locale={{ emptyText: '暂无司机档案' }}
+                      />
+                    </Spin>
+                  </Card>
+                </Col>
+                <Col xs={24} xl={13}>
+                  <Card
+                    title="车辆档案"
+                    extra={
+                      <Button type="primary" icon={<PlusOutlined />} onClick={openCreateVehicle}>
+                        新增车辆
+                      </Button>
+                    }
+                  >
+                    <Spin spinning={fleetLoading}>
+                      <Table
+                        rowKey="id"
+                        dataSource={vehicles}
+                        pagination={{ pageSize: 8 }}
+                        scroll={{ x: 880 }}
+                        columns={[
+                          { title: '车牌号', dataIndex: 'plate_number', key: 'plate_number', width: 110 },
+                          {
+                            title: '车型',
+                            dataIndex: 'vehicle_type',
+                            key: 'vehicle_type',
+                            width: 110,
+                            render: (v: string) => v || '--',
+                          },
+                          {
+                            title: '载重',
+                            dataIndex: 'load_capacity',
+                            key: 'load_capacity',
+                            width: 90,
+                            render: (v: number) => (v ? `${v} 吨` : '--'),
+                          },
+                          {
+                            title: '绑定司机',
+                            dataIndex: 'driver_id',
+                            key: 'driver_id',
+                            width: 110,
+                            render: (v: number) => drivers.find((driver) => driver.id === v)?.name || '--',
+                          },
+                          {
+                            title: '保险有效期',
+                            dataIndex: 'insurance_expire_at',
+                            key: 'insurance_expire_at',
+                            width: 120,
+                            render: (v: string) => v || '--',
+                          },
+                          {
+                            title: '状态',
+                            dataIndex: 'status',
+                            key: 'status',
+                            width: 90,
+                            render: (v: string) => (
+                              <Tag color={v === 'inactive' ? 'default' : 'success'}>
+                                {v === 'inactive' ? '停用' : '可用'}
+                              </Tag>
+                            ),
+                          },
+                          {
+                            title: '操作',
+                            key: 'action',
+                            width: 90,
+                            render: (_: unknown, record: LogisticsVehicle) => (
+                              <Button size="small" onClick={() => openEditVehicle(record)}>
+                                编辑
+                              </Button>
+                            ),
+                          },
+                        ]}
+                        locale={{ emptyText: '暂无车辆档案' }}
+                      />
+                    </Spin>
+                  </Card>
+                </Col>
+              </Row>
+            </>
+          )}
+
           <Modal
             title="提交物流报价"
             open={quoteModal.visible}
@@ -1088,6 +1440,198 @@ function App() {
                 />
               </div>
             </Space>
+          </Modal>
+
+          <Modal
+            title={`推进节点：${statusModal.label || '--'}`}
+            open={statusModal.visible}
+            onOk={handleStatusSubmit}
+            onCancel={() => setStatusModal({ visible: false, order: null, nextStatus: '', label: '', requiredDocs: [] })}
+            okText="上传并推进"
+          >
+            <Form form={statusForm} layout="vertical">
+              {statusModal.nextStatus === 'pickup_scheduled' && (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="需先读取卖方提货指令"
+                  description="卖方上传提货单/提货指令后才能预约提货；如果没有文件 URL，请联系卖方补传。"
+                  style={{ marginBottom: 16 }}
+                />
+              )}
+              {statusModal.requiredDocs.length === 0 ? (
+                <Paragraph type="secondary">该节点无需补充单据，确认后会直接推进物流状态。</Paragraph>
+              ) : (
+                statusModal.requiredDocs.map((docType) => (
+                  <Form.Item
+                    key={docType}
+                    name={`doc_${docType}`}
+                    label={`必要单据：${docType}`}
+                    rules={[{ required: true, message: '请输入单据 URL' }]}
+                  >
+                    <Input placeholder="https://..." />
+                  </Form.Item>
+                ))
+              )}
+              <Form.Item name="remark" label="节点备注">
+                <Input.TextArea rows={3} placeholder="选填" />
+              </Form.Item>
+            </Form>
+          </Modal>
+
+          <Modal
+            title={editingDriver ? '编辑司机档案' : '新增司机档案'}
+            open={driverModalVisible}
+            onOk={handleDriverSubmit}
+            onCancel={() => setDriverModalVisible(false)}
+            width={680}
+            okText="保存"
+          >
+            <Form form={driverForm} layout="vertical">
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="name" label="司机姓名" rules={[{ required: true, message: '请输入司机姓名' }]}>
+                    <Input placeholder="例：张师傅" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="phone" label="联系电话" rules={[{ required: true, message: '请输入联系电话' }]}>
+                    <Input placeholder="例：13800000000" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="id_card" label="身份证号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="license_no" label="驾驶证号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="license_expire_at" label="驾驶证有效期">
+                    <Input placeholder="例：2028-12-31" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="qualification_no" label="从业资格证号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="qualification_expire_at" label="从业资格有效期">
+                    <Input placeholder="例：2028-12-31" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="status" label="状态">
+                    <Select
+                      options={[
+                        { label: '可用', value: 'active' },
+                        { label: '停用', value: 'inactive' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="remark" label="备注">
+                <Input.TextArea rows={3} />
+              </Form.Item>
+            </Form>
+          </Modal>
+
+          <Modal
+            title={editingVehicle ? '编辑车辆档案' : '新增车辆档案'}
+            open={vehicleModalVisible}
+            onOk={handleVehicleSubmit}
+            onCancel={() => setVehicleModalVisible(false)}
+            width={680}
+            okText="保存"
+          >
+            <Form form={vehicleForm} layout="vertical">
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="plate_number" label="车牌号" rules={[{ required: true, message: '请输入车牌号' }]}>
+                    <Input placeholder="例：沪A12345" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="vehicle_type" label="车型">
+                    <Select
+                      placeholder="选择车型"
+                      options={[
+                        { label: '平板车', value: '平板车' },
+                        { label: '厢式货车', value: '厢式货车' },
+                        { label: '自卸车', value: '自卸车' },
+                        { label: '集装箱车', value: '集装箱车' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="load_capacity" label="载重能力(吨)">
+                    <InputNumber min={0} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="driver_id" label="绑定司机">
+                    <Select
+                      allowClear
+                      placeholder="选择司机"
+                      options={drivers.map((driver) => ({ label: `${driver.name} ${driver.phone}`, value: driver.id }))}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="vehicle_license" label="行驶证号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="license_expire_at" label="行驶证有效期">
+                    <Input placeholder="例：2028-12-31" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="insurance_no" label="保险单号">
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="insurance_expire_at" label="保险有效期">
+                    <Input placeholder="例：2028-12-31" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="status" label="状态">
+                    <Select
+                      options={[
+                        { label: '可用', value: 'active' },
+                        { label: '停用', value: 'inactive' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="remark" label="备注">
+                <Input.TextArea rows={3} />
+              </Form.Item>
+            </Form>
           </Modal>
         </Content>
       </Layout>

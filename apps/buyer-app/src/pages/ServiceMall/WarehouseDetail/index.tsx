@@ -40,6 +40,9 @@ export default function WarehouseDetailPage() {
                     <Space wrap className="mb-3">
                       <Tag color="blue">资源 #{data.id}</Tag>
                       <Tag color="green">平台已审核</Tag>
+                      <Tag color={data.finance_certified ? 'purple' : 'default'}>
+                        {data.finance_certified ? '资方认证监管仓' : '普通仓'}
+                      </Tag>
                       {data.service_types?.map((service) => <Tag key={service}>{service}</Tag>)}
                     </Space>
                     <Title level={2} className="!mb-3">{data.warehouse_name}</Title>
@@ -99,6 +102,11 @@ export default function WarehouseDetailPage() {
                   </Descriptions.Item>
                   <Descriptions.Item label="审核状态">
                     <Tag color="green">已审核通过</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="监管仓认证">
+                    <Tag color={data.finance_certified ? 'purple' : 'default'}>
+                      {data.finance_certified ? '资方认证监管仓' : '未认证'}
+                    </Tag>
                   </Descriptions.Item>
                   <Descriptions.Item label="更新时间">{data.updated_at || '-'}</Descriptions.Item>
                 </Descriptions>

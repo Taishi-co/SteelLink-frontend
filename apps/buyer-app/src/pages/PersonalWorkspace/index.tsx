@@ -1,39 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import type React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Alert, Button, Card, Col, Row, Space, Spin, Steps, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Space, Spin, Steps, Table, Tag, Typography, message } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import {
   BankOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  HomeOutlined,
   IdcardOutlined,
   RightOutlined,
-  ShopOutlined,
-  ShoppingCartOutlined,
-  TruckOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { certificationService, EnterpriseInfo, EnterpriseServicePermission, getIdentityStatusLabel } from '@/services/certificationService'
+import { personalInquiryDraftService, type PersonalInquiryDraft, type PersonalInquiryDraftPayload } from '@/services/personalInquiryDraftService'
 import { useUserStore } from '@/stores'
+import ServiceIconBadge from '@/pages/Dashboard/ServiceIconBadge'
+import { getEffectiveServiceStatus, serviceDefinitions } from '@/pages/Dashboard/serviceAccess'
 
 const { Text, Title, Paragraph } = Typography
-
-type ServiceKey = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
-
-const serviceCards: Array<{
-  key: ServiceKey
-  title: string
-  role: string
-  desc: string
-  icon: React.ReactNode
-}> = [
-  { key: 'sales', title: '销售交易能力', role: '供应商', desc: '商品发布、竞价报价、销售订单。', icon: <ShopOutlined /> },
-  { key: 'procurement', title: '采购交易能力', role: '采购商', desc: '采购下单、AI采购、竞价定标。', icon: <ShoppingCartOutlined /> },
-  { key: 'logistics', title: '物流服务商能力', role: '物流方', desc: '运输承接、物流履约、节点协同。', icon: <TruckOutlined /> },
-  { key: 'warehouse', title: '仓储服务商能力', role: '仓储方', desc: '仓储资源、入出库协同。', icon: <HomeOutlined /> },
-  { key: 'finance', title: '金融服务商能力', role: '资金方', desc: '融资服务、资信材料、凭单融资。', icon: <BankOutlined /> },
-]
 
 const permissionStatus: Record<number, { label: string; color: string }> = {
   1: { label: '审核中', color: 'processing' },
@@ -62,6 +45,10 @@ export default function PersonalWorkspace() {
   const [loading, setLoading] = useState(true)
   const [enterprise, setEnterprise] = useState<EnterpriseInfo | null>(null)
   const [permissions, setPermissions] = useState<EnterpriseServicePermission[]>([])
+  const [drafts, setDrafts] = useState<PersonalInquiryDraft[]>([])
+  const [draftModalOpen, setDraftModalOpen] = useState(false)
+  const [editingDraft, setEditingDraft] = useState<PersonalInquiryDraft | null>(null)
+  const [draftForm] = Form.useForm<PersonalInquiryDraftPayload>()
 
   useEffect(() => {
     let ignore = false
@@ -81,6 +68,10 @@ export default function PersonalWorkspace() {
             }
           }
         }
+        if (user?.identityStatus === 2) {
+          const draftList = await personalInquiryDraftService.list()
+          if (!ignore) setDrafts(draftList || [])
+        }
       } finally {
         if (!ignore) setLoading(false)
       }
@@ -90,7 +81,7 @@ export default function PersonalWorkspace() {
     return () => {
       ignore = true
     }
-  }, [user?.enterpriseCode])
+  }, [user?.enterpriseCode, user?.identityStatus])
 
   const identityDone = user?.identityStatus === 2
   const enterpriseApproved = enterprise?.status === 1
@@ -100,12 +91,73 @@ export default function PersonalWorkspace() {
     return 0
   }, [enterpriseApproved, identityDone])
 
-  const permissionMap = useMemo(() => {
-    return permissions.reduce<Record<string, EnterpriseServicePermission>>((acc, item) => {
-      acc[item.service] = item
-      return acc
-    }, {})
-  }, [permissions])
+  const openDraftModal = (draft?: PersonalInquiryDraft) => {
+    setEditingDraft(draft || null)
+    draftForm.setFieldsValue(
+      draft || {
+        title: '',
+        product_name: '',
+        category: '',
+        material: '',
+        spec: '',
+        quantity: 0,
+        unit: '吨',
+        target_price: 0,
+        delivery_address: '',
+        requirement: '',
+      },
+    )
+    setDraftModalOpen(true)
+  }
+
+  const reloadDrafts = async () => {
+    if (user?.identityStatus !== 2) return
+    const list = await personalInquiryDraftService.list()
+    setDrafts(list || [])
+  }
+
+  const submitDraft = async () => {
+    try {
+      const values = await draftForm.validateFields()
+      if (editingDraft) {
+        await personalInquiryDraftService.update(editingDraft.id, values)
+        message.success('询价草稿已更新')
+      } else {
+        await personalInquiryDraftService.create(values)
+        message.success('询价草稿已保存')
+      }
+      setDraftModalOpen(false)
+      setEditingDraft(null)
+      await reloadDrafts()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('保存询价草稿失败')
+    }
+  }
+
+  const deleteDraft = async (draft: PersonalInquiryDraft) => {
+    await personalInquiryDraftService.remove(draft.id)
+    message.success('询价草稿已删除')
+    await reloadDrafts()
+  }
+
+  const draftColumns: ColumnsType<PersonalInquiryDraft> = [
+    { title: '标题', dataIndex: 'title', key: 'title' },
+    { title: '品名', dataIndex: 'product_name', key: 'product_name', render: (value?: string) => value || '-' },
+    { title: '规格', dataIndex: 'spec', key: 'spec', render: (value?: string) => value || '-' },
+    { title: '数量', key: 'quantity', render: (_, record) => `${Number(record.quantity || 0).toLocaleString()} ${record.unit || '吨'}` },
+    { title: '目标价', dataIndex: 'target_price', key: 'target_price', render: (value: number) => (value ? `¥${Number(value).toLocaleString()}` : '-') },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_, record) => (
+        <Space>
+          <Button size="small" onClick={() => openDraftModal(record)}>编辑</Button>
+          <Button size="small" danger onClick={() => deleteDraft(record)}>删除</Button>
+        </Space>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -146,6 +198,25 @@ export default function PersonalWorkspace() {
       </Card>
 
       <Spin spinning={loading}>
+        {identityDone && (
+          <Card className="mb-4" title="实名个人轻量能力" extra={<Button type="primary" onClick={() => openDraftModal()}>保存询价草稿</Button>}>
+            <Alert
+              className="mb-4"
+              type="info"
+              showIcon
+              message="实名个人可保存询价草稿，但不开放交易闭环"
+              description="草稿用于记录采购意向。下单、竞价、金融服务和物流履约仍需企业认证并开通对应服务能力。"
+            />
+            <Table
+              rowKey="id"
+              size="small"
+              columns={draftColumns}
+              dataSource={drafts}
+              pagination={{ pageSize: 5 }}
+            />
+          </Card>
+        )}
+
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={12}>
             <Card title="个人实名认证" extra={<Tag color={identityDone ? 'success' : 'warning'}>{getIdentityStatusLabel(user?.identityStatus ?? 0)}</Tag>}>
@@ -183,24 +254,21 @@ export default function PersonalWorkspace() {
         ) : (
           <Card className="mt-4" title="企业能力">
             <Row gutter={[16, 16]}>
-              {serviceCards.slice(0, 5).map((service) => {
-                const permission = permissionMap[service.key]
-                const status = permission?.status ?? 0
+              {serviceDefinitions.map((service) => {
+                const status = getEffectiveServiceStatus(service.key, permissions, user?.enterpriseRole)
                 return (
                   <Col xs={24} md={12} xl={8} key={service.key}>
                     <Card size="small" className="h-full">
                       <div className="flex gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
-                          {service.icon}
-                        </div>
+                        <ServiceIconBadge serviceKey={service.key} />
                         <div className="min-w-0 flex-1">
                           <Space wrap>
                             <strong>{service.title}</strong>
                             {status ? <Tag color={permissionStatus[status]?.color}>{permissionStatus[status]?.label}</Tag> : <Tag>未申请</Tag>}
                           </Space>
                           <div className="text-xs text-gray-400 mt-1">{service.role}</div>
-                          <p className="text-sm text-gray-500 mt-2 min-h-[40px]">{service.desc}</p>
-                          <Link to={`/dashboard/services/${service.key}`}>
+                          <p className="text-sm text-gray-500 mt-2 min-h-[40px]">{service.description}</p>
+                          <Link to={service.route}>
                             <Button size="small" type={status === 2 ? 'primary' : 'default'}>
                               {status === 2 ? '进入能力' : '申请/查看'} <RightOutlined />
                             </Button>
@@ -215,6 +283,59 @@ export default function PersonalWorkspace() {
           </Card>
         )}
       </Spin>
+
+      <Modal
+        title={editingDraft ? '编辑询价草稿' : '保存询价草稿'}
+        open={draftModalOpen}
+        onCancel={() => setDraftModalOpen(false)}
+        onOk={submitDraft}
+        okText="保存"
+      >
+        <Form form={draftForm} layout="vertical">
+          <Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入草稿标题' }]}>
+            <Input placeholder="例：Q235B 热轧卷采购意向" />
+          </Form.Item>
+          <Form.Item name="product_name" label="品名">
+            <Input placeholder="例：热轧卷" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="category" label="品类">
+                <Input placeholder="例：板材" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="material" label="材质">
+                <Input placeholder="例：Q235B" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="spec" label="规格">
+            <Input placeholder="例：5.75*1500*C" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="quantity" label="数量">
+                <InputNumber min={0} className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="unit" label="单位">
+                <Input placeholder="吨" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="target_price" label="目标单价">
+            <InputNumber min={0} className="w-full" prefix="¥" />
+          </Form.Item>
+          <Form.Item name="delivery_address" label="收货地址">
+            <Input placeholder="请输入收货地址" />
+          </Form.Item>
+          <Form.Item name="requirement" label="采购要求">
+            <Input.TextArea rows={3} placeholder="补充交期、质保、发票等要求" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }

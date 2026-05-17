@@ -151,19 +151,30 @@ export default function ProductsPage() {
   }, [categories, selectedCategory])
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6">
-      <div className="mx-auto max-w-7xl px-6">
-        <Card className="mb-6">
+    <div className="min-h-screen bg-[#f4efe6] py-8">
+      <div className="mx-auto max-w-7xl px-6 md:px-10">
+        <div className="mb-6 rounded-[30px] border border-[#eadcc7] bg-[#fffaf1] p-7 shadow-sm">
+          <Text className="text-sm font-bold uppercase tracking-[0.28em] text-[#a4662c]">Products</Text>
+          <div className="mt-2 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+            <div>
+              <Title level={2} className="!mb-2 !font-black !text-[#17221b]">商品列表</Title>
+              <Paragraph className="!mb-0 !text-[#5f6b61]">筛选已审核现货，按品类、价格、钢厂、仓库和库存快速定位可采购资源。</Paragraph>
+            </div>
+            <Link to="/mall" className="font-semibold text-[#9f5f23]">返回商城首页</Link>
+          </div>
+        </div>
+
+        <Card className="mb-6 rounded-[28px] border-[#eadcc7] bg-[#fffaf1] shadow-sm">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-4">
               <div>
-                <Paragraph className="!mb-1 text-xs text-gray-500">搜索商品</Paragraph>
+                <Paragraph className="!mb-1 text-xs text-[#7a847a]">搜索商品</Paragraph>
                 <Search
                   placeholder="搜索商品名称、编号或 SKU"
                   defaultValue={searchText}
                   allowClear
                   enterButton={<SearchOutlined />}
-                  style={{ width: 360 }}
+                  style={{ width: 'min(360px, 100%)' }}
                   onSearch={(value) => {
                     setSearchText(value)
                     setCurrentPage(1)
@@ -172,7 +183,7 @@ export default function ProductsPage() {
               </div>
 
               <div>
-                <Paragraph className="!mb-1 text-xs text-gray-500">排序方式</Paragraph>
+                <Paragraph className="!mb-1 text-xs text-[#7a847a]">排序方式</Paragraph>
                 <Select
                   value={sortBy}
                   onChange={(value) => {
@@ -185,9 +196,9 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="rounded-2xl border border-[#eadcc7] bg-[#f8f0e4] p-4">
               <div className="mb-3 flex items-center justify-between gap-4">
-                <Text strong className="text-gray-800">筛选条件</Text>
+                <Text strong className="text-[#17221b]">筛选条件</Text>
                 {hasActiveFilters ? (
                   <Button
                     type="link"
@@ -213,7 +224,7 @@ export default function ProductsPage() {
 
               <Space size="middle" wrap>
                 <div>
-                  <Paragraph className="!mb-1 text-xs text-gray-500">品类</Paragraph>
+                  <Paragraph className="!mb-1 text-xs text-[#7a847a]">品类</Paragraph>
                   <Select
                     value={selectedCategory}
                     onChange={(value) => {
@@ -225,7 +236,7 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <Paragraph className="!mb-1 text-xs text-gray-500">价格区间</Paragraph>
+                  <Paragraph className="!mb-1 text-xs text-[#7a847a]">价格区间</Paragraph>
                   <Space.Compact>
                     <InputNumber
                       placeholder="最低价"
@@ -250,7 +261,7 @@ export default function ProductsPage() {
                   </Space.Compact>
                 </div>
                 <div>
-                  <Paragraph className="!mb-1 text-xs text-gray-500">钢厂</Paragraph>
+                  <Paragraph className="!mb-1 text-xs text-[#7a847a]">钢厂</Paragraph>
                   <Input
                     placeholder="输入钢厂"
                     style={{ width: 150 }}
@@ -262,7 +273,7 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <Paragraph className="!mb-1 text-xs text-gray-500">省份</Paragraph>
+                  <Paragraph className="!mb-1 text-xs text-[#7a847a]">省份</Paragraph>
                   <Input
                     placeholder="仓库省份"
                     style={{ width: 140 }}
@@ -274,7 +285,7 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <Paragraph className="!mb-1 text-xs text-gray-500">城市</Paragraph>
+                  <Paragraph className="!mb-1 text-xs text-[#7a847a]">城市</Paragraph>
                   <Input
                     placeholder="仓库城市"
                     style={{ width: 140 }}
@@ -286,7 +297,7 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <Paragraph className="!mb-1 text-xs text-gray-500">快捷筛选</Paragraph>
+                  <Paragraph className="!mb-1 text-xs text-[#7a847a]">快捷筛选</Paragraph>
                   <Space className="h-8">
                     <Switch
                       checked={quickOrderOnly}
@@ -295,11 +306,11 @@ export default function ProductsPage() {
                         setCurrentPage(1)
                       }}
                     />
-                    <Text className="text-sm text-gray-600">只看可立即下单</Text>
+                    <Text className="text-sm text-[#5f6b61]">只看可立即下单</Text>
                   </Space>
                 </div>
                 <div>
-                  <Paragraph className="!mb-1 text-xs text-gray-500">可售库存</Paragraph>
+                  <Paragraph className="!mb-1 text-xs text-[#7a847a]">可售库存</Paragraph>
                   <InputNumber
                     placeholder="最低库存"
                     min={0}
@@ -318,10 +329,10 @@ export default function ProductsPage() {
         </Card>
 
         <div className="mb-4 flex items-center justify-between gap-4">
-          <Title level={4} className="!mb-0">
+          <Title level={4} className="!mb-0 !text-[#17221b]">
             审核通过商品
           </Title>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-[#7a847a]">
             共 {quickOrderOnly ? displayedProducts.length : total} 个商品
             {quickOrderOnly ? '（可立即下单）' : ''}
           </span>
@@ -331,14 +342,14 @@ export default function ProductsPage() {
           <Row gutter={[16, 16]}>
             {displayedProducts.length > 0 ? (
               displayedProducts.map((product) => (
-                <Col key={product.id} span={6}>
-                  <Link to={`/products/${product.id}`}>
-                    <Card hoverable className="h-full">
-                      <div className="mb-3 flex h-40 items-center justify-center overflow-hidden rounded bg-gray-100">
+                <Col key={product.id} xs={24} sm={12} lg={6}>
+                  <Link to={`/products/${product.id}`} className="block h-full no-underline">
+                    <Card hoverable className="mall-product-card h-full rounded-[26px] border-[#eadcc7] bg-[#fffaf1] shadow-sm">
+                      <div className="mb-3 flex h-40 items-center justify-center overflow-hidden rounded-2xl bg-[#efe3d1]">
                         {product.images?.[0] ? (
                           <img src={product.images[0]} alt={product.name} className="h-full w-full object-cover" />
                         ) : (
-                          <span className="text-5xl">钢</span>
+                          <span className="text-5xl font-black text-[#214332]">钢</span>
                         )}
                       </div>
                       <Title level={5} className="!mb-2 !text-sm line-clamp-2">
@@ -350,23 +361,26 @@ export default function ProductsPage() {
                         {product.availableQty >= product.minOrderQty && product.minOrderQty > 0 ? (
                           <Tag color="green">可立即下单</Tag>
                         ) : null}
+                        <Tag color={product.titleConfirmed ? 'green' : 'default'}>
+                          {product.titleConfirmed ? '仓库确权' : '未确权'}
+                        </Tag>
                       </Space>
-                      <Paragraph className="!mb-1 text-xs text-gray-500">编号：{product.productNo || '-'}</Paragraph>
-                      <Paragraph className="!mb-1 text-xs text-gray-500">
+                      <Paragraph className="!mb-1 text-xs text-[#7a847a]">编号：{product.productNo || '-'}</Paragraph>
+                      <Paragraph className="!mb-1 text-xs text-[#7a847a]">
                         钢厂：{product.steelMill || '-'}
                       </Paragraph>
-                      <Paragraph className="!mb-1 text-xs text-gray-500">
+                      <Paragraph className="!mb-1 text-xs text-[#7a847a]">
                         库存：{product.availableQty} 吨 · 起订：{product.minOrderQty} 吨
                       </Paragraph>
-                      <Paragraph className="!mb-1 text-xs text-gray-500">
+                      <Paragraph className="!mb-1 text-xs text-[#7a847a]">
                         仓库：{product.warehouseInfo?.warehouse_name || '-'} · {product.warehouseInfo?.province || '-'} / {product.warehouseInfo?.city || '-'}
                       </Paragraph>
-                      <Paragraph className="!mb-1 text-xs text-gray-500">
+                      <Paragraph className="!mb-1 text-xs text-[#7a847a]">
                         仓库编码：{product.warehouseInfo?.warehouse_code || '-'}
                       </Paragraph>
-                      <div className="text-lg font-bold text-red-500">
+                      <div className="text-lg font-black text-[#b45324]">
                         ￥{product.unitPrice.toLocaleString()}
-                        <span className="ml-1 text-xs text-gray-400">/吨</span>
+                        <span className="ml-1 text-xs text-[#7a847a]">/吨</span>
                       </div>
                     </Card>
                   </Link>
@@ -374,7 +388,9 @@ export default function ProductsPage() {
               ))
             ) : (
               <Col span={24}>
-                <Empty description="暂无符合条件的商品" />
+                <Card className="rounded-[26px] border-[#eadcc7] bg-[#fffaf1]">
+                  <Empty description="暂无符合条件的商品" />
+                </Card>
               </Col>
             )}
           </Row>
