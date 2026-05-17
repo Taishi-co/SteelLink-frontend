@@ -29,7 +29,6 @@ import {
   HomeOutlined,
   InboxOutlined,
   SafetyCertificateOutlined,
-  BankOutlined,
   CalendarOutlined,
   ExclamationCircleOutlined,
   PlusOutlined,
@@ -621,16 +620,22 @@ function App() {
       <Sider width={232} theme="light">
         <div
           style={{
-            height: 64,
+            height: 78,
             display: 'flex',
             alignItems: 'center',
             padding: '0 24px',
-            borderBottom: '1px solid #edf0f5',
+            borderBottom: '1px solid #eadcc7',
+            background: 'linear-gradient(135deg, rgba(255,253,248,.92), rgba(248,240,228,.72))',
           }}
         >
           <Space>
-            <BankOutlined style={{ color: '#16a34a' }} />
-            <Text strong>RecoLink 仓储</Text>
+            <span style={{ display: 'inline-grid', width: 36, height: 36, placeItems: 'center', borderRadius: 16, background: '#214332', color: '#f3c17c', fontWeight: 900 }}>
+              R
+            </span>
+            <span>
+              <Text strong style={{ display: 'block', color: '#17221b' }}>锐联仓储</Text>
+              <Text style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', color: '#a4662c' }}>RecoLink</Text>
+            </span>
           </Space>
         </div>
         <div style={{ padding: 16 }}>
@@ -639,18 +644,21 @@ function App() {
             dataSource={menuItems}
             renderItem={(item) => (
               <List.Item
+                className="service-nav-item"
                 style={{
                   border: 0,
-                  padding: '10px 12px',
-                  borderRadius: 8,
+                  padding: '11px 12px',
+                  borderRadius: 14,
                   cursor: 'pointer',
-                  background: activeTab === item.key ? '#eaf8ee' : 'transparent',
+                  marginBottom: 6,
+                  background: activeTab === item.key ? '#214332' : 'transparent',
+                  color: activeTab === item.key ? '#fffaf1' : '#5f6b61',
                 }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                     {item.key === 'pending' && pendingOrders.length > 0 && (
                       <Badge count={pendingOrders.length} style={{ marginLeft: 8 }} />
@@ -673,7 +681,10 @@ function App() {
             justifyContent: 'space-between',
           }}
         >
-          <Text strong>仓储方工作台</Text>
+          <div>
+            <Text strong style={{ display: 'block', color: '#17221b', fontSize: 16 }}>仓储方工作台</Text>
+            <Text style={{ color: '#7a847a', fontSize: 12 }}>仓库资源、出入库、库存快照与物流履约协同</Text>
+          </div>
           <Space>
             <Button
               icon={<CalendarOutlined />}

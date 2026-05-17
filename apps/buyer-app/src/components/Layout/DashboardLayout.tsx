@@ -193,42 +193,36 @@ export default function DashboardLayout() {
   }
 
   return (
-    <Layout className="min-h-screen">
+    <Layout className="dashboard-shell">
       <Sider
         width={220}
         collapsedWidth={64}
         collapsed={collapsed}
         onCollapse={setCollapsed}
-        className="!bg-[#0c1a38] fixed left-0 top-0 bottom-0 z-50 overflow-auto"
+        className="dashboard-sider fixed bottom-0 left-0 top-0 z-50 overflow-auto"
         trigger={null}
       >
         <div className="h-full flex flex-col">
-          <div className="px-5 py-5 border-b border-white/[0.06]">
+          <div className="dashboard-brand px-5 py-5">
             <div className="flex items-center gap-2.5">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, #4f8ef7, #1e4fc2)',
-                  boxShadow: '0 2px 8px rgba(30,79,194,.4)',
-                }}
-              >
-                <DashboardOutlined className="text-white text-sm" />
+              <div className="dashboard-brand-mark flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl font-black">
+                R
               </div>
               {!collapsed && (
                 <div>
-                  <div className="text-white font-bold text-[15px] tracking-wide">RecoLink</div>
-                  <div className="text-white/30 text-[10px]">产业资源协同平台</div>
+                  <div className="text-[15px] font-black tracking-[-0.02em] text-[#17221b]">锐联产业协同平台</div>
+                  <div className="text-[10px] font-bold tracking-[0.16em] text-[#a4662c]">RecoLink Workbench</div>
                 </div>
               )}
             </div>
           </div>
 
           {!collapsed && user?.enterpriseCode && (
-            <div className="mx-3 mt-3 mb-1 bg-white/5 rounded-lg px-3 py-2.5">
-              <div className="text-white/35 text-[10px] mb-1">当前账户</div>
-              <div className="text-white/85 text-xs font-medium truncate">{user.companyName}</div>
+            <div className="dashboard-account-card mx-3 mb-1 mt-3 rounded-2xl px-3 py-3">
+              <div className="mb-1 text-[10px] font-bold tracking-[0.14em] text-[#a4662c]">当前账户</div>
+              <div className="truncate text-xs font-semibold text-[#17221b]">{user.companyName}</div>
               <div className="flex items-center gap-1.5 mt-1.5">
-                <span className="text-[9px] bg-emerald-500/18 text-emerald-400 px-1.5 py-0.5 rounded font-semibold">
+                <span className="rounded-full bg-[#edf6ef] px-2 py-0.5 text-[9px] font-semibold text-[#2f6b49]">
                   {user.enterpriseRole === 'buyer'
                     ? '采购方'
                     : user.enterpriseRole === 'seller'
@@ -241,29 +235,28 @@ export default function DashboardLayout() {
                             ? '资金方'
                             : '企业'}
                 </span>
-                <span className="text-[9px] text-white/30">{identityLabel}</span>
+                <span className="text-[9px] text-[#7a847a]">{identityLabel}</span>
               </div>
             </div>
           )}
 
           {!collapsed && !user?.enterpriseCode && (
-            <div className="mx-3 mt-3 mb-1 bg-white/5 rounded-lg px-3 py-2.5">
-              <div className="text-white/35 text-[10px] mb-1">个人账户</div>
-              <div className="text-white/85 text-xs font-medium">
+            <div className="dashboard-account-card mx-3 mb-1 mt-3 rounded-2xl px-3 py-3">
+              <div className="mb-1 text-[10px] font-bold tracking-[0.14em] text-[#a4662c]">个人账户</div>
+              <div className="text-xs font-semibold text-[#17221b]">
                 {user?.username || user?.mobile || '用户'}
               </div>
               <div className="flex items-center gap-1.5 mt-1.5">
-                <span className="text-[9px] text-white/30">{identityLabel}</span>
+                <span className="text-[9px] text-[#7a847a]">{identityLabel}</span>
               </div>
             </div>
           )}
 
           <nav className="flex-1 px-2.5 pt-2 overflow-y-auto">
-            <div className="text-white/25 text-[10px] px-3 mb-1.5 uppercase tracking-wider">
+            <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#a4662c]">
               {collapsed ? '' : '业务'}
             </div>
             <Menu
-              theme="dark"
               mode="inline"
               selectedKeys={getSelectedKey()}
               onClick={({ key }) => navigate(key)}
@@ -272,14 +265,13 @@ export default function DashboardLayout() {
                 icon: item.icon,
                 label: item.label,
               }))}
-              className="!bg-transparent !border-none [&_.ant-menu-item]:!h-9 [&_.ant-menu-item]:!leading-9 [&_.ant-menu-item]:!my-0.5 [&_.ant-menu-item]:!rounded-lg [&_.ant-menu-item-selected]:!bg-white/10 [&_.ant-menu-item-selected]:!text-white [&_.ant-menu-item]:!text-white/45 [&_.ant-menu-item:hover]:!text-white/80 [&_.ant-menu-item:hover]:!bg-white/6"
+              className="dashboard-menu !border-none !bg-transparent [&_.ant-menu-item]:!my-1 [&_.ant-menu-item]:!h-10 [&_.ant-menu-item]:!rounded-xl [&_.ant-menu-item]:!leading-10"
             />
 
-            <div className="text-white/25 text-[10px] px-3 mt-4 mb-1.5 uppercase tracking-wider">
+            <div className="px-3 mt-4 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#a4662c]">
               {collapsed ? '' : '账户'}
             </div>
             <Menu
-              theme="dark"
               mode="inline"
               selectedKeys={getSelectedKey()}
               onClick={({ key }) => navigate(key)}
@@ -288,27 +280,23 @@ export default function DashboardLayout() {
                 icon: item.icon,
                 label: item.label,
               }))}
-              className="!bg-transparent !border-none [&_.ant-menu-item]:!h-9 [&_.ant-menu-item]:!leading-9 [&_.ant-menu-item]:!my-0.5 [&_.ant-menu-item]:!rounded-lg [&_.ant-menu-item-selected]:!bg-white/10 [&_.ant-menu-item-selected]:!text-white [&_.ant-menu-item]:!text-white/45 [&_.ant-menu-item:hover]:!text-white/80 [&_.ant-menu-item:hover]:!bg-white/6"
+              className="dashboard-menu !border-none !bg-transparent [&_.ant-menu-item]:!my-1 [&_.ant-menu-item]:!h-10 [&_.ant-menu-item]:!rounded-xl [&_.ant-menu-item]:!leading-10"
             />
           </nav>
 
           <div className="px-2.5 mb-2">
             {effectiveServices.has('sales') && (
               <div
-                className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
-                style={{
-                  background: 'rgba(16,185,129,.14)',
-                  border: '1px solid rgba(16,185,129,.25)',
-                }}
+                className="dashboard-quick-link mb-2 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
                 onClick={switchToSellerCenter}
               >
-                <ShopOutlined className="text-emerald-400 text-sm" />
+                <ShopOutlined className="text-sm text-[#2f6b49]" />
                 {!collapsed && (
                   <>
-                    <span className="text-xs text-emerald-400 font-semibold flex-1">
+                    <span className="flex-1 text-xs font-semibold">
                       进入卖家中心
                     </span>
-                    <ArrowRightOutlined className="text-emerald-400 text-[10px]" />
+                    <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
                   </>
                 )}
               </div>
@@ -316,19 +304,15 @@ export default function DashboardLayout() {
             {effectiveServices.has('finance') && (
               <a href={financeWorkbenchHref}>
                 <div
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
-                  style={{
-                    background: 'rgba(124,58,237,.14)',
-                    border: '1px solid rgba(124,58,237,.25)',
-                  }}
+                  className="dashboard-quick-link mb-2 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
                 >
-                  <BankOutlined className="text-violet-400 text-sm" />
+                  <BankOutlined className="text-sm text-[#2f6b49]" />
                   {!collapsed && (
                     <>
-                      <span className="text-xs text-violet-300 font-semibold flex-1">
+                      <span className="flex-1 text-xs font-semibold">
                         进入资金方工作台
                       </span>
-                      <ArrowRightOutlined className="text-violet-300 text-[10px]" />
+                      <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
                     </>
                   )}
                 </div>
@@ -337,19 +321,15 @@ export default function DashboardLayout() {
             {effectiveServices.has('logistics') && (
               <a href={logisticsWorkbenchHref}>
                 <div
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
-                  style={{
-                    background: 'rgba(37,99,235,.14)',
-                    border: '1px solid rgba(37,99,235,.25)',
-                  }}
+                  className="dashboard-quick-link mb-2 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
                 >
-                  <TruckOutlined className="text-blue-300 text-sm" />
+                  <TruckOutlined className="text-sm text-[#2f6b49]" />
                   {!collapsed && (
                     <>
-                      <span className="text-xs text-blue-300 font-semibold flex-1">
+                      <span className="flex-1 text-xs font-semibold">
                         进入物流管理中心
                       </span>
-                      <ArrowRightOutlined className="text-blue-300 text-[10px]" />
+                      <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
                     </>
                   )}
                 </div>
@@ -358,19 +338,15 @@ export default function DashboardLayout() {
             {effectiveServices.has('warehouse') && (
               <a href={warehouseWorkbenchHref}>
                 <div
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-2"
-                  style={{
-                    background: 'rgba(22,163,74,.14)',
-                    border: '1px solid rgba(22,163,74,.25)',
-                  }}
+                  className="dashboard-quick-link mb-2 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
                 >
-                  <HomeOutlined className="text-emerald-300 text-sm" />
+                  <HomeOutlined className="text-sm text-[#2f6b49]" />
                   {!collapsed && (
                     <>
-                      <span className="text-xs text-emerald-300 font-semibold flex-1">
+                      <span className="flex-1 text-xs font-semibold">
                         进入仓储管理中心
                       </span>
-                      <ArrowRightOutlined className="text-emerald-300 text-[10px]" />
+                      <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
                     </>
                   )}
                 </div>
@@ -378,38 +354,34 @@ export default function DashboardLayout() {
             )}
             <Link to="/mall">
               <div
-                className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer"
-                style={{
-                  background: 'rgba(99,102,241,.15)',
-                  border: '1px solid rgba(99,102,241,.25)',
-                }}
+                className="dashboard-quick-link flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
               >
-                <ShoppingOutlined className="text-indigo-400 text-sm" />
+                <ShoppingOutlined className="text-sm text-[#2f6b49]" />
                 {!collapsed && (
                   <>
-                    <span className="text-xs text-indigo-400 font-semibold flex-1">进入商城</span>
-                    <ArrowRightOutlined className="text-indigo-400 text-[10px]" />
+                    <span className="flex-1 text-xs font-semibold">进入商城</span>
+                    <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
                   </>
                 )}
               </div>
             </Link>
           </div>
 
-          <div className="px-4 py-3 border-t border-white/[0.06]">
+          <div className="border-t border-[#eadcc7] px-4 py-3">
             <div className="flex items-center gap-2">
-              <Avatar size={28} icon={<UserOutlined />} className="bg-indigo-500 shrink-0" />
+              <Avatar size={28} icon={<UserOutlined />} className="shrink-0 bg-[#c47b34]" />
               {!collapsed && (
                 <div className="flex-1 min-w-0">
-                  <div className="text-white/82 text-xs font-medium truncate">
+                  <div className="truncate text-xs font-semibold text-[#17221b]">
                     {user?.realName || user?.username || '用户'}
                   </div>
-                  <div className="text-white/30 text-[10px] truncate">{user?.mobile || ''}</div>
+                  <div className="truncate text-[10px] text-[#7a847a]">{user?.mobile || ''}</div>
                 </div>
               )}
               {!collapsed && (
                 <Tooltip title="退出登录">
                   <LogoutOutlined
-                    className="text-white/30 hover:text-red-400 cursor-pointer text-xs transition-colors"
+                    className="cursor-pointer text-xs text-[#7a847a] transition-colors hover:text-[#b45324]"
                     onClick={handleLogout}
                   />
                 </Tooltip>
@@ -418,7 +390,7 @@ export default function DashboardLayout() {
           </div>
 
           <div
-            className="flex items-center justify-center h-10 cursor-pointer border-t border-white/[0.06] text-white/30 hover:text-white/60 transition-colors"
+            className="flex h-10 cursor-pointer items-center justify-center border-t border-[#eadcc7] text-[#7a847a] transition-colors hover:text-[#214332]"
             onClick={() => setCollapsed(!collapsed)}
           >
             {collapsed ? <ArrowRightOutlined /> : <LogoutOutlined className="rotate-180" />}
@@ -427,7 +399,7 @@ export default function DashboardLayout() {
       </Sider>
 
       <Layout className="transition-all duration-200" style={{ marginLeft: collapsed ? 64 : 220 }}>
-        <Content className="bg-[#f0f4f9] min-h-screen p-6">
+        <Content className="dashboard-content">
           <Outlet />
         </Content>
       </Layout>

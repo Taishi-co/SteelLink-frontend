@@ -914,10 +914,13 @@ function App() {
   return (
     <Layout className="service-shell">
       <Sider width={232} theme="light">
-        <div style={{ height: 64, display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: '1px solid #edf0f5' }}>
+        <div style={{ height: 78, display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: '1px solid #eadcc7', background: 'linear-gradient(135deg, rgba(255,253,248,.92), rgba(248,240,228,.72))' }}>
           <Space>
-            <DollarCircleOutlined style={{ color: '#7c3aed' }} />
-            <Text strong>RecoLink 资金</Text>
+            <span style={{ display: 'inline-grid', width: 36, height: 36, placeItems: 'center', borderRadius: 16, background: '#214332', color: '#f3c17c', fontWeight: 900 }}>R</span>
+            <span>
+              <Text strong style={{ display: 'block', color: '#17221b' }}>锐联资金</Text>
+              <Text style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', color: '#a4662c' }}>RecoLink</Text>
+            </span>
           </Space>
         </div>
         <div style={{ padding: 16 }}>
@@ -928,12 +931,13 @@ function App() {
             {menuItems.filter((item) => item.group === 'product').map((item) => (
               <List.Item
                 key={item.key}
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                className="service-nav-item"
+                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                   </Text>
                 </Space>
@@ -948,12 +952,13 @@ function App() {
             {menuItems.filter((item) => item.group === 'approval').map((item) => (
               <List.Item
                 key={item.key}
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                className="service-nav-item"
+                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                     {item.key === 'risk-review' && riskOrders.length > 0 && (
                       <Badge count={riskOrders.length} style={{ marginLeft: 8 }} />
@@ -971,12 +976,13 @@ function App() {
             {menuItems.filter((item) => item.group === 'contract').map((item) => (
               <List.Item
                 key={item.key}
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                className="service-nav-item"
+                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                     {item.key === 'debt-contract' && debtOrders.length > 0 && (
                       <Badge count={debtOrders.length} style={{ marginLeft: 8 }} />
@@ -994,12 +1000,13 @@ function App() {
             {menuItems.filter((item) => item.group === 'pledge').map((item) => (
               <List.Item
                 key={item.key}
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                className="service-nav-item"
+                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                   </Text>
                 </Space>
@@ -1014,12 +1021,13 @@ function App() {
             {menuItems.filter((item) => item.group === 'center').map((item) => (
               <List.Item
                 key={item.key}
-                style={{ border: 0, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: activeTab === item.key ? '#f0eaff' : 'transparent' }}
+                className="service-nav-item"
+                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
                 onClick={() => setActiveTab(item.key)}
               >
                 <Space>
                   {item.icon}
-                  <Text type={activeTab === item.key ? undefined : 'secondary'}>
+                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
                     {item.label}
                   </Text>
                 </Space>
@@ -1029,8 +1037,11 @@ function App() {
         </div>
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text strong>资金服务方工作台</Text>
+        <Header style={{ background: 'rgba(255,253,248,.92)', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <Text strong style={{ display: 'block', color: '#17221b', fontSize: 16 }}>资金服务方工作台</Text>
+            <Text style={{ color: '#7a847a', fontSize: 12 }}>金融产品、风控审批、债务合同、放款与质押监控</Text>
+          </div>
           <Space>
             <Button icon={<AuditOutlined />} onClick={() => { 
               if (activeTab === 'products') fetchProducts(); 

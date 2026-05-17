@@ -110,10 +110,16 @@ export default function SellerLayout() {
   }
 
   return (
-    <Layout className="min-h-screen min-w-0">
-      <Sider width={220} className="bg-white shadow-sm shrink-0">
-        <div className="h-16 flex items-center justify-center border-b">
-          <Text className="text-xl font-bold text-primary-600">RecoLink</Text>
+    <Layout className="seller-shell min-w-0">
+      <Sider width={220} className="seller-sider shrink-0">
+        <div className="flex h-[78px] items-center border-b border-[#eadcc7] px-5">
+          <Space>
+            <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[#214332] font-black text-[#f3c17c]">R</span>
+            <span>
+              <Text className="block text-[15px] font-black text-[#17221b]">锐联卖家</Text>
+              <Text className="text-[10px] font-bold tracking-[0.14em] text-[#a4662c]">RecoLink</Text>
+            </span>
+          </Space>
         </div>
         {!ready && (
           <div className="px-4 py-3 mx-3 mt-3 bg-orange-50 rounded-lg border border-orange-100">
@@ -127,25 +133,28 @@ export default function SellerLayout() {
           selectedKeys={[location.pathname]}
           items={menuItems}
           onClick={handleMenuClick}
-          className="border-none h-[calc(100vh-64px)]"
+          className="seller-menu h-[calc(100vh-78px)] border-none !bg-transparent px-2 pt-3 [&_.ant-menu-item]:!my-1 [&_.ant-menu-item]:!h-10 [&_.ant-menu-item]:!rounded-xl [&_.ant-menu-item]:!leading-10"
         />
       </Sider>
       <Layout className="min-w-0">
-        <Header className="bg-white px-6 flex items-center justify-between shadow-sm h-16">
-          <Text className="text-lg font-medium">卖家后台</Text>
+        <Header className="flex h-16 items-center justify-between border-b border-[#eadcc7] bg-[#fffdf8]/90 px-6 shadow-[0_10px_30px_rgba(64,44,25,.06)] backdrop-blur-xl">
+          <div>
+            <Text className="block text-base font-black text-[#17221b]">卖家后台</Text>
+            <Text className="text-xs text-[#7a847a]">商品、竞价、订单、履约与店铺设置</Text>
+          </div>
           <Space size="middle">
             <a href={`${buyerBaseURL}/dashboard`}>
-              <Button icon={<HomeOutlined />}>买家首页</Button>
+              <Button icon={<HomeOutlined />} className="rounded-full border-[#d0b991] bg-white">买家首页</Button>
             </a>
             <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
-              <Space className="cursor-pointer">
-                <Avatar icon={<UserOutlined />} />
-                <Text>{user?.phone || '卖家账号'}</Text>
+              <Space className="cursor-pointer rounded-full border border-[#dfd0ba] bg-white/70 px-3 py-2 shadow-sm">
+                <Avatar icon={<UserOutlined />} className="bg-[#c47b34]" />
+                <Text className="font-semibold text-[#17221b]">{user?.phone || '卖家账号'}</Text>
               </Space>
             </Dropdown>
           </Space>
         </Header>
-        <Content className="m-6 min-w-0 overflow-x-hidden rounded-lg bg-white p-6 min-h-[calc(100vh-112px)]">
+        <Content className="seller-content m-7 min-h-[calc(100vh-120px)] min-w-0 overflow-x-hidden p-7">
           <Outlet />
         </Content>
       </Layout>
