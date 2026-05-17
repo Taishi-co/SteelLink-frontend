@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import type React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Space, Spin, Steps, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -7,35 +6,17 @@ import {
   BankOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  HomeOutlined,
   IdcardOutlined,
   RightOutlined,
-  ShopOutlined,
-  ShoppingCartOutlined,
-  TruckOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { certificationService, EnterpriseInfo, EnterpriseServicePermission, getIdentityStatusLabel } from '@/services/certificationService'
 import { personalInquiryDraftService, type PersonalInquiryDraft, type PersonalInquiryDraftPayload } from '@/services/personalInquiryDraftService'
 import { useUserStore } from '@/stores'
+import ServiceIconBadge from '@/pages/Dashboard/ServiceIconBadge'
+import { getEffectiveServiceStatus, serviceDefinitions } from '@/pages/Dashboard/serviceAccess'
 
 const { Text, Title, Paragraph } = Typography
-
-type ServiceKey = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
-
-const serviceCards: Array<{
-  key: ServiceKey
-  title: string
-  role: string
-  desc: string
-  icon: React.ReactNode
-}> = [
-  { key: 'sales', title: '销售交易能力', role: '供应商', desc: '商品发布、竞价报价、销售订单。', icon: <ShopOutlined /> },
-  { key: 'procurement', title: '采购交易能力', role: '采购商', desc: '采购下单、AI采购、竞价定标。', icon: <ShoppingCartOutlined /> },
-  { key: 'logistics', title: '物流服务商能力', role: '物流方', desc: '运输承接、物流履约、节点协同。', icon: <TruckOutlined /> },
-  { key: 'warehouse', title: '仓储服务商能力', role: '仓储方', desc: '仓储资源、入出库协同。', icon: <HomeOutlined /> },
-  { key: 'finance', title: '金融服务商能力', role: '资金方', desc: '融资服务、资信材料、凭单融资。', icon: <BankOutlined /> },
-]
 
 const permissionStatus: Record<number, { label: string; color: string }> = {
   1: { label: '审核中', color: 'processing' },
@@ -109,13 +90,6 @@ export default function PersonalWorkspace() {
     if (identityDone) return 1
     return 0
   }, [enterpriseApproved, identityDone])
-
-  const permissionMap = useMemo(() => {
-    return permissions.reduce<Record<string, EnterpriseServicePermission>>((acc, item) => {
-      acc[item.service] = item
-      return acc
-    }, {})
-  }, [permissions])
 
   const openDraftModal = (draft?: PersonalInquiryDraft) => {
     setEditingDraft(draft || null)
@@ -280,24 +254,21 @@ export default function PersonalWorkspace() {
         ) : (
           <Card className="mt-4" title="企业能力">
             <Row gutter={[16, 16]}>
-              {serviceCards.slice(0, 5).map((service) => {
-                const permission = permissionMap[service.key]
-                const status = permission?.status ?? 0
+              {serviceDefinitions.map((service) => {
+                const status = getEffectiveServiceStatus(service.key, permissions, user?.enterpriseRole)
                 return (
                   <Col xs={24} md={12} xl={8} key={service.key}>
                     <Card size="small" className="h-full">
                       <div className="flex gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
-                          {service.icon}
-                        </div>
+                        <ServiceIconBadge serviceKey={service.key} />
                         <div className="min-w-0 flex-1">
                           <Space wrap>
                             <strong>{service.title}</strong>
                             {status ? <Tag color={permissionStatus[status]?.color}>{permissionStatus[status]?.label}</Tag> : <Tag>未申请</Tag>}
                           </Space>
                           <div className="text-xs text-gray-400 mt-1">{service.role}</div>
-                          <p className="text-sm text-gray-500 mt-2 min-h-[40px]">{service.desc}</p>
-                          <Link to={`/dashboard/services/${service.key}`}>
+                          <p className="text-sm text-gray-500 mt-2 min-h-[40px]">{service.description}</p>
+                          <Link to={service.route}>
                             <Button size="small" type={status === 2 ? 'primary' : 'default'}>
                               {status === 2 ? '进入能力' : '申请/查看'} <RightOutlined />
                             </Button>

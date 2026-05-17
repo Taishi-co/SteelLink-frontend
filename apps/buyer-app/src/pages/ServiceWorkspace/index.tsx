@@ -32,8 +32,8 @@ import {
 } from '@/services/certificationService'
 import { getSellerCenterHref, getBuyerToken } from '@/services/auth'
 import { uploadService } from '@/services/uploadService'
-
-type ServiceKey = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
+import { getEffectiveServiceStatus, type ServiceKey } from '@/pages/Dashboard/serviceAccess'
+import { useUserStore } from '@/stores'
 
 function getWorkbenchHref(port: number, path: string, tab?: string) {
   const params = new URLSearchParams()
@@ -75,6 +75,7 @@ const serviceConfig: Record<
     icon: <ShopOutlined />,
     actions: [
       { label: '进入卖家中心', href: () => getSellerCenterHref('/seller/dashboard') },
+      { label: '参与竞价', href: () => getSellerCenterHref('/seller/bidding') },
       { label: '商品管理', href: () => getSellerCenterHref('/seller/products') },
     ],
   },
@@ -135,6 +136,7 @@ export default function ServiceWorkspace() {
   const params = useParams()
   const service = isServiceKey(params.service) ? params.service : 'procurement'
   const config = serviceConfig[service]
+  const user = useUserStore((state) => state.user)
   const queryClient = useQueryClient()
   const [documentUrls, setDocumentUrls] = useState<Record<string, string>>({})
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
@@ -154,7 +156,7 @@ export default function ServiceWorkspace() {
   const permission = overview?.permissions?.find((item) => item.service === service) as
     | EnterpriseServicePermission
     | undefined
-  const status = permission?.status ?? 0
+  const status = getEffectiveServiceStatus(service, overview?.permissions ?? [], user?.enterpriseRole)
   const requiredDocuments = useMemo(
     () => overview?.required_documents?.[service] ?? [],
     [overview?.required_documents, service]
@@ -338,6 +340,7 @@ export default function ServiceWorkspace() {
 }
 
 export function ServiceOverview() {
+  const user = useUserStore((state) => state.user)
   const { data, isLoading } = useQuery({
     queryKey: ['enterprise-services'],
     queryFn: () => certificationService.getMyServices(),
@@ -348,8 +351,7 @@ export function ServiceOverview() {
     <Card title="企业能力入口" loading={isLoading}>
       <Row gutter={[16, 16]}>
         {(Object.keys(serviceConfig) as ServiceKey[]).map((key) => {
-          const permission = permissions.find((item) => item.service === key)
-          const status = permission?.status ?? 0
+          const status = getEffectiveServiceStatus(key, permissions, user?.enterpriseRole)
           return (
             <Col xs={24} md={12} xl={8} key={key}>
               <Card size="small" className="h-full">

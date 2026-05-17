@@ -24,6 +24,7 @@ import { clearBuyerSession, getBuyerToken, hasEnterpriseAccess } from '@/service
 import { useUserStore } from '@/stores'
 import { getIdentityStatusLabel, certificationService } from '@/services/certificationService'
 import type { EnterpriseServicePermission } from '@/services/certificationService'
+import { getFallbackServicesByEnterpriseRole } from '@/pages/Dashboard/serviceAccess'
 
 const { Sider, Content } = Layout
 
@@ -43,7 +44,7 @@ const allNavItems: NavItem[] = [
     key: '/dashboard/bidding',
     icon: <RiseOutlined />,
     label: '竞价管理',
-    services: ['procurement', 'sales'],
+    services: ['procurement'],
   },
   {
     key: '/dashboard/orders',
@@ -129,27 +130,7 @@ export default function DashboardLayout() {
   }, [servicePermissions])
 
   const fallbackServices = useMemo(() => {
-    const services = new Set<string>()
-    switch (user?.enterpriseRole) {
-      case 'buyer':
-        services.add('procurement')
-        break
-      case 'seller':
-        services.add('sales')
-        break
-      case 'logistics':
-        services.add('logistics')
-        break
-      case 'warehouse':
-        services.add('warehouse')
-        break
-      case 'fund':
-        services.add('finance')
-        break
-      default:
-        break
-    }
-    return services
+    return new Set<string>(getFallbackServicesByEnterpriseRole(user?.enterpriseRole))
   }, [user?.enterpriseRole])
 
   const effectiveServices = useMemo(() => {
