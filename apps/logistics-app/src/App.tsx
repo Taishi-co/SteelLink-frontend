@@ -82,6 +82,10 @@ const logisticsOrderStatusMap: Record<string, { label: string; color: string }> 
 
 type TabKey = 'dashboard' | 'bidding' | 'logistics-flow' | 'resources' | 'fleet'
 
+function isTabKey(value: string | null): value is TabKey {
+  return Boolean(value && ['dashboard', 'bidding', 'logistics-flow', 'resources', 'fleet'].includes(value))
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
   const [biddingOrders, setBiddingOrders] = useState<OrderInfo[]>([])
@@ -122,8 +126,14 @@ function App() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const token = urlParams.get('token')
+    const tab = urlParams.get('tab')
     if (token) {
       saveLogisticsToken(token)
+    }
+    if (isTabKey(tab)) {
+      setActiveTab(tab)
+    }
+    if (token || tab) {
       window.history.replaceState({}, '', window.location.pathname)
     }
     setTokenReady(true)
@@ -342,16 +352,6 @@ function App() {
       message.error('保存车辆档案失败')
     }
   }
-
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const token = urlParams.get('token')
-    if (token) {
-      saveLogisticsToken(token)
-      window.history.replaceState({}, '', window.location.pathname)
-    }
-    setTokenReady(true)
-  }, [])
 
   useEffect(() => {
     if (!tokenReady) return
@@ -581,6 +581,14 @@ function App() {
     { key: 'fleet' as TabKey, label: '司机车辆档案', icon: <SafetyCertificateOutlined /> },
   ]
 
+  if (!tokenReady) {
+    return (
+      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin size="large" />
+      </Layout>
+    )
+  }
+
   if (!hasLogisticsCapability()) {
     return (
       <Layout
@@ -598,14 +606,6 @@ function App() {
             当前账户未开通物流服务商能力，请联系平台管理员申请开通。
           </Paragraph>
         </Card>
-      </Layout>
-    )
-  }
-
-  if (!tokenReady) {
-    return (
-      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size="large" />
       </Layout>
     )
   }

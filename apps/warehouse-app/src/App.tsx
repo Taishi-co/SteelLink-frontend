@@ -86,6 +86,10 @@ const resourceStatusMap: Record<number, { label: string; color: string }> = {
 
 type TabKey = 'dashboard' | 'pending' | 'movements' | 'logistics' | 'inventory' | 'resources' | 'all'
 
+function isTabKey(value: string | null): value is TabKey {
+  return Boolean(value && ['dashboard', 'pending', 'movements', 'logistics', 'inventory', 'resources', 'all'].includes(value))
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
   const [pendingOrders, setPendingOrders] = useState<OrderInfo[]>([])
@@ -125,8 +129,14 @@ function App() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const token = urlParams.get('token')
+    const tab = urlParams.get('tab')
     if (token) {
       saveWarehouseToken(token)
+    }
+    if (isTabKey(tab)) {
+      setActiveTab(tab)
+    }
+    if (token || tab) {
       window.history.replaceState({}, '', window.location.pathname)
     }
     setTokenReady(true)

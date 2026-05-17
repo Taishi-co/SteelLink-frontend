@@ -35,15 +35,24 @@ import { uploadService } from '@/services/uploadService'
 
 type ServiceKey = 'sales' | 'procurement' | 'logistics' | 'warehouse' | 'finance'
 
-function getWorkbenchHref(port: number, path: string) {
+function getWorkbenchHref(port: number, path: string, tab?: string) {
+  const params = new URLSearchParams()
+  if (import.meta.env.DEV) {
+    const sharedToken = getBuyerToken()
+    if (sharedToken) {
+      params.set('token', sharedToken)
+    }
+  }
+  if (tab) {
+    params.set('tab', tab)
+  }
+  const query = params.toString()
   if (!import.meta.env.DEV) {
-    return path
+    return `${path}${query ? `?${query}` : ''}`
   }
   const protocol = window.location.protocol || 'http:'
   const hostname = window.location.hostname || 'localhost'
-  const sharedToken = getBuyerToken()
-  const tokenParam = sharedToken ? `?token=${encodeURIComponent(sharedToken)}` : ''
-  return `${protocol}//${hostname}:${port}${path}${tokenParam}`
+  return `${protocol}//${hostname}:${port}${path}${query ? `?${query}` : ''}`
 }
 
 const SHARED_PERMISSIONS_KEY = 'enterprise_service_permissions'
@@ -88,7 +97,7 @@ const serviceConfig: Record<
     icon: <TruckOutlined />,
     actions: [
       { label: '进入物流管理中心', href: getWorkbenchHref(5175, '/logistics/') },
-      { label: '物流资源管理', href: '/dashboard/logistics-resources' },
+      { label: '运力资源管理', href: getWorkbenchHref(5175, '/logistics/', 'resources') },
     ],
   },
   warehouse: {
@@ -98,7 +107,7 @@ const serviceConfig: Record<
     icon: <HomeOutlined />,
     actions: [
       { label: '进入仓储管理中心', href: getWorkbenchHref(5176, '/warehouse/') },
-      { label: '仓储资源管理', href: '/dashboard/warehouse-resources' },
+      { label: '仓储资源管理', href: getWorkbenchHref(5176, '/warehouse/', 'resources') },
     ],
   },
   finance: {
@@ -106,7 +115,10 @@ const serviceConfig: Record<
     description: '资金方发布金融产品，并处理融资风控、债务合同、分佣放款和货权质押。',
     enterpriseRole: '资金方',
     icon: <BankOutlined />,
-    actions: [{ label: '进入资金方工作台', href: getWorkbenchHref(5177, '/finance/') }],
+    actions: [
+      { label: '进入资金方工作台', href: getWorkbenchHref(5177, '/finance/') },
+      { label: '金融产品管理', href: getWorkbenchHref(5177, '/finance/', 'products') },
+    ],
   },
 }
 

@@ -70,24 +70,6 @@ const allNavItems: NavItem[] = [
     label: '服务入口',
     roles: ['enterprise'],
   },
-  {
-    key: '/dashboard/warehouse-resources',
-    icon: <CloudServerOutlined />,
-    label: '仓库管理',
-    services: ['warehouse'],
-  },
-  {
-    key: '/dashboard/logistics-resources',
-    icon: <TruckOutlined />,
-    label: '运力资源管理',
-    services: ['logistics'],
-  },
-  {
-    key: '/dashboard/finance-products',
-    icon: <BankOutlined />,
-    label: '金融产品管理',
-    services: ['finance'],
-  },
 ]
 
 const accountItems = [

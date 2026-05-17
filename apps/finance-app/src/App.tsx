@@ -16,7 +16,7 @@ import {
 import { financeOrderService } from '@/services/orderService'
 import type { CollateralMonitorInfo, OrderInfo, WarehouseReceiptPledgeInfo } from '@/services/orderService'
 import { financeService, type FinanceServiceItem } from '@/services/financeService'
-import { hasFinanceCapability } from '@/services/auth'
+import { hasFinanceCapability, saveFinanceToken } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography
@@ -46,6 +46,21 @@ const statusMap: Record<number, { label: string; color: string }> = {
 }
 
 type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'disburse' | 'pledge' | 'warehouse-receipt-pledge' | 'collateral-monitor' | 'release-pledge' | 'finance-flow' | 'all'
+
+function isTabKey(value: string | null): value is TabKey {
+  return Boolean(value && [
+    'products',
+    'risk-review',
+    'debt-contract',
+    'disburse',
+    'pledge',
+    'warehouse-receipt-pledge',
+    'collateral-monitor',
+    'release-pledge',
+    'finance-flow',
+    'all',
+  ].includes(value))
+}
 const productStatusMap: Record<number, { label: string; color: string }> = {
   1: { label: '待审核', color: 'processing' },
   2: { label: '已通过', color: 'success' },
@@ -78,6 +93,7 @@ function App() {
   const [collateralList, setCollateralList] = useState<CollateralMonitorInfo[]>([])
   const [warehouseReceiptPledges, setWarehouseReceiptPledges] = useState<WarehouseReceiptPledgeInfo[]>([])
   const [loading, setLoading] = useState(false)
+  const [tokenReady, setTokenReady] = useState(false)
 
   const [riskModal, setRiskModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [riskApproved, setRiskApproved] = useState(true)
@@ -126,6 +142,22 @@ function App() {
   const [wrpReleaseRemark, setWrpReleaseRemark] = useState('')
   
   const [expandedFinanceOrders, setExpandedFinanceOrders] = useState<number[]>([])
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const token = urlParams.get('token')
+    const tab = urlParams.get('tab')
+    if (token) {
+      saveFinanceToken(token)
+    }
+    if (isTabKey(tab)) {
+      setActiveTab(tab)
+    }
+    if (token || tab) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    setTokenReady(true)
+  }, [])
 
   const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {
     Modal.success({
@@ -858,6 +890,14 @@ function App() {
     { key: 'finance-flow' as TabKey, label: '融资流程', icon: <DotChartOutlined />, group: 'center' },
     { key: 'all' as TabKey, label: '订单中心', icon: <FileSearchOutlined />, group: 'center' },
   ]
+
+  if (!tokenReady) {
+    return (
+      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin size="large" />
+      </Layout>
+    )
+  }
 
   if (!hasFinanceCapability()) {
     return (
