@@ -90,4 +90,33 @@ body {
   background: #f8f0e4 !important;
   color: #38463b;
   font-weight: 800;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.seller-content .ant-table-wrapper {
+  max-width: 100%;
+}
+
+.seller-content .ant-table-container,
+.seller-content .ant-table-content,
+.seller-content .ant-table-body {
+  max-width: 100%;
+}
+
+.seller-content .ant-table-thead > tr > th .ant-table-column-title {
+  display: inline-block;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.seller-content .ant-table-tbody > tr > td {
+  border-bottom-color: #eadcc7;
+  vertical-align: middle;
+}
+
+.seller-content .ant-table-cell {
+  overflow-wrap: anywhere;
 }
