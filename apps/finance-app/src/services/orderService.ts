@@ -214,7 +214,7 @@ export const financeOrderService = {
     return response.data
   },
 
-  async releasePledge(orderId: number, payload: { reason: string; voucher_url?: string }) {
+  async releasePledge(orderId: number, payload: { reason: string; voucher_url?: string; release_amount?: number }) {
     const response = await api.post<unknown, ApiResponse<OrderInfo['financing_info']>>(`/orders/${orderId}/pledges/release`, payload)
     return response.data
   },

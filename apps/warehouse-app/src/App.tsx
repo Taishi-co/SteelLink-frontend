@@ -38,7 +38,7 @@ import {
   DashboardOutlined,
 } from '@ant-design/icons'
 import { warehouseOrderService, warehouseMovementService, warehouseInventoryService, warehouseLogisticsService } from '@/services/orderService'
-import type { LogisticsOrder, OrderEventInfo, OrderInfo, WarehouseInventorySnapshot, WarehouseMovement } from '@/services/orderService'
+import type { LogisticsOrder, OrderInfo, WarehouseInventorySnapshot, WarehouseMovement } from '@/services/orderService'
 import { warehouseResourceService } from '@/services/warehouseResourceService'
 import type {
   WarehouseResource,
@@ -114,7 +114,6 @@ function App() {
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderInfo | null>(null)
-  const [orderEvents, setOrderEvents] = useState<OrderEventInfo[]>([])
   const [tokenReady, setTokenReady] = useState(false)
   const [logisticsModal, setLogisticsModal] = useState<{ visible: boolean; order: LogisticsOrder | null; nextStatus: string; label: string; requiredDocs: string[] }>({
     visible: false,
@@ -428,15 +427,10 @@ function App() {
   const openOrderDetail = async (record: OrderInfo) => {
     setDetailModalVisible(true)
     setSelectedOrder(record)
-    setOrderEvents([])
     setDetailLoading(true)
     try {
-      const [detail, events] = await Promise.all([
-        warehouseOrderService.getById(record.id),
-        warehouseOrderService.listEvents(record.id),
-      ])
+      const detail = await warehouseOrderService.getById(record.id)
       setSelectedOrder(detail)
-      setOrderEvents(events || [])
     } catch {
       message.error('获取订单详情失败')
     } finally {
@@ -1497,37 +1491,6 @@ function App() {
                       rowKey={(item) => `${item.product_id}-${item.product_no}`}
                       pagination={false}
                       locale={{ emptyText: '暂无商品明细' }}
-                    />
-                  </Card>
-
-                  <Card size="small" title="履约事件">
-                    <List
-                      size="small"
-                      dataSource={orderEvents}
-                      locale={{ emptyText: '暂无事件记录' }}
-                      renderItem={(event) => (
-                        <List.Item>
-                          <List.Item.Meta
-                            title={
-                              <Space>
-                                <Tag>{event.actor_service || 'system'}</Tag>
-                                <Text>{event.event_type}</Text>
-                                <Text type="secondary">
-                                  {`${statusMap[event.from_status]?.label || event.from_status} -> ${statusMap[event.to_status]?.label || event.to_status}`}
-                                </Text>
-                              </Space>
-                            }
-                            description={
-                              <Space direction="vertical" size={2}>
-                                <Text type="secondary">{formatDateTime(event.created_at)}</Text>
-                                {event.payload && Object.keys(event.payload).length > 0 && (
-                                  <Text type="secondary">{JSON.stringify(event.payload)}</Text>
-                                )}
-                              </Space>
-                            }
-                          />
-                        </List.Item>
-                      )}
                     />
                   </Card>
                 </Space>

@@ -174,6 +174,10 @@ export const sellerOrderService = {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/sign-contract`)
     return response.data
   },
+  async attachContract(id: number, payload: { contract_no?: string; contract_url: string; contract_hash?: string }) {
+    const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/contract`, payload)
+    return response.data
+  },
   async confirmOutbound(id: number, payload: { pickup_code: string }) {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/confirm-outbound`, payload)
     return response.data
