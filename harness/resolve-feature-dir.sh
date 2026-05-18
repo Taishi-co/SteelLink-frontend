@@ -7,8 +7,10 @@ DEFAULT_FEATURE_DIR="${DEFAULT_FEATURE_DIR:-docs/features/SL-FE-GOV-PILOT}"
 
 strip_wrapping() {
   local value="$1"
-  value="${value#\`}"
-  value="${value%\`}"
+  local backtick
+  backtick="$(printf '\140')"
+  value="${value#${backtick}}"
+  value="${value%${backtick}}"
   value="${value#\"}"
   value="${value%\"}"
   printf '%s' "${value}"
@@ -31,34 +33,16 @@ if [[ -n "${FEATURE_ID:-}" ]]; then
 fi
 
 if [[ -n "${GITHUB_EVENT_PATH:-}" && -f "${GITHUB_EVENT_PATH}" ]]; then
-  parsed_feature_dir="$(
-    node - <<'NODE'
-const fs = require('fs')
-
-const eventPath = process.env.GITHUB_EVENT_PATH
-const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'))
-const body = event.pull_request?.body || event.issue?.body || ''
-
-const normalize = (value) => value.replace(/[`"]/g, '').trim()
-const pathMatch =
-  body.match(/Feature 文档:\s*([^\n\r]+)/i) ||
-  body.match(/docs\/features\/[A-Za-z0-9._-]+/i)
-
-if (pathMatch) {
-  const raw = normalize(pathMatch[1] || pathMatch[0])
-  const directPath = raw.match(/docs\/features\/[A-Za-z0-9._-]+/i)
-  if (directPath) {
-    process.stdout.write(directPath[0])
-    process.exit(0)
-  }
-}
-
-const idMatch = body.match(/Feature ID:\s*`?([A-Za-z0-9._-]+)`?/i)
-if (idMatch) {
-  process.stdout.write(`docs/features/${normalize(idMatch[1])}`)
-}
-NODE
+  event_body="$(
+    node -e 'const fs = require("fs"); const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8")); process.stdout.write((event.pull_request && event.pull_request.body) || (event.issue && event.issue.body) || "")'
   )"
+  parsed_feature_dir="$(printf '%s' "${event_body}" | grep -Eo 'docs/features/[A-Za-z0-9._-]+' | head -n 1 || true)"
+  if [[ -z "${parsed_feature_dir}" ]]; then
+    parsed_feature_id="$(printf '%s' "${event_body}" | sed -nE 's/.*Feature ID:[[:space:]]*"?([A-Za-z0-9._-]+)"?.*/\1/ip' | head -n 1 || true)"
+    if [[ -n "${parsed_feature_id}" ]]; then
+      parsed_feature_dir="docs/features/$(strip_wrapping "${parsed_feature_id}")"
+    fi
+  fi
 
   print_if_valid "${parsed_feature_dir}"
 fi
