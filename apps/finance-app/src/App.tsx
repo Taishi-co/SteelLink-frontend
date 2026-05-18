@@ -125,6 +125,7 @@ function App() {
   const [releaseModal, setReleaseModal] = useState<{ visible: boolean; orderId: number | null }>({ visible: false, orderId: null })
   const [releaseReason, setReleaseReason] = useState('')
   const [releaseVoucherURL, setReleaseVoucherURL] = useState('')
+  const [releaseAmount, setReleaseAmount] = useState<number | null>(null)
   const [collateralReceiptModal, setCollateralReceiptModal] = useState<{ visible: boolean; record: CollateralMonitorInfo | null }>({ visible: false, record: null })
   const [collateralReceiptURL, setCollateralReceiptURL] = useState('')
   const [collateralReceiptRemark, setCollateralReceiptRemark] = useState('')
@@ -458,11 +459,13 @@ function App() {
       await financeOrderService.releasePledge(releaseModal.orderId, {
         reason: releaseReason,
         voucher_url: releaseVoucherURL || undefined,
+        release_amount: releaseAmount || undefined,
       })
       showCompleted('货权质押释放已完成', '释放事件已进入订单链路，可回工作台查看。', 'all')
       setReleaseModal({ visible: false, orderId: null })
       setReleaseReason('')
       setReleaseVoucherURL('')
+      setReleaseAmount(null)
       fetchAll()
     } catch {
       message.error('释放货权质押失败')
@@ -1929,6 +1932,7 @@ function App() {
               setReleaseModal({ visible: false, orderId: null })
               setReleaseReason('')
               setReleaseVoucherURL('')
+              setReleaseAmount(null)
             }}
             okText="释放质押"
           >
@@ -1936,6 +1940,10 @@ function App() {
               <div>
                 <Text>释放原因：</Text>
                 <Input value={releaseReason} onChange={(e) => setReleaseReason(e.target.value)} placeholder="必填" />
+              </div>
+              <div>
+                <Text>本次释放金额：</Text>
+                <InputNumber value={releaseAmount} onChange={(value) => setReleaseAmount(value)} min={0} precision={2} style={{ width: '100%' }} placeholder="不填则全额释放" />
               </div>
               <div>
                 <Text>释放凭证 URL：</Text>

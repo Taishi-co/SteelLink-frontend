@@ -646,6 +646,11 @@ export default function OrdersPage() {
   async function handleSignContract(order: SellerOrderInfo) {
     setActionLoading(true)
     try {
+      if (!order.contract_info?.contract_url) {
+        const contractURL = window.prompt('请输入已上传的买卖合同文件 URL')
+        if (!contractURL) return
+        await sellerOrderService.attachContract(order.id, { contract_url: contractURL })
+      }
       const detail = await sellerOrderService.signContract(order.id)
       setSelectedOrder(detail)
       setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
@@ -656,7 +661,7 @@ export default function OrdersPage() {
         message.success('卖方签署已完成，等待买方签署')
       }
     } catch (error: unknown) {
-      message.error(getErrorMessage(error, '签署合同失败'))
+      message.error(getErrorMessage(error, '上传/确认合同失败'))
     } finally {
       setActionLoading(false)
     }
@@ -823,7 +828,7 @@ export default function OrdersPage() {
           )}
           {record.status === 2 && !record.contract_info?.seller_signed && (
             <Button type="link" size="small" onClick={() => void openOrderDetail(record)}>
-              签署合同
+              上传合同
             </Button>
           )}
           {record.status === 4 && (
@@ -839,7 +844,7 @@ export default function OrdersPage() {
                 setActionLoading(true)
                 try {
                   const detail = await sellerOrderService.createLogisticsBidding(record.id, {
-                    freight_payer: 'buyer',
+                    freight_payer: 'seller',
                   })
                   showCompleted(
                     '物流竞价发起已完成',
@@ -1398,7 +1403,7 @@ export default function OrdersPage() {
               loading={actionLoading}
               onClick={() => selectedOrder && void handleSignContract(selectedOrder)}
             >
-              签署合同
+              上传合同
             </Button>
           ) : null,
           selectedOrder?.status === 4 && selectedOrder.payment_info?.voucher_url ? (
@@ -1450,7 +1455,7 @@ export default function OrdersPage() {
                 setActionLoading(true)
                 try {
                   const detail = await sellerOrderService.createLogisticsBidding(selectedOrder.id, {
-                    freight_payer: 'buyer',
+                    freight_payer: 'seller',
                   })
                   showCompleted(
                     '物流竞价发起已完成',

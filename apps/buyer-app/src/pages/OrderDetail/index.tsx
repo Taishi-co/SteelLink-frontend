@@ -868,15 +868,20 @@ export default function OrderDetailPage() {
   const handleSignContract = async () => {
     try {
       setSigning(true)
+      if (!order?.contract_info?.contract_url) {
+        const contractURL = window.prompt('请输入已上传的买卖合同文件 URL')
+        if (!contractURL) return
+        await orderService.attachContract(Number(id), { contract_url: contractURL })
+      }
       await orderService.signContract(Number(id))
-      showCompleted('合同签署已完成', '等待对方签署；双方签署后进入支付节点。', {
+      showCompleted('合同上传确认已完成', '等待对方确认；双方确认后进入支付节点。', {
         label: '留在详情跟进',
         onClick: () => undefined,
       })
       await queryClient.invalidateQueries({ queryKey: ['order-detail', id] })
       await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
     } catch (error: unknown) {
-      message.error(getErrorMessage(error, '签署失败'))
+      message.error(getErrorMessage(error, '上传/确认合同失败'))
     } finally {
       setSigning(false)
     }
@@ -1611,7 +1616,7 @@ export default function OrderDetailPage() {
                 )}
                 {order.status === 2 && !order.contract_info?.buyer_signed && (
                   <Button type="primary" loading={signing} onClick={handleSignContract}>
-                    签署合同
+                    上传合同
                   </Button>
                 )}
                 {order.status === 3 && (

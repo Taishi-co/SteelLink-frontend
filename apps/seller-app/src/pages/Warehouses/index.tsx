@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Space, Spin, Table, Tag, Typography, message } from 'antd'
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Form, Input, InputNumber, Modal, Space, Spin, Table, Tag, Typography, message } from 'antd'
+import { ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { getErrorMessage } from '@steellink/shared/utils'
 import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
@@ -30,10 +30,10 @@ export default function WarehousesPage() {
   const loadWarehouses = async () => {
     setLoading(true)
     try {
-      const response = await serviceOfferService.listMyWarehouses()
-      setWarehouses(response.data)
+      const response = await serviceOfferService.listWarehouses({ status: 2 })
+      setWarehouses(response.data.list)
     } catch (error) {
-      message.error(getErrorMessage(error, '仓库列表加载失败，请确认当前企业已开通销售能力'))
+      message.error(getErrorMessage(error, '仓库列表加载失败'))
     } finally {
       setLoading(false)
     }
@@ -55,22 +55,6 @@ export default function WarehousesPage() {
       ),
     [warehouses],
   )
-
-  const openCreate = () => {
-    setEditing(null)
-    form.resetFields()
-    form.setFieldsValue({
-      service_types: ['发货仓', '现货仓储'],
-      pledge_supervision: false,
-    })
-    setModalOpen(true)
-  }
-
-  const openEdit = (record: WarehouseServiceItem) => {
-    setEditing(record)
-    form.setFieldsValue(record)
-    setModalOpen(true)
-  }
 
   const closeModal = () => {
     setModalOpen(false)
@@ -95,16 +79,6 @@ export default function WarehousesPage() {
       message.error(getErrorMessage(error, '仓库保存失败'))
     } finally {
       setSubmitting(false)
-    }
-  }
-
-  const stopWarehouse = async (id: number) => {
-    try {
-      await serviceOfferService.deleteWarehouse(id)
-      message.success('仓库已停用')
-      await loadWarehouses()
-    } catch (error) {
-      message.error(getErrorMessage(error, '仓库停用失败'))
     }
   }
 
@@ -139,23 +113,6 @@ export default function WarehousesPage() {
         return <Tag color={meta.color}>{meta.text}</Tag>
       },
     },
-    {
-      title: '操作',
-      key: 'action',
-      width: 180,
-      render: (_, record) => (
-        <Space wrap>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-            编辑
-          </Button>
-          <Popconfirm title="确认停用仓库？" onConfirm={() => void stopWarehouse(record.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />}>
-              停用
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
   ]
 
   return (
@@ -167,9 +124,6 @@ export default function WarehousesPage() {
             <Button icon={<ReloadOutlined />} onClick={() => void loadWarehouses()}>
               刷新
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-              新增仓库
-            </Button>
           </Space>
         }
       >
@@ -177,8 +131,8 @@ export default function WarehousesPage() {
           className="mb-4"
           type="info"
           showIcon
-          message="仓库审核通过后才能绑定商品"
-          description="卖家可以维护自有发货仓库；新增或编辑后会进入平台审核。审核通过的仓库可在商品发布页选择，AI采购和订单会读取商品绑定的发货仓库。"
+          message="卖家端仅查看平台仓库"
+          description="仓库上架和库容维护由仓储方工作台处理；卖家可查看已审核仓库，并在商品或订单流程中选择可用仓储资源。"
         />
 
         <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
