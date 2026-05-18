@@ -1434,6 +1434,27 @@ function App() {
                       },
                     },
                     {
+                      title: '卖方释放申请',
+                      key: 'release_request',
+                      width: 220,
+                      render: (_: unknown, record: OrderInfo) => {
+                        const request = record.pledge_events
+                          ?.filter((event) => event.event_type === 'pledge_release_requested')
+                          .slice(-1)[0]
+                        if (!request) return <Text type="secondary">暂无申请</Text>
+                        return (
+                          <Space direction="vertical" size={2}>
+                            <Text>{`申请 ${request.release_amount?.toLocaleString() || 0}`}</Text>
+                            <Space size={8}>
+                              {request.order_voucher_url && <a href={request.order_voucher_url} target="_blank" rel="noreferrer">订单</a>}
+                              {request.repayment_voucher_url && <a href={request.repayment_voucher_url} target="_blank" rel="noreferrer">还款</a>}
+                            </Space>
+                            <Text type="secondary">{request.reason || ''}</Text>
+                          </Space>
+                        )
+                      },
+                    },
+                    {
                       title: '操作',
                       key: 'action',
                       width: 120,
@@ -1442,6 +1463,14 @@ function App() {
                         if (fs === 'pledged') {
                           return (
                             <Button type="primary" size="small" icon={<EditOutlined />} onClick={() => {
+                              const request = record.pledge_events
+                                ?.filter((event) => event.event_type === 'pledge_release_requested')
+                                .slice(-1)[0]
+                              if (request) {
+                                setReleaseAmount(request.release_amount || null)
+                                setReleaseReason(request.reason || '')
+                                setReleaseVoucherURL(request.repayment_voucher_url || '')
+                              }
                               setReleaseModal({ visible: true, orderId: record.id })
                             }}>
                               释放质押

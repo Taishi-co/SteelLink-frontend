@@ -86,6 +86,73 @@ export interface SellerOrderInfo {
   }
   logistics_quotes?: LogisticsQuoteInfo[]
   shipment_task?: ShipmentTaskInfo
+  financing_info?: FinancingRequestInfo
+  pledge_events?: PledgeEventInfo[]
+  logistics_contract?: LogisticsContractInfo
+  logistics_settlement?: LogisticsSettlementInfo
+}
+
+export interface FinancingRequestInfo {
+  id: number
+  order_id: number
+  order_no: string
+  requested_amount: number
+  approved_amount: number
+  term_days: number
+  annual_rate: number
+  service_fee: number
+  status: string
+  risk_result?: string
+  risk_remark?: string
+  debt_contract_no?: string
+  debt_contract_url?: string
+  buyer_signed_at?: string
+  fee_voucher_url?: string
+  fee_paid_at?: string
+  disbursement_voucher?: string
+  disbursed_at?: string
+  pledge_voucher_url?: string
+  pledge_remark?: string
+  pledged_at?: string
+  release_condition?: string
+  release_reason?: string
+  released_at?: string
+}
+
+export interface PledgeEventInfo {
+  id: number
+  event_type: string
+  release_amount: number
+  condition?: string
+  reason?: string
+  order_voucher_url?: string
+  repayment_voucher_url?: string
+  voucher_url?: string
+  actor_enterprise_id: number
+  created_at: string
+}
+
+export interface LogisticsContractInfo {
+  contract_no: string
+  contract_url?: string
+  freight_amount: number
+  status: string
+  is_financing_order?: boolean
+  buyer_signed_at?: string
+  logistics_signed_at?: string
+  completed_at?: string
+}
+
+export interface LogisticsSettlementInfo {
+  settlement_no: string
+  freight_amount: number
+  platform_commission: number
+  net_payable: number
+  payment_voucher_url?: string
+  commission_voucher_url?: string
+  status: string
+  paid_at?: string
+  commission_paid_at?: string
 }
 
 export interface ShipmentTaskInfo {
@@ -204,6 +271,10 @@ export const sellerOrderService = {
   },
   async confirmLogisticsQuote(id: number, payload: { quote_id: number }) {
     const response = await api.post<unknown, ApiResponse<SellerOrderInfo>>(`/orders/${id}/logistics-confirm`, payload)
+    return response.data
+  },
+  async requestPledgeRelease(id: number, payload: { release_amount: number; order_voucher_url: string; repayment_voucher_url: string; reason?: string }) {
+    const response = await api.post<unknown, ApiResponse<PledgeEventInfo>>(`/orders/${id}/pledges/release-requests`, payload)
     return response.data
   },
   async reconcile(id: number) {

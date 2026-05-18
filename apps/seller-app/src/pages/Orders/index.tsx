@@ -6,6 +6,7 @@ import {
   Descriptions,
   Form,
   Input,
+  InputNumber,
   Modal,
   Radio,
   Select,
@@ -439,6 +440,11 @@ export default function OrdersPage() {
     logisticsOrderId: number | null
   }>({ visible: false, order: null, logisticsOrderId: null })
   const [pickupInstructionForm] = Form.useForm()
+  const [pledgeReleaseModal, setPledgeReleaseModal] = useState<{
+    visible: boolean
+    order: SellerOrderInfo | null
+  }>({ visible: false, order: null })
+  const [pledgeReleaseForm] = Form.useForm()
 
   const loadOrders = useCallback(async () => {
     setLoading(true)
@@ -675,6 +681,31 @@ export default function OrdersPage() {
   async function handleConfirmOutbound(order: SellerOrderInfo) {
     setConfirmAction({ type: 'outbound', order })
     setConfirmInput('')
+  }
+
+  async function handleRequestPledgeRelease() {
+    if (!pledgeReleaseModal.order) return
+    try {
+      const values = await pledgeReleaseForm.validateFields()
+      setActionLoading(true)
+      await sellerOrderService.requestPledgeRelease(pledgeReleaseModal.order.id, {
+        release_amount: Number(values.release_amount),
+        order_voucher_url: values.order_voucher_url,
+        repayment_voucher_url: values.repayment_voucher_url,
+        reason: values.reason,
+      })
+      const detail = await sellerOrderService.getById(pledgeReleaseModal.order.id)
+      message.success('质押释放申请已提交给资金方')
+      setSelectedOrder(detail)
+      setOrders((prev) => prev.map((item) => (item.id === detail.id ? detail : item)))
+      setPledgeReleaseModal({ visible: false, order: null })
+      pledgeReleaseForm.resetFields()
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'errorFields' in error) return
+      message.error(getErrorMessage(error, '提交释放申请失败'))
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   async function executeConfirmAction() {
@@ -992,6 +1023,14 @@ export default function OrdersPage() {
   const selectedGuidance = getSellerGuidance(selectedOrder)
   const selectedFulfillmentLogistics = fulfillmentSummary?.logistics_orders?.[0]
   const selectedFulfillmentMovement = fulfillmentSummary?.warehouse_movements?.[0]
+  const selectedReleasedAmount =
+    selectedOrder?.pledge_events
+      ?.filter((event) => ['pledge_released', 'pledge_partially_released'].includes(event.event_type))
+      .reduce((sum, event) => sum + Number(event.release_amount || 0), 0) || 0
+  const selectedRemainingPledgeAmount = Math.max(
+    0,
+    Number(selectedOrder?.financing_info?.approved_amount || 0) - selectedReleasedAmount
+  )
   const pickupInstructionReady = Boolean(
     selectedFulfillmentLogistics?.status_requirements?.find(
       (item) => item.status === 'pickup_scheduled'
@@ -1443,6 +1482,21 @@ export default function OrdersPage() {
               上传提货指令
             </Button>
           ) : null,
+          selectedOrder?.financing_info?.status === 'pledged' ? (
+            <Button
+              key="pledge-release-request"
+              loading={actionLoading}
+              onClick={() => {
+                if (!selectedOrder) return
+                pledgeReleaseForm.setFieldsValue({
+                  release_amount: selectedRemainingPledgeAmount || selectedOrder.financing_info?.approved_amount,
+                })
+                setPledgeReleaseModal({ visible: true, order: selectedOrder })
+              }}
+            >
+              申请释放质押
+            </Button>
+          ) : null,
           selectedOrder?.status === 4 ||
           selectedOrder?.status === 5 ||
           selectedOrder?.status === 25 ? (
@@ -1657,6 +1711,139 @@ export default function OrdersPage() {
                 )}
               </Descriptions.Item>
             </Descriptions>
+
+            {selectedOrder.financing_info && (
+              <Card title="托盘融资与质押" size="small" style={{ marginTop: 16 }}>
+                <Descriptions bordered column={2} size="small">
+                  <Descriptions.Item label="融资状态">
+                    <Tag color={selectedOrder.financing_info.status === 'released' ? 'success' : 'purple'}>
+                      {selectedOrder.financing_info.status}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="授信金额">
+                    {formatCurrency(selectedOrder.financing_info.approved_amount || selectedOrder.financing_info.requested_amount)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="账期/年化">
+                    {selectedOrder.financing_info.term_days || '-'} 天 / {selectedOrder.financing_info.annual_rate || '-'}%
+                  </Descriptions.Item>
+                  <Descriptions.Item label="手续费">
+                    {formatCurrency(selectedOrder.financing_info.service_fee || 0)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="债务合同">
+                    {selectedOrder.financing_info.debt_contract_url ? (
+                      <a href={selectedOrder.financing_info.debt_contract_url} target="_blank" rel="noreferrer">
+                        {selectedOrder.financing_info.debt_contract_no || '查看合同'}
+                      </a>
+                    ) : (
+                      selectedOrder.financing_info.debt_contract_no || '-'
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="资方放款凭证">
+                    {selectedOrder.financing_info.disbursement_voucher ? (
+                      <a href={selectedOrder.financing_info.disbursement_voucher} target="_blank" rel="noreferrer">
+                        查看凭证
+                      </a>
+                    ) : (
+                      '-'
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="质押凭证">
+                    {selectedOrder.financing_info.pledge_voucher_url ? (
+                      <a href={selectedOrder.financing_info.pledge_voucher_url} target="_blank" rel="noreferrer">
+                        查看凭证
+                      </a>
+                    ) : (
+                      '-'
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="剩余可释放">
+                    {formatCurrency(selectedRemainingPledgeAmount)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="释放条件" span={2}>
+                    {selectedOrder.financing_info.release_condition || '-'}
+                  </Descriptions.Item>
+                </Descriptions>
+
+                {selectedOrder.pledge_events?.length ? (
+                  <div style={{ marginTop: 12 }}>
+                    <Text strong>释放申请/释放记录</Text>
+                    <div style={{ marginTop: 8 }}>
+                      {selectedOrder.pledge_events.map((event) => (
+                        <Card key={event.id} size="small" style={{ marginBottom: 8 }}>
+                          <Descriptions bordered column={2} size="small">
+                            <Descriptions.Item label="类型">
+                              {event.event_type === 'pledge_release_requested' ? '卖方申请释放' : '资方确认释放'}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="金额">
+                              {formatCurrency(event.release_amount || 0)}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="销售订单">
+                              {event.order_voucher_url ? (
+                                <a href={event.order_voucher_url} target="_blank" rel="noreferrer">查看订单</a>
+                              ) : '-'}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="还款凭证">
+                              {event.repayment_voucher_url ? (
+                                <a href={event.repayment_voucher_url} target="_blank" rel="noreferrer">查看还款</a>
+                              ) : event.voucher_url ? (
+                                <a href={event.voucher_url} target="_blank" rel="noreferrer">查看释放凭证</a>
+                              ) : '-'}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="说明" span={2}>{event.reason || '-'}</Descriptions.Item>
+                            <Descriptions.Item label="时间" span={2}>{formatDate(event.created_at)}</Descriptions.Item>
+                          </Descriptions>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </Card>
+            )}
+
+            {selectedOrder.logistics_contract && (
+              <Card title="物流合同与结算" size="small" style={{ marginTop: 16 }}>
+                <Descriptions bordered column={2} size="small">
+                  <Descriptions.Item label="物流合同号">
+                    {selectedOrder.logistics_contract.contract_no || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="合同状态">
+                    {selectedOrder.logistics_contract.status || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="运费金额">
+                    {formatCurrency(selectedOrder.logistics_contract.freight_amount || 0)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="合同文件">
+                    {selectedOrder.logistics_contract.contract_url ? (
+                      <a href={selectedOrder.logistics_contract.contract_url} target="_blank" rel="noreferrer">查看合同</a>
+                    ) : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="发起方签署">
+                    {formatDate(selectedOrder.logistics_contract.buyer_signed_at)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="物流方签署">
+                    {formatDate(selectedOrder.logistics_contract.logistics_signed_at)}
+                  </Descriptions.Item>
+                </Descriptions>
+                {selectedOrder.logistics_settlement && (
+                  <Descriptions bordered column={2} size="small" style={{ marginTop: 12 }}>
+                    <Descriptions.Item label="结算单号">
+                      {selectedOrder.logistics_settlement.settlement_no}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="结算状态">
+                      {selectedOrder.logistics_settlement.status}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="实付运费">
+                      {formatCurrency(selectedOrder.logistics_settlement.net_payable || 0)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="运费支付凭证">
+                      {selectedOrder.logistics_settlement.payment_voucher_url ? (
+                        <a href={selectedOrder.logistics_settlement.payment_voucher_url} target="_blank" rel="noreferrer">查看凭证</a>
+                      ) : '-'}
+                    </Descriptions.Item>
+                  </Descriptions>
+                )}
+              </Card>
+            )}
 
             <Descriptions bordered column={2} size="middle" style={{ marginTop: 16 }}>
               <Descriptions.Item label="提货司机">
@@ -2042,6 +2229,57 @@ export default function OrdersPage() {
           </Form.Item>
           <Form.Item name="remark" label="备注">
             <Input.TextArea rows={3} placeholder="选填，例如提货窗口、联系人或特殊装车要求" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="申请释放货权质押"
+        open={pledgeReleaseModal.visible}
+        onOk={() => void handleRequestPledgeRelease()}
+        onCancel={() => {
+          setPledgeReleaseModal({ visible: false, order: null })
+          pledgeReleaseForm.resetFields()
+        }}
+        okText="提交申请"
+        confirmLoading={actionLoading}
+        destroyOnHidden
+      >
+        <Form form={pledgeReleaseForm} layout="vertical">
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="上传销售订单和还款凭证后，资金方可按本次金额部分释放货权。"
+          />
+          <Form.Item
+            name="release_amount"
+            label="本次申请释放金额"
+            rules={[{ required: true, message: '请输入释放金额' }]}
+          >
+            <InputNumber
+              min={0.01}
+              precision={2}
+              style={{ width: '100%' }}
+              placeholder={`剩余可释放 ${formatCurrency(selectedRemainingPledgeAmount)}`}
+            />
+          </Form.Item>
+          <Form.Item
+            name="order_voucher_url"
+            label="销售订单文件 URL"
+            rules={[{ required: true, message: '请输入销售订单文件 URL' }]}
+          >
+            <Input placeholder="https://..." />
+          </Form.Item>
+          <Form.Item
+            name="repayment_voucher_url"
+            label="还款凭证 URL"
+            rules={[{ required: true, message: '请输入还款凭证 URL' }]}
+          >
+            <Input placeholder="https://..." />
+          </Form.Item>
+          <Form.Item name="reason" label="申请说明">
+            <Input.TextArea rows={3} placeholder="例如本笔销售订单已回款并完成对应还款，申请部分释放货权" />
           </Form.Item>
         </Form>
       </Modal>

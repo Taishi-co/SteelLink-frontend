@@ -58,9 +58,21 @@ export interface OrderInfo {
     release_condition?: string
     status: string
   }
+  pledge_events?: PledgeEventInfo[]
 }
 
 export type FinancingRequestInfo = NonNullable<OrderInfo['financing_info']>
+
+export interface PledgeEventInfo {
+  id: number
+  event_type: string
+  release_amount: number
+  reason?: string
+  order_voucher_url?: string
+  repayment_voucher_url?: string
+  voucher_url?: string
+  created_at: string
+}
 
 export interface WarehouseInventorySnapshotInfo {
   id: number
