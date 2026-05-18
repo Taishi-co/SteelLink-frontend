@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Col, Form, Input, InputNumber, Layout, List, Modal, Row, Space, Spin, Steps, Table, Tag, Typography, message } from 'antd'
+import { Badge, Button, Card, Col, Form, Input, InputNumber, Layout, List, Modal, Row, Select, Space, Spin, Steps, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   AuditOutlined,
@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons'
 import { financeOrderService } from '@/services/orderService'
 import type { CollateralMonitorInfo, OrderInfo, WarehouseReceiptPledgeInfo } from '@/services/orderService'
-import { financeService, type FinanceServiceItem } from '@/services/financeService'
+import { financeService, type AuthorizedWarehouseInfo, type FinanceServiceItem, type WarehouseServiceItem } from '@/services/financeService'
 import { hasFinanceCapability, saveFinanceToken } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
@@ -82,6 +82,9 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('products')
   const [productForm] = Form.useForm()
   const [financeProducts, setFinanceProducts] = useState<FinanceServiceItem[]>([])
+  const [warehouseCandidates, setWarehouseCandidates] = useState<WarehouseServiceItem[]>([])
+  const [authorizedWarehouses, setAuthorizedWarehouses] = useState<Record<number, AuthorizedWarehouseInfo[]>>({})
+  const [selectedWarehouseByProduct, setSelectedWarehouseByProduct] = useState<Record<number, number | undefined>>({})
   const [productLoading, setProductLoading] = useState(false)
   const [creatingProduct, setCreatingProduct] = useState(false)
   const [editingProduct, setEditingProduct] = useState<FinanceServiceItem | null>(null)
@@ -193,12 +196,52 @@ function App() {
   const fetchProducts = async () => {
     setProductLoading(true)
     try {
-      const list = await financeService.listMine()
-      setFinanceProducts(list || [])
+      const [list, warehouseResult] = await Promise.all([
+        financeService.listMine(),
+        financeService.listWarehouses(),
+      ])
+      const products = list || []
+      setFinanceProducts(products)
+      setWarehouseCandidates((warehouseResult?.list || []).filter((item) => item.status === 2 && item.pledge_supervision))
+      const authPairs = await Promise.all(products.map(async (item) => {
+        try {
+          const result = await financeService.listAuthorizedWarehouses(item.id)
+          return [item.id, result.list || []] as const
+        } catch {
+          return [item.id, []] as const
+        }
+      }))
+      setAuthorizedWarehouses(Object.fromEntries(authPairs))
     } catch {
       message.error('获取金融产品失败')
     } finally {
       setProductLoading(false)
+    }
+  }
+
+  const handleAuthorizeWarehouse = async (product: FinanceServiceItem) => {
+    const warehouseId = selectedWarehouseByProduct[product.id]
+    if (!warehouseId) {
+      message.warning('请选择监管仓库')
+      return
+    }
+    try {
+      await financeService.authorizeWarehouse(product.id, warehouseId)
+      message.success('监管仓认证成功')
+      setSelectedWarehouseByProduct({ ...selectedWarehouseByProduct, [product.id]: undefined })
+      fetchProducts()
+    } catch {
+      message.error('监管仓认证失败')
+    }
+  }
+
+  const handleRevokeWarehouse = async (auth: AuthorizedWarehouseInfo) => {
+    try {
+      await financeService.revokeWarehouse(auth.id)
+      message.success('已撤销监管仓认证')
+      fetchProducts()
+    } catch {
+      message.error('撤销失败')
     }
   }
 
@@ -761,6 +804,15 @@ function App() {
     },
     { title: '手续费规则', dataIndex: 'fee_rule', key: 'fee_rule', width: 180, render: (v?: string) => v || '-' },
     {
+      title: '监管仓',
+      key: 'authorized_warehouses',
+      width: 120,
+      render: (_: unknown, row) => {
+        const count = authorizedWarehouses[row.id]?.length ?? row.authorized_warehouse_ids?.length ?? 0
+        return count > 0 ? <Tag color="purple">已认证 {count}</Tag> : <Tag>未认证</Tag>
+      },
+    },
+    {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
@@ -783,6 +835,52 @@ function App() {
       ),
     },
   ]
+
+  const renderAuthorizedWarehousePanel = (record: FinanceServiceItem) => {
+    const records = authorizedWarehouses[record.id] || []
+    const warehouseById = new Map(warehouseCandidates.map((item) => [item.id, item]))
+    const authorizedIDs = new Set(records.map((item) => item.warehouse_service_id))
+    const options = warehouseCandidates
+      .filter((item) => !authorizedIDs.has(item.id))
+      .map((item) => ({
+        value: item.id,
+        label: `${item.warehouse_name} · ${[item.province, item.city, item.district].filter(Boolean).join('') || item.address || '-'}`,
+      }))
+    return (
+      <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        <Text type="secondary">将平台已审核且支持质押监管的仓库认证为该金融产品的监管仓。买方选择该监管仓收货时，只能选择对应授权的金融产品。</Text>
+        <Space wrap>
+          <Select
+            showSearch
+            allowClear
+            style={{ minWidth: 320 }}
+            placeholder="选择支持质押监管的仓库"
+            options={options}
+            value={selectedWarehouseByProduct[record.id]}
+            optionFilterProp="label"
+            onChange={(value) => setSelectedWarehouseByProduct({ ...selectedWarehouseByProduct, [record.id]: value })}
+          />
+          <Button type="primary" disabled={!selectedWarehouseByProduct[record.id]} onClick={() => handleAuthorizeWarehouse(record)}>
+            认证监管仓
+          </Button>
+        </Space>
+        {records.length > 0 ? (
+          <Space wrap>
+            {records.map((auth) => {
+              const warehouse = warehouseById.get(auth.warehouse_service_id)
+              return (
+                <Tag key={auth.id} color="purple" closable onClose={(event) => { event.preventDefault(); handleRevokeWarehouse(auth) }}>
+                  {warehouse?.warehouse_name || `仓库 #${auth.warehouse_service_id}`}
+                </Tag>
+              )
+            })}
+          </Space>
+        ) : (
+          <Text type="secondary">暂无已认证监管仓。</Text>
+        )}
+      </Space>
+    )
+  }
 
   const warehouseReceiptPledgeColumns: ColumnsType<WarehouseReceiptPledgeInfo> = [
     { title: '申请号', dataIndex: 'application_no', key: 'application_no', width: 170 },
@@ -1124,7 +1222,15 @@ function App() {
                 <Col xs={24} xl={15}>
                   <Card title="我的金融产品">
                     <Spin spinning={productLoading}>
-                      <Table columns={productColumns} dataSource={financeProducts} rowKey="id" pagination={{ pageSize: 8 }} scroll={{ x: 940 }} locale={{ emptyText: '暂无金融产品' }} />
+                      <Table
+                        columns={productColumns}
+                        dataSource={financeProducts}
+                        rowKey="id"
+                        pagination={{ pageSize: 8 }}
+                        scroll={{ x: 1060 }}
+                        locale={{ emptyText: '暂无金融产品' }}
+                        expandable={{ expandedRowRender: renderAuthorizedWarehousePanel }}
+                      />
                     </Spin>
                   </Card>
                 </Col>
