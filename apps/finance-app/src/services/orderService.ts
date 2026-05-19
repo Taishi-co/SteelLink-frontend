@@ -265,6 +265,11 @@ export const financeOrderService = {
   },
 
   async confirmCollateralReceipt(logisticsOrderId: number, payload: { receipt_url: string; remark?: string }) {
+    await api.post<unknown, ApiResponse<unknown>>(`/logistics/orders/${logisticsOrderId}/documents`, {
+      doc_type: 'receipt_order',
+      file_url: payload.receipt_url,
+      remark: payload.remark || '资金方确认监管收货',
+    })
     const response = await api.put<unknown, ApiResponse<unknown>>(`/logistics/orders/${logisticsOrderId}/status`, {
       status: 'receipt_signed',
       remark: payload.remark,
