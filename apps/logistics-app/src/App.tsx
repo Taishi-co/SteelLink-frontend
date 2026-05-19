@@ -1009,7 +1009,7 @@ function App() {
                           }
                           if (status === 'pickup_scheduled' || status === 'accepted') return { label: '等待仓储到场确认', next: 'arrival_signed_in', externalAction: true }
                           if (status === 'arrival_signed_in') return { label: '等待仓储出库确认', next: 'outbound_confirmed', externalAction: true }
-                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed', docs: ['loading_voucher'] }
+                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed', docs: ['loading_voucher', 'seal_photo'] }
                           if (status === 'loading_confirmed') return { label: '发车', next: 'in_transit', docs: ['gps_track'] }
                           if (status === 'in_transit') return { label: '到货确认', next: 'arrival_confirmed', docs: ['delivery_photo'] }
                           if (status === 'arrival_confirmed') return { label: '等待收货仓验货入库', next: 'inbound_completed', externalAction: true }

@@ -923,7 +923,7 @@ function App() {
                               type="primary"
                               onClick={() => openLogisticsModal(record, 'outbound_confirmed', '确认出库', ['outbound_order', 'seal_photo'])}
                             >
-                              上传出库/封条并确认
+                              上传出库/封条商品照并确认
                             </Button>
                           )
                         }
@@ -934,7 +934,7 @@ function App() {
                               type="primary"
                               onClick={() => openLogisticsModal(record, 'inbound_completed', '收货仓验货入库', ['seal_photo', 'inbound_order', 'receipt_order'])}
                             >
-                              上传封条/入库/收货单
+                              上传封条商品照/入库/收货单
                             </Button>
                           )
                         }
