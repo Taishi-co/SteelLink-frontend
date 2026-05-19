@@ -107,6 +107,22 @@ export interface LogisticsOrder {
   created_at: string
 }
 
+export interface FulfillmentDocumentInfo {
+  id: number
+  logistics_order_id: number
+  order_id: number
+  doc_type: string
+  file_url: string
+  remark?: string
+  gps_latitude?: number
+  gps_longitude?: number
+  captured_at?: string
+  uploaded_by: number
+  enterprise_id: number
+  uploaded_role: string
+  created_at: string
+}
+
 export interface LogisticsContractInfo {
   id: number
   contract_no: string
@@ -275,6 +291,13 @@ export const logisticsFulfillmentService = {
       payload
     )
     return response.data
+  },
+
+  async listDocuments(id: number) {
+    const response = await api.get<unknown, ApiResponse<{ list: FulfillmentDocumentInfo[] }>>(
+      `/logistics/orders/${id}/documents`
+    )
+    return response.data.list
   },
 
   async addTrackingEvent(

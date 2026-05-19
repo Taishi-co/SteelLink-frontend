@@ -810,6 +810,10 @@ export default function OrderDetailPage() {
   }
 
   const handleConfirmReceipt = async () => {
+    if (isFinancingOrder) {
+      message.warning('托盘垫资订单由资金方确认监管收货并上传凭证')
+      return
+    }
     try {
       const values = await receiptForm.validateFields()
       setConfirmingReceipt(true)
@@ -1823,7 +1827,10 @@ export default function OrderDetailPage() {
                   </span>
                 )}
 
-                {(order.status === 6 || order.status === 7) && (
+                {(order.status === 6 || order.status === 7) && isFinancingOrder && (
+                  <Tag color="gold">托盘垫资订单由资金方确认收货并上传凭证</Tag>
+                )}
+                {(order.status === 6 || order.status === 7) && !isFinancingOrder && (
                   <Button
                     type="primary"
                     icon={<CheckCircleOutlined />}

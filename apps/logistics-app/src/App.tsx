@@ -38,7 +38,7 @@ import {
   FileTextOutlined,
 } from '@ant-design/icons'
 import { logisticsOrderService, logisticsFulfillmentService } from '@/services/orderService'
-import type { OrderInfo, LogisticsOrder } from '@/services/orderService'
+import type { OrderInfo, LogisticsOrder, FulfillmentDocumentInfo } from '@/services/orderService'
 import { logisticsResourceService } from '@/services/logisticsResourceService'
 import type {
   LogisticsResource,
@@ -121,7 +121,12 @@ function App() {
     label: '',
     requiredDocs: [],
   })
+  const [statusDocuments, setStatusDocuments] = useState<FulfillmentDocumentInfo[]>([])
+  const [statusDocumentsLoading, setStatusDocumentsLoading] = useState(false)
   const [statusForm] = Form.useForm<Record<string, string>>()
+  const pickupInstructionDocs = statusDocuments.filter(
+    (doc) => doc.doc_type === 'pickup_instruction' && doc.uploaded_role === 'seller'
+  )
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -392,9 +397,32 @@ function App() {
     }
   }
 
+  const loadStatusDocuments = async (logisticsOrderId: number) => {
+    setStatusDocumentsLoading(true)
+    try {
+      const docs = await logisticsFulfillmentService.listDocuments(logisticsOrderId)
+      setStatusDocuments(docs)
+    } catch {
+      setStatusDocuments([])
+      message.error('获取履约单据失败')
+    } finally {
+      setStatusDocumentsLoading(false)
+    }
+  }
+
+  const resetStatusModal = () => {
+    setStatusModal({ visible: false, order: null, nextStatus: '', label: '', requiredDocs: [] })
+    setStatusDocuments([])
+    setStatusDocumentsLoading(false)
+  }
+
   const openStatusModal = (order: LogisticsOrder, nextStatus: string, label: string, requiredDocs: string[] = []) => {
     setStatusModal({ visible: true, order, nextStatus, label, requiredDocs })
+    setStatusDocuments([])
     statusForm.resetFields()
+    if (nextStatus === 'pickup_scheduled') {
+      void loadStatusDocuments(order.id)
+    }
   }
 
   const handleStatusSubmit = async () => {
@@ -415,7 +443,7 @@ function App() {
         status: statusModal.nextStatus,
       })
       message.success('物流节点已更新')
-      setStatusModal({ visible: false, order: null, nextStatus: '', label: '', requiredDocs: [] })
+      resetStatusModal()
       fetchLogisticsOrders()
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
@@ -981,7 +1009,7 @@ function App() {
                           }
                           if (status === 'pickup_scheduled' || status === 'accepted') return { label: '等待仓储到场确认', next: 'arrival_signed_in', externalAction: true }
                           if (status === 'arrival_signed_in') return { label: '等待仓储出库确认', next: 'outbound_confirmed', externalAction: true }
-                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed', docs: ['loading_voucher'] }
+                          if (status === 'outbound_confirmed') return { label: '装货确认', next: 'loading_confirmed', docs: ['loading_voucher', 'seal_photo'] }
                           if (status === 'loading_confirmed') return { label: '发车', next: 'in_transit', docs: ['gps_track'] }
                           if (status === 'in_transit') return { label: '到货确认', next: 'arrival_confirmed', docs: ['delivery_photo'] }
                           if (status === 'arrival_confirmed') return { label: '等待收货仓验货入库', next: 'inbound_completed', externalAction: true }
@@ -1446,18 +1474,57 @@ function App() {
             title={`推进节点：${statusModal.label || '--'}`}
             open={statusModal.visible}
             onOk={handleStatusSubmit}
-            onCancel={() => setStatusModal({ visible: false, order: null, nextStatus: '', label: '', requiredDocs: [] })}
+            onCancel={resetStatusModal}
             okText="上传并推进"
           >
             <Form form={statusForm} layout="vertical">
               {statusModal.nextStatus === 'pickup_scheduled' && (
-                <Alert
-                  type="info"
-                  showIcon
-                  message="需先读取卖方提货指令"
-                  description="卖方上传提货单/提货指令后才能预约提货；如果没有文件 URL，请联系卖方补传。"
-                  style={{ marginBottom: 16 }}
-                />
+                <Space direction="vertical" size="middle" style={{ width: '100%', marginBottom: 16 }}>
+                  <Alert
+                    type="info"
+                    showIcon
+                    message="需先读取卖方提货指令"
+                    description="卖方上传提货单/提货指令后才能预约提货；请先核对提货仓库、联系人、预约窗口和装车要求。"
+                  />
+                  <Spin spinning={statusDocumentsLoading}>
+                    {pickupInstructionDocs.length ? (
+                      <List
+                        size="small"
+                        bordered
+                        dataSource={pickupInstructionDocs}
+                        renderItem={(doc) => (
+                          <List.Item
+                            actions={[
+                              <a key="open" href={doc.file_url} target="_blank" rel="noreferrer">
+                                查看文件
+                              </a>,
+                            ]}
+                          >
+                            <List.Item.Meta
+                              avatar={<FileTextOutlined />}
+                              title="卖方提货单/提货指令"
+                              description={
+                                <Space direction="vertical" size={0}>
+                                  <Text type="secondary">{doc.remark || '无备注'}</Text>
+                                  <Text type="secondary">
+                                    上传时间：{doc.created_at ? new Date(doc.created_at).toLocaleString() : '--'}
+                                  </Text>
+                                </Space>
+                              }
+                            />
+                          </List.Item>
+                        )}
+                      />
+                    ) : (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        message="暂未读取到卖方提货指令"
+                        description="如果列表仍显示可预约，请刷新后重试；否则联系卖方补传提货单。"
+                      />
+                    )}
+                  </Spin>
+                </Space>
               )}
               {statusModal.requiredDocs.length === 0 ? (
                 <Paragraph type="secondary">该节点无需补充单据，确认后会直接推进物流状态。</Paragraph>

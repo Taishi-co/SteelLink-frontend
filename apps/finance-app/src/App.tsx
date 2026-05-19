@@ -147,6 +147,15 @@ function App() {
   
   const [expandedFinanceOrders, setExpandedFinanceOrders] = useState<number[]>([])
 
+  const findCollateralRecord = (orderId: number) =>
+    collateralList.find((item) => item.order_id === orderId)
+
+  const openCollateralReceiptModal = (record: CollateralMonitorInfo) => {
+    setCollateralReceiptURL('')
+    setCollateralReceiptRemark('')
+    setCollateralReceiptModal({ visible: true, record })
+  }
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const token = urlParams.get('token')
@@ -261,8 +270,12 @@ function App() {
   const fetchAll = async () => {
     setLoading(true)
     try {
-      const list = await financeOrderService.listAll()
+      const [list, collateral] = await Promise.all([
+        financeOrderService.listAll(),
+        financeOrderService.listCollateralMonitor(),
+      ])
       setAllOrders(list || [])
+      setCollateralList(collateral || [])
     } catch {
       message.error('获取订单列表失败')
     } finally {
@@ -782,7 +795,16 @@ function App() {
       render: (_: unknown, record: OrderInfo) => {
         const status = record.financing_info?.status
         if (status === 'disbursed') {
-          return <Text type="secondary">待物流入监管仓</Text>
+          const collateral = findCollateralRecord(record.id)
+          if (collateral?.logistics_status === 'inbound_completed') {
+            return (
+              <Button size="small" type="primary" onClick={() => openCollateralReceiptModal(collateral)}>
+                确认收货并质押
+              </Button>
+            )
+          }
+          if (collateral?.logistics_order_id) return <Text type="secondary">待收货仓入库</Text>
+          return <Text type="secondary">待发起物流</Text>
         }
         if (status === 'pledged') {
           return <Button size="small" onClick={() => setReleaseModal({ visible: true, orderId: record.id })}>释放质押</Button>
@@ -1385,7 +1407,16 @@ function App() {
                       render: (_: unknown, record: OrderInfo) => {
                         const fs = record.financing_info?.status
                         if (fs === 'disbursed') {
-                          return <Text type="secondary">到仓后在货权监控确认</Text>
+                          const collateral = findCollateralRecord(record.id)
+                          if (collateral?.logistics_status === 'inbound_completed') {
+                            return (
+                              <Button size="small" type="primary" onClick={() => openCollateralReceiptModal(collateral)}>
+                                确认收货并质押
+                              </Button>
+                            )
+                          }
+                          if (collateral?.logistics_order_id) return <Text type="secondary">待收货仓入库</Text>
+                          return <Text type="secondary">待发起物流</Text>
                         }
                         return <Text type="secondary">--</Text>
                       },
@@ -1703,7 +1734,7 @@ function App() {
                           if (record.financing_status !== 'disbursed') return <Text type="secondary">--</Text>
                           if (record.logistics_status !== 'inbound_completed') return <Text type="secondary">待收货仓入库</Text>
                           return (
-                            <Button size="small" type="primary" onClick={() => setCollateralReceiptModal({ visible: true, record })}>
+                            <Button size="small" type="primary" onClick={() => openCollateralReceiptModal(record)}>
                               确认收货并质押
                             </Button>
                           )
