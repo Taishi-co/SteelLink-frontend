@@ -314,7 +314,8 @@ function getStatusNotice(
   status: number,
   _hasPaymentVoucher: boolean,
   _hasDeliveryInfo: boolean,
-  contractInfo?: { buyer_signed: boolean; seller_signed: boolean }
+  contractInfo?: { buyer_signed: boolean; seller_signed: boolean },
+  isFinancingOrder = false
 ) {
   if (status === 1) {
     return {
@@ -424,8 +425,10 @@ function getStatusNotice(
   if (status === 4) {
     return {
       type: 'success' as const,
-      title: '当前状态：支付/监管已完成',
-      message: '下一步：等待卖方发起物流竞价。',
+      title: isFinancingOrder ? '当前状态：资方付款已完成' : '当前状态：支付已完成',
+      message: isFinancingOrder
+        ? '下一步：发起物流竞价并送达监管仓，随后由资金方确认收货完成质押。'
+        : '下一步：等待卖方发起物流竞价。',
     }
   }
   if (status === 16) {
@@ -657,7 +660,8 @@ export default function OrderDetailPage() {
     order?.status || 0,
     Boolean(order?.payment_info?.voucher_url),
     Boolean(order?.delivery_info?.pickup_code),
-    order?.contract_info
+    order?.contract_info,
+    isFinancingOrder
   )
   const pickupWarehouseName =
     order?.delivery_info?.warehouse_name || productDetail?.warehouseInfo?.warehouse_name || ''
@@ -1468,12 +1472,15 @@ export default function OrderDetailPage() {
                 <Space direction="vertical" size="middle" className="w-full">
                   <Descriptions bordered column={2}>
                     <Descriptions.Item label="融资状态">
-                      {order.financing_info.status === 'pending' && '待审批'}
+                      {order.financing_info.status === 'submitted' && '待风控'}
                       {order.financing_info.status === 'risk_approved' && '风控通过'}
                       {order.financing_info.status === 'buyer_confirmed' && '买方已确认'}
                       {order.financing_info.status === 'contract_generated' && '合同已生成'}
-                      {order.financing_info.status === 'completed' && '已完成'}
-                      {order.financing_info.status === 'cancelled' && '已取消'}
+                      {order.financing_info.status === 'buyer_signed_fee_paid' && '待资方付款'}
+                      {order.financing_info.status === 'disbursed' && '资方已付款'}
+                      {order.financing_info.status === 'pledged' && '已完成质押'}
+                      {order.financing_info.status === 'released' && '已释放质押'}
+                      {order.financing_info.status === 'risk_rejected' && '已驳回'}
                     </Descriptions.Item>
                     <Descriptions.Item label="授信金额">
                       ¥{Number(order.financing_info.approved_amount || 0).toLocaleString()}
@@ -1505,11 +1512,14 @@ export default function OrderDetailPage() {
                       { key: 'applied', title: '申请提交', owner: '买方负责', hint: '提交融资申请，填写申请信息' },
                       { key: 'risk_review', title: '风控审批', owner: '资金方负责', hint: '资金方进行风控审核，给出授信额度' },
                       { key: 'buyer_confirm', title: '确认方案', owner: '买方负责', hint: '确认融资方案，同意授信条件' },
-                      { key: 'sign_contract', title: '签署合同', owner: '双方签署', hint: '签署债务质押合同，支付手续费' },
-                      { key: 'funded', title: '放款完成', owner: '资金方负责', hint: '资金方放款，订单进入支付完成状态' },
+                      { key: 'sign_contract', title: '上传合同', owner: '双方确认', hint: '上传债务质押合同，支付手续费' },
+                      { key: 'funded', title: '资方付款', owner: '资金方负责', hint: '付款凭证同步给卖方' },
+                      { key: 'logistics_collateral', title: '物流入仓', owner: '卖方/物流/仓储', hint: '付款后发起物流竞价并送达监管仓' },
+                      { key: 'pledged', title: '确认收货质押', owner: '资金方负责', hint: '资金方确认监管收货后完成质押' },
                     ].map((step, index) => {
-                      const statusOrder = ['pending', 'risk_approved', 'buyer_confirmed', 'contract_generated', 'completed']
-                      const currentStep = statusOrder.indexOf(order.financing_info!.status)
+                      const statusOrder = ['submitted', 'risk_approved', 'buyer_confirmed', 'contract_generated', 'buyer_signed_fee_paid', 'disbursed', 'logistics_collateral', 'pledged']
+                      const currentKey = order.financing_info!.status === 'disbursed' ? 'logistics_collateral' : order.financing_info!.status
+                      const currentStep = statusOrder.indexOf(currentKey)
                       const stepState =
                         index < currentStep
                           ? 'completed'

@@ -292,6 +292,21 @@ function formatStatus(status: number) {
   return statusMeta[status] ?? { color: 'default', text: `状态${status}` }
 }
 
+function formatFinancingStatus(status?: string) {
+  const map: Record<string, { color: string; text: string }> = {
+    submitted: { color: 'processing', text: '待风控' },
+    risk_approved: { color: 'cyan', text: '风控通过' },
+    buyer_confirmed: { color: 'blue', text: '买方已确认' },
+    contract_generated: { color: 'gold', text: '合同已生成' },
+    buyer_signed_fee_paid: { color: 'purple', text: '待资方付款' },
+    disbursed: { color: 'green', text: '资方已付款' },
+    pledged: { color: 'cyan', text: '已完成质押' },
+    released: { color: 'success', text: '已释放质押' },
+    risk_rejected: { color: 'red', text: '已驳回' },
+  }
+  return map[status || ''] ?? { color: 'default', text: status || '-' }
+}
+
 function formatDate(value?: string) {
   if (!value) {
     return '-'
@@ -363,8 +378,10 @@ function getSellerGuidance(order?: SellerOrderInfo | null) {
   if (order.status === 4)
     return {
       type: 'warning' as const,
-      title: '当前状态：买方支付已完成',
-      next: '请确认收款；之后发起物流竞价。',
+      title: order.financing_info ? '当前状态：资方付款已完成' : '当前状态：买方支付已完成',
+      next: order.financing_info
+        ? '付款凭证已同步；可按运费承担方发起物流竞价，送达监管仓后由资方确认收货完成质押。'
+        : '请确认收款；之后发起物流竞价。',
     }
   if (order.status === 5)
     return {
@@ -1716,9 +1733,10 @@ export default function OrdersPage() {
               <Card title="托盘融资与质押" size="small" style={{ marginTop: 16 }}>
                 <Descriptions bordered column={2} size="small">
                   <Descriptions.Item label="融资状态">
-                    <Tag color={selectedOrder.financing_info.status === 'released' ? 'success' : 'purple'}>
-                      {selectedOrder.financing_info.status}
-                    </Tag>
+                    {(() => {
+                      const meta = formatFinancingStatus(selectedOrder.financing_info?.status)
+                      return <Tag color={meta.color}>{meta.text}</Tag>
+                    })()}
                   </Descriptions.Item>
                   <Descriptions.Item label="授信金额">
                     {formatCurrency(selectedOrder.financing_info.approved_amount || selectedOrder.financing_info.requested_amount)}

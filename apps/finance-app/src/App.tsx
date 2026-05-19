@@ -422,7 +422,7 @@ function App() {
         commission_voucher: commissionVoucher,
         remark: disburseRemark || undefined,
       })
-      showCompleted('资金方放款已完成', '合规要求：必须继续记录货权质押后，订单才能进入物流履约。', 'all')
+      showCompleted('资金方付款已完成', '付款凭证已同步给卖方；订单现在可进入物流竞价，送达监管仓后由资金方确认收货完成质押。', 'all')
       setDisburseModal({ visible: false, orderId: null })
       setDisbursementVoucher('')
       setFundingCommission(0)
@@ -442,7 +442,7 @@ function App() {
         release_condition: releaseCondition,
         pledge_remark: pledgeRemark || undefined,
       })
-      showCompleted('货权质押记录已完成', '订单已满足物流履约前置合规要求，等待卖方发起物流竞价。', 'all')
+      showCompleted('货权质押记录已完成', '监管仓收货确认与质押状态已进入订单链路。', 'all')
       setPledgeModal({ visible: false, orderId: null })
       setPledgeVoucherURL('')
       setReleaseCondition('')
@@ -484,7 +484,7 @@ function App() {
         receipt_url: collateralReceiptURL,
         remark: collateralReceiptRemark || '资金方确认监管收货',
       })
-      message.success('资金方监管收货已确认')
+      message.success('资金方监管收货已确认，货权质押已完成')
       setCollateralReceiptModal({ visible: false, record: null })
       setCollateralReceiptURL('')
       setCollateralReceiptRemark('')
@@ -630,17 +630,19 @@ function App() {
 
   const getFinancingStepInfo = (status?: string) => {
     const stepDefinitions = [
-      { key: 'pending', title: '申请提交', owner: '买方', hint: '提交融资申请' },
+      { key: 'submitted', title: '申请提交', owner: '买方', hint: '提交融资申请' },
       { key: 'risk_approved', title: '风控审批', owner: '资金方', hint: '风控审核通过' },
       { key: 'buyer_confirmed', title: '确认方案', owner: '买方', hint: '确认授信方案' },
-      { key: 'contract_generated', title: '签署合同', owner: '双方', hint: '签署债务质押合同' },
+      { key: 'contract_generated', title: '上传合同', owner: '双方', hint: '上传债务质押合同' },
       { key: 'buyer_signed_fee_paid', title: '支付手续费', owner: '买方', hint: '支付融资手续费' },
-      { key: 'disbursed', title: '放款完成', owner: '资金方', hint: '资金方放款' },
-      { key: 'pledged', title: '货权质押', owner: '资金方', hint: '记录货权质押' },
+      { key: 'disbursed', title: '付款完成', owner: '资金方', hint: '付款凭证同步给卖方' },
+      { key: 'logistics_collateral', title: '物流入仓', owner: '卖方/物流/仓储', hint: '发起物流并送达监管仓' },
+      { key: 'pledged', title: '确认收货质押', owner: '资金方', hint: '确认监管收货后完成质押' },
       { key: 'released', title: '质押释放', owner: '资金方', hint: '释放货权质押' },
     ]
-    const statusOrder = ['pending', 'risk_approved', 'buyer_confirmed', 'contract_generated', 'buyer_signed_fee_paid', 'disbursed', 'pledged', 'released']
-    const currentStep = status ? statusOrder.indexOf(status) : -1
+    const statusOrder = ['submitted', 'risk_approved', 'buyer_confirmed', 'contract_generated', 'buyer_signed_fee_paid', 'disbursed', 'logistics_collateral', 'pledged', 'released']
+    const currentKey = status === 'disbursed' ? 'logistics_collateral' : status
+    const currentStep = currentKey ? statusOrder.indexOf(currentKey) : -1
     return { stepDefinitions, currentStep }
   }
 
@@ -665,9 +667,9 @@ function App() {
         const map: Record<string, { label: string; color: string }> = {
           buyer_confirmed: { label: '待生成合同', color: 'orange' },
           contract_generated: { label: '待买方签署', color: 'blue' },
-          buyer_signed_fee_paid: { label: '待放款', color: 'purple' },
-          disbursed: { label: '已放款', color: 'green' },
-          pledged: { label: '已质押', color: 'cyan' },
+          buyer_signed_fee_paid: { label: '待资方付款', color: 'purple' },
+          disbursed: { label: '已付款待入仓', color: 'green' },
+          pledged: { label: '已完成质押', color: 'cyan' },
           released: { label: '已释放', color: 'default' },
         }
         const meta = map[fs || ''] || { label: fs || '--', color: 'default' }
@@ -768,7 +770,7 @@ function App() {
           <Space direction="vertical" size={0}>
             <Text style={{ fontSize: 12 }}>申请: ¥{fin.requested_amount?.toLocaleString()}</Text>
             {fin.approved_amount && <Text style={{ fontSize: 12 }}>审批: ¥{fin.approved_amount?.toLocaleString()}</Text>}
-            {fin.disbursed_at && <Text style={{ fontSize: 12, color: '#52c41a' }}>已放款</Text>}
+            {fin.disbursed_at && <Text style={{ fontSize: 12, color: '#52c41a' }}>已付款</Text>}
           </Space>
         )
       },
@@ -780,7 +782,7 @@ function App() {
       render: (_: unknown, record: OrderInfo) => {
         const status = record.financing_info?.status
         if (status === 'disbursed') {
-          return <Button size="small" onClick={() => setPledgeModal({ visible: true, orderId: record.id })}>记录质押</Button>
+          return <Text type="secondary">待物流入监管仓</Text>
         }
         if (status === 'pledged') {
           return <Button size="small" onClick={() => setReleaseModal({ visible: true, orderId: record.id })}>释放质押</Button>
@@ -1310,9 +1312,9 @@ function App() {
                         const map: Record<string, { label: string; color: string }> = {
                           buyer_confirmed: { label: '待生成合同', color: 'orange' },
                           contract_generated: { label: '待买方签署', color: 'blue' },
-                          buyer_signed_fee_paid: { label: '待放款', color: 'purple' },
-                          disbursed: { label: '已放款', color: 'green' },
-                          pledged: { label: '已质押', color: 'cyan' },
+                          buyer_signed_fee_paid: { label: '待资方付款', color: 'purple' },
+                          disbursed: { label: '已付款待入仓', color: 'green' },
+                          pledged: { label: '已完成质押', color: 'cyan' },
                           released: { label: '已释放', color: 'default' },
                         }
                         const meta = map[fs || ''] || { label: fs || '--', color: 'default' }
@@ -1349,7 +1351,7 @@ function App() {
           )}
 
           {activeTab === 'pledge' && (
-            <Card title="货权质押" extra={<Tag color="cyan">已放款待质押</Tag>}>
+            <Card title="货权质押" extra={<Tag color="cyan">付款后物流入仓</Tag>}>
               <Spin spinning={loading}>
                 <Table 
                   columns={[
@@ -1371,7 +1373,7 @@ function App() {
                       width: 120,
                       render: (_: unknown, record: OrderInfo) => {
                         const fs = record.financing_info?.status
-                        if (fs === 'disbursed') return <Tag color="orange">待质押</Tag>
+                        if (fs === 'disbursed') return <Tag color="orange">待物流入监管仓</Tag>
                         if (fs === 'pledged') return <Tag color="cyan">已质押</Tag>
                         return <Text type="secondary">--</Text>
                       },
@@ -1383,23 +1385,17 @@ function App() {
                       render: (_: unknown, record: OrderInfo) => {
                         const fs = record.financing_info?.status
                         if (fs === 'disbursed') {
-                          return (
-                            <Button type="primary" size="small" icon={<SafetyCertificateOutlined />} onClick={() => {
-                              setPledgeModal({ visible: true, orderId: record.id })
-                            }}>
-                              记录质押
-                            </Button>
-                          )
+                          return <Text type="secondary">到仓后在货权监控确认</Text>
                         }
                         return <Text type="secondary">--</Text>
                       },
                     },
                   ]}
-                  dataSource={allOrders.filter((order) => order.financing_info?.status === 'disbursed')} 
+                  dataSource={allOrders.filter((order) => order.financing_info?.status === 'disbursed' || order.financing_info?.status === 'pledged')}
                   rowKey="id" 
                   pagination={{ pageSize: 10 }} 
                   scroll={{ x: 800 }} 
-                  locale={{ emptyText: '暂无待质押订单' }} 
+                  locale={{ emptyText: '暂无待监管质押订单' }}
                 />
               </Spin>
             </Card>
@@ -1537,13 +1533,16 @@ function App() {
           {activeTab === 'collateral-monitor' && (
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-                <Col xs={24} sm={8}>
+                <Col xs={24} sm={6}>
                   <Card><Typography.Text type="secondary">监控订单</Typography.Text><br /><Title level={3}>{collateralList.length}</Title></Card>
                 </Col>
-                <Col xs={24} sm={8}>
+                <Col xs={24} sm={6}>
+                  <Card><Typography.Text type="secondary">待监管收货</Typography.Text><br /><Title level={3}>{collateralList.filter((item) => item.financing_status === 'disbursed').length}</Title></Card>
+                </Col>
+                <Col xs={24} sm={6}>
                   <Card><Typography.Text type="secondary">已质押</Typography.Text><br /><Title level={3}>{collateralList.filter((item) => item.financing_status === 'pledged').length}</Title></Card>
                 </Col>
-                <Col xs={24} sm={8}>
+                <Col xs={24} sm={6}>
                   <Card><Typography.Text type="secondary">已释放</Typography.Text><br /><Title level={3}>{collateralList.filter((item) => item.financing_status === 'released').length}</Title></Card>
                 </Col>
               </Row>
@@ -1627,8 +1626,8 @@ function App() {
                         width: 130,
                         render: (v: string) => {
                           const map: Record<string, { label: string; color: string }> = {
-                            disbursed: { label: '已放款', color: 'green' },
-                            pledged: { label: '已质押', color: 'geekblue' },
+                            disbursed: { label: '已付款待入仓', color: 'green' },
+                            pledged: { label: '已完成质押', color: 'geekblue' },
                             released: { label: '已释放', color: 'success' },
                           }
                           const meta = map[v] || { label: v || '--', color: 'default' }
@@ -1698,12 +1697,14 @@ function App() {
                         key: 'monitor_action',
                         width: 130,
                         render: (_: unknown, record: CollateralMonitorInfo) => {
-                          if (!record.logistics_order_id) return <Text type="secondary">无物流单</Text>
-                          if (record.financing_status !== 'pledged') return <Text type="secondary">--</Text>
+                          if (record.financing_status === 'pledged') return <Tag color="cyan">已完成质押</Tag>
+                          if (record.financing_status === 'released') return <Tag color="green">已释放</Tag>
+                          if (!record.logistics_order_id) return <Text type="secondary">待发起物流</Text>
+                          if (record.financing_status !== 'disbursed') return <Text type="secondary">--</Text>
                           if (record.logistics_status !== 'inbound_completed') return <Text type="secondary">待收货仓入库</Text>
                           return (
                             <Button size="small" type="primary" onClick={() => setCollateralReceiptModal({ visible: true, record })}>
-                              确认收货
+                              确认收货并质押
                             </Button>
                           )
                         },
@@ -1776,13 +1777,13 @@ function App() {
                       width: 160,
                       render: (_: unknown, record: OrderInfo) => {
                         const statusMap: Record<string, { label: string; color: string }> = {
-                          pending: { label: '待风控审核', color: 'orange' },
+                          submitted: { label: '待风控审核', color: 'orange' },
                           risk_approved: { label: '风控已通过', color: 'cyan' },
                           buyer_confirmed: { label: '买方已确认', color: 'blue' },
                           contract_generated: { label: '合同已生成', color: 'purple' },
-                          buyer_signed_fee_paid: { label: '待放款', color: 'magenta' },
-                          disbursed: { label: '已放款', color: 'green' },
-                          pledged: { label: '已质押', color: 'geekblue' },
+                          buyer_signed_fee_paid: { label: '待资方付款', color: 'magenta' },
+                          disbursed: { label: '已付款待入仓', color: 'green' },
+                          pledged: { label: '已完成质押', color: 'geekblue' },
                           released: { label: '已完成', color: 'success' },
                         }
                         const meta = statusMap[record.financing_info?.status || ''] || { label: record.financing_info?.status || '--', color: 'default' }
@@ -1990,7 +1991,7 @@ function App() {
               setCollateralReceiptURL('')
               setCollateralReceiptRemark('')
             }}
-            okText="上传并确认"
+            okText="确认收货并质押"
           >
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               <Paragraph type="secondary">
