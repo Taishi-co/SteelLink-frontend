@@ -83,6 +83,7 @@ export interface OrderFormPayload {
   contact_name: string
   contact_phone: string
   warehouse_name: string
+  dest_warehouse_service_id?: number
   delivery_address: string
   delivery_method: string
   payment_method: string
