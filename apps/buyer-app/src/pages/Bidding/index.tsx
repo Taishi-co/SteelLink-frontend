@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons'
 import { marketService } from '@/services/marketService'
 import type { BiddingActivity, BiddingStats } from '@/services/marketService'
+import { openSellerCenter } from '@/services/auth'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -152,7 +153,7 @@ export default function BiddingPage() {
             </div>
             <Space>
               <Link to="/dashboard/bidding"><Button type="primary" icon={<RiseOutlined />}>发起竞价</Button></Link>
-              <a href={import.meta.env.DEV ? 'http://localhost:5174/seller/bidding' : '/seller/bidding'}><Button icon={<UserSwitchOutlined />}>参与报价</Button></a>
+              <Button icon={<UserSwitchOutlined />} onClick={() => void openSellerCenter('/seller/bidding')}>参与报价</Button>
             </Space>
           </div>
 
@@ -305,7 +306,7 @@ export default function BiddingPage() {
                   </div>
                   <Space>
                     <Link to="/dashboard/bidding"><Button type="primary">买家工作台</Button></Link>
-                    <a href={import.meta.env.DEV ? 'http://localhost:5174/seller/bidding' : '/seller/bidding'}><Button>卖家工作台</Button></a>
+                    <Button onClick={() => void openSellerCenter('/seller/bidding')}>卖家工作台</Button>
                   </Space>
                 </div>
               </Card>

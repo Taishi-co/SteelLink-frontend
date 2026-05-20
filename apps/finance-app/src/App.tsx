@@ -23,7 +23,7 @@ import { WorkbenchShell } from '@/workbench/WorkbenchShell'
 import { financeOrderService } from '@/services/orderService'
 import type { CollateralMonitorInfo, OrderInfo, WarehouseReceiptPledgeInfo } from '@/services/orderService'
 import { financeService, type AuthorizedWarehouseInfo, type FinanceServiceItem, type WarehouseServiceItem } from '@/services/financeService'
-import { hasFinanceCapability } from '@/services/auth'
+import { financeAuthService, hasFinanceCapability, saveFinanceSession, saveFinanceToken } from '@/services/auth'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -106,18 +106,46 @@ function App() {
   }
 
   useEffect(() => {
+    let cancelled = false
     const urlParams = new URLSearchParams(window.location.search)
+    const token = urlParams.get('token')
+    const switchToken = urlParams.get('switch_token')
     const tab = urlParams.get('tab')
-    if (isTabKey(tab)) {
-      setActiveTab(tab)
+
+    const prepareSession = async () => {
+      if (token) {
+        saveFinanceToken(token)
+      }
+      if (switchToken) {
+        try {
+          const response = await financeAuthService.consumeSwitchSession(switchToken)
+          if (response.code !== 0 || !response.data) {
+            throw new Error(response.message || '切换登录失败')
+          }
+          saveFinanceSession(response.data.access_token, response.data.user)
+        } catch {
+          message.error('切换到资金方工作台失败，请重新从个人工作台进入')
+        }
+      }
+      if (isTabKey(tab)) {
+        setActiveTab(tab)
+      }
+      if (urlParams.has('token') || urlParams.has('switch_token') || tab) {
+        urlParams.delete('token')
+        urlParams.delete('switch_token')
+        urlParams.delete('tab')
+        const query = urlParams.toString()
+        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+      }
+      if (!cancelled) {
+        setTokenReady(true)
+      }
     }
-    if (urlParams.has('token') || tab) {
-      urlParams.delete('token')
-      urlParams.delete('tab')
-      const query = urlParams.toString()
-      window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+
+    void prepareSession()
+    return () => {
+      cancelled = true
     }
-    setTokenReady(true)
   }, [])
 
   const showCompleted = (title: string, next: string, targetTab: TabKey = 'all') => {

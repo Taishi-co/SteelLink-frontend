@@ -20,7 +20,7 @@ import {
   CloudServerOutlined,
   MailOutlined,
 } from '@ant-design/icons'
-import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
+import { clearBuyerSession, hasEnterpriseAccess, openSellerCenter, openServiceWorkbench } from '@/services/auth'
 import { useUserStore } from '@/stores'
 import { getIdentityStatusLabel, certificationService } from '@/services/certificationService'
 import type { EnterpriseServicePermission } from '@/services/certificationService'
@@ -84,25 +84,12 @@ function setSharedPermissionsCookie(value: string) {
   document.cookie = `${SHARED_PERMISSIONS_KEY}=${encodeURIComponent(value)}; path=/; SameSite=Lax`
 }
 
-function getCrossAppBaseURL(port: number) {
-  if (!import.meta.env.DEV) {
-    return ''
-  }
-  const protocol = window.location.protocol || 'http:'
-  const hostname = window.location.hostname || 'localhost'
-  return `${protocol}//${hostname}:${port}`
-}
-
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [servicePermissions, setServicePermissions] = useState<EnterpriseServicePermission[]>([])
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useUserStore()
-  const sellerBaseURL = getCrossAppBaseURL(5174)
-  const financeWorkbenchHref = `${getCrossAppBaseURL(5177)}/finance/`
-  const logisticsWorkbenchHref = `${getCrossAppBaseURL(5175)}/logistics/`
-  const warehouseWorkbenchHref = `${getCrossAppBaseURL(5176)}/warehouse/`
 
   useEffect(() => {
     if (!hasEnterpriseAccess(user)) {
@@ -155,7 +142,7 @@ export default function DashboardLayout() {
   const identityLabel = getIdentityStatusLabel(user?.identityStatus ?? 0)
 
   const switchToSellerCenter = () => {
-    window.location.href = `${sellerBaseURL}/seller/dashboard`
+    void openSellerCenter('/seller/dashboard')
   }
 
   const getSelectedKey = () => {
@@ -281,55 +268,52 @@ export default function DashboardLayout() {
               </div>
             )}
             {effectiveServices.has('finance') && (
-              <a href={financeWorkbenchHref}>
-                <div
-                  className="dashboard-quick-link mb-2 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
-                >
-                  <BankOutlined className="text-sm text-[#2f6b49]" />
-                  {!collapsed && (
-                    <>
-                      <span className="flex-1 text-xs font-semibold">
-                        进入资金方工作台
-                      </span>
-                      <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
-                    </>
-                  )}
-                </div>
-              </a>
+              <div
+                className="dashboard-quick-link mb-2 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
+                onClick={() => void openServiceWorkbench('finance', 5177, '/finance/')}
+              >
+                <BankOutlined className="text-sm text-[#2f6b49]" />
+                {!collapsed && (
+                  <>
+                    <span className="flex-1 text-xs font-semibold">
+                      进入资金方工作台
+                    </span>
+                    <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
+                  </>
+                )}
+              </div>
             )}
             {effectiveServices.has('logistics') && (
-              <a href={logisticsWorkbenchHref}>
-                <div
-                  className="dashboard-quick-link mb-2 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
-                >
-                  <TruckOutlined className="text-sm text-[#2f6b49]" />
-                  {!collapsed && (
-                    <>
-                      <span className="flex-1 text-xs font-semibold">
-                        进入物流管理中心
-                      </span>
-                      <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
-                    </>
-                  )}
-                </div>
-              </a>
+              <div
+                className="dashboard-quick-link mb-2 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
+                onClick={() => void openServiceWorkbench('logistics', 5175, '/logistics/')}
+              >
+                <TruckOutlined className="text-sm text-[#2f6b49]" />
+                {!collapsed && (
+                  <>
+                    <span className="flex-1 text-xs font-semibold">
+                      进入物流管理中心
+                    </span>
+                    <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
+                  </>
+                )}
+              </div>
             )}
             {effectiveServices.has('warehouse') && (
-              <a href={warehouseWorkbenchHref}>
-                <div
-                  className="dashboard-quick-link mb-2 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
-                >
-                  <HomeOutlined className="text-sm text-[#2f6b49]" />
-                  {!collapsed && (
-                    <>
-                      <span className="flex-1 text-xs font-semibold">
-                        进入仓储管理中心
-                      </span>
-                      <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
-                    </>
-                  )}
-                </div>
-              </a>
+              <div
+                className="dashboard-quick-link mb-2 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
+                onClick={() => void openServiceWorkbench('warehouse', 5176, '/warehouse/')}
+              >
+                <HomeOutlined className="text-sm text-[#2f6b49]" />
+                {!collapsed && (
+                  <>
+                    <span className="flex-1 text-xs font-semibold">
+                      进入仓储管理中心
+                    </span>
+                    <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
+                  </>
+                )}
+              </div>
             )}
             <Link to="/mall">
               <div

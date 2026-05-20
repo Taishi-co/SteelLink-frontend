@@ -55,14 +55,7 @@ function getCookie(name: string) {
 }
 
 function getSharedToken() {
-  return (
-    localStorage.getItem('buyer_token') ||
-    sessionStorage.getItem('buyer_token') ||
-    getCookie('buyer_token') ||
-    localStorage.getItem('token') ||
-    sessionStorage.getItem('token') ||
-    getCookie('token')
-  )
+  return getStoredToken(['buyer_token', 'seller_token', 'logistics_token', 'warehouse_token', 'token'])
 }
 
 function getSharedPermissions() {
@@ -92,10 +85,29 @@ function removeStorageItem(key: string) {
   sessionStorage.removeItem(key)
 }
 
+function getStoredToken(keys: string[]) {
+  for (const key of keys) {
+    const token = localStorage.getItem(key) || sessionStorage.getItem(key) || getCookie(key)
+    if (!token) continue
+    if (isJwtExpired(token)) {
+      removeStorageItem(key)
+      removeCookie(key)
+      continue
+    }
+    return token
+  }
+  return null
+}
+
 export const financeAuthService = {
   login: (payload: FinanceLoginPayload) =>
     api.post<unknown, ApiResponse<LoginResponse>>('/auth/login', payload),
   me: () => api.get<unknown, ApiResponse<FinanceProfile>>('/users/me'),
+  consumeSwitchSession: (switchToken: string) =>
+    api.post<unknown, ApiResponse<LoginResponse>>('/auth/switch-session/consume', {
+      switch_token: switchToken,
+      target: 'finance',
+    }),
 }
 
 function parseJwtPayload(token: string): Record<string, unknown> | null {
@@ -108,6 +120,13 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+function isJwtExpired(token: string, skewSeconds = 30) {
+  const payload = parseJwtPayload(token)
+  const exp = payload?.exp
+  const expiresAt = typeof exp === 'number' ? exp : Number(exp || 0)
+  return !expiresAt || expiresAt * 1000 <= Date.now() + skewSeconds * 1000
+}
+
 export function saveFinanceSession(token: string, profile: FinanceProfile) {
   setStorageItem(TOKEN_KEY, token)
   setStorageItem(USER_KEY, JSON.stringify(profile))
@@ -116,12 +135,7 @@ export function saveFinanceSession(token: string, profile: FinanceProfile) {
 }
 
 export function getFinanceToken() {
-  return (
-    localStorage.getItem(TOKEN_KEY) ||
-    sessionStorage.getItem(TOKEN_KEY) ||
-    getCookie(TOKEN_KEY) ||
-    getSharedToken()
-  )
+  return getStoredToken([TOKEN_KEY]) || getSharedToken()
 }
 
 export function getFinanceUser(): FinanceProfile | null {

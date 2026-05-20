@@ -298,7 +298,7 @@ export default function AiProcurementPage() {
         delivery_method: '平台协同配送',
       })
     }
-  }, [orderForm, result?.parsed.delivery_address, selectedProducts])
+  }, [orderForm, result?.parsed.delivery_address, result?.parsed.delivery_warehouse_id, selectedProducts])
 
   const currentStep = activeStep ? activeStep - 1 : 0
   const categoryOptions = useMemo(

@@ -17,7 +17,7 @@ import {
   MailOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { clearSellerSession, getSellerUser, isIdentityVerified, hasEnterprise, hasEnterprisePending, isSellerReady, sellerAuthService, sellerHasService, updateSellerUser } from '@/services/auth'
+import { clearSellerSession, getSellerUser, isIdentityVerified, hasEnterprise, hasEnterprisePending, isSellerReady, openBuyerCenter, sellerAuthService, sellerHasService, updateSellerUser } from '@/services/auth'
 
 const { Content, Sider } = Layout
 const { Text } = Typography
@@ -25,7 +25,6 @@ export default function SellerLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [user, setUser] = useState(getSellerUser())
-  const buyerBaseURL = import.meta.env.DEV ? 'http://localhost:5173' : ''
 
   useEffect(() => {
     let ignore = false
@@ -148,13 +147,14 @@ export default function SellerLayout() {
             />
           </nav>
           <div className="mb-2 px-2.5">
-            <a href={`${buyerBaseURL}/dashboard`}>
-              <div className="dashboard-quick-link flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2">
-                <HomeOutlined className="text-sm text-[#2f6b49]" />
-                <span className="flex-1 text-xs font-semibold">返回买家工作台</span>
-                <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
-              </div>
-            </a>
+            <div
+              className="dashboard-quick-link flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2"
+              onClick={() => void openBuyerCenter('/dashboard')}
+            >
+              <HomeOutlined className="text-sm text-[#2f6b49]" />
+              <span className="flex-1 text-xs font-semibold">返回买家工作台</span>
+              <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
+            </div>
           </div>
           <div className="border-t border-[#eadcc7] px-4 py-3">
             <div className="flex items-center gap-2">

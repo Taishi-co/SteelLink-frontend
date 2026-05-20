@@ -43,7 +43,7 @@ import type {
   WarehouseResource,
   WarehouseResourcePayload,
 } from '@/services/warehouseResourceService'
-import { hasWarehouseCapability } from '@/services/auth'
+import { hasWarehouseCapability, saveWarehouseSession, saveWarehouseToken, warehouseAuthService } from '@/services/auth'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
@@ -84,18 +84,46 @@ function App() {
   const [logisticsForm] = Form.useForm<Record<string, string>>()
 
   useEffect(() => {
+    let cancelled = false
     const urlParams = new URLSearchParams(window.location.search)
+    const token = urlParams.get('token')
+    const switchToken = urlParams.get('switch_token')
     const tab = urlParams.get('tab')
-    if (isTabKey(tab)) {
-      setActiveTab(tab)
+
+    const prepareSession = async () => {
+      if (token) {
+        saveWarehouseToken(token)
+      }
+      if (switchToken) {
+        try {
+          const response = await warehouseAuthService.consumeSwitchSession(switchToken)
+          if (response.code !== 0 || !response.data) {
+            throw new Error(response.message || '切换登录失败')
+          }
+          saveWarehouseSession(response.data.access_token, response.data.user)
+        } catch {
+          message.error('切换到仓储工作台失败，请重新从个人工作台进入')
+        }
+      }
+      if (isTabKey(tab)) {
+        setActiveTab(tab)
+      }
+      if (urlParams.has('token') || urlParams.has('switch_token') || tab) {
+        urlParams.delete('token')
+        urlParams.delete('switch_token')
+        urlParams.delete('tab')
+        const query = urlParams.toString()
+        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+      }
+      if (!cancelled) {
+        setTokenReady(true)
+      }
     }
-    if (urlParams.has('token') || tab) {
-      urlParams.delete('token')
-      urlParams.delete('tab')
-      const query = urlParams.toString()
-      window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+
+    void prepareSession()
+    return () => {
+      cancelled = true
     }
-    setTokenReady(true)
   }, [])
 
   const formatDateTime = (value?: string) => (value ? value.slice(0, 19).replace('T', ' ') : '--')
