@@ -16,33 +16,40 @@ import {
 import { financeOrderService } from '@/services/orderService'
 import type { CollateralMonitorInfo, OrderInfo, WarehouseReceiptPledgeInfo } from '@/services/orderService'
 import { financeService, type AuthorizedWarehouseInfo, type FinanceServiceItem, type WarehouseServiceItem } from '@/services/financeService'
-import { hasFinanceCapability, saveFinanceToken } from '@/services/auth'
+import { hasFinanceCapability } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography
 
 const statusMap: Record<number, { label: string; color: string }> = {
-  0: { label: '待确认', color: 'default' },
-  12: { label: '待仓库确认', color: 'orange' },
-  13: { label: '待卖方确认', color: 'blue' },
-  14: { label: '待买方确认', color: 'blue' },
+  0: { label: '草稿', color: 'default' },
+  1: { label: '待确认', color: 'orange' },
   2: { label: '待签合同', color: 'cyan' },
   3: { label: '待付款', color: 'gold' },
   4: { label: '待确认收款', color: 'purple' },
-  21: { label: '融资审批中', color: 'purple' },
-  22: { label: '待签署融资合同', color: 'magenta' },
   5: { label: '待提货', color: 'geekblue' },
-  15: { label: '物流竞价中', color: 'processing' },
-  16: { label: '待确认物流', color: 'blue' },
-  17: { label: '运输中', color: 'cyan' },
-  6: { label: '已发货', color: 'cyan' },
-  7: { label: '已到货', color: 'green' },
-  18: { label: '已收货', color: 'green' },
+  6: { label: '配送中', color: 'cyan' },
+  7: { label: '已送达', color: 'green' },
   8: { label: '已完成', color: 'success' },
-  19: { label: '已对账', color: 'success' },
-  20: { label: '已归档', color: 'default' },
   9: { label: '已终止', color: 'red' },
+  10: { label: '已冻结', color: 'volcano' },
   11: { label: '异常', color: 'red' },
+  12: { label: '待选择目的地仓储', color: 'geekblue' },
+  13: { label: '待仓库确认', color: 'orange' },
+  14: { label: '待卖方确认', color: 'blue' },
+  15: { label: '待买方确认', color: 'blue' },
+  16: { label: '物流竞价中', color: 'processing' },
+  17: { label: '待确认物流', color: 'blue' },
+  18: { label: '运输中', color: 'cyan' },
+  19: { label: '已收货', color: 'green' },
+  20: { label: '已对账', color: 'success' },
+  21: { label: '已归档', color: 'default' },
+  22: { label: '融资审批中', color: 'purple' },
+  23: { label: '待签署融资合同', color: 'magenta' },
+  24: { label: '待重新选仓', color: 'volcano' },
+  25: { label: '待重新发起物流', color: 'volcano' },
+  26: { label: '待选择仓库', color: 'geekblue' },
+  27: { label: '待签署物流合同', color: 'gold' },
 }
 
 type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'disburse' | 'pledge' | 'warehouse-receipt-pledge' | 'collateral-monitor' | 'release-pledge' | 'finance-flow' | 'all'
@@ -158,16 +165,15 @@ function App() {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
-    const token = urlParams.get('token')
     const tab = urlParams.get('tab')
-    if (token) {
-      saveFinanceToken(token)
-    }
     if (isTabKey(tab)) {
       setActiveTab(tab)
     }
-    if (token || tab) {
-      window.history.replaceState({}, '', window.location.pathname)
+    if (urlParams.has('token') || tab) {
+      urlParams.delete('token')
+      urlParams.delete('tab')
+      const query = urlParams.toString()
+      window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
     }
     setTokenReady(true)
   }, [])
@@ -1278,7 +1284,7 @@ function App() {
                   <Card><Typography.Text type="secondary">预警案件</Typography.Text><br /><Title level={3}>--</Title></Card>
                 </Col>
               </Row>
-              <Card title="融资审批池" extra={<Tag color="purple">状态 21</Tag>}>
+              <Card title="融资审批池" extra={<Tag color="purple">状态 22</Tag>}>
                 <Spin spinning={loading}>
                   <Table columns={riskColumns} dataSource={riskOrders} rowKey="id" pagination={false} scroll={{ x: 940 }} locale={{ emptyText: '暂无待审批融资申请' }} />
                 </Spin>
@@ -1288,7 +1294,7 @@ function App() {
 
           {activeTab === 'debt-contract' && (
             <>
-              <Card title="合同与放款" extra={<Tag color="magenta">状态 22</Tag>} style={{ marginBottom: 16 }}>
+              <Card title="合同与放款" extra={<Tag color="magenta">状态 23</Tag>} style={{ marginBottom: 16 }}>
                 <Spin spinning={loading}>
                   <Table columns={debtColumns} dataSource={debtOrders} rowKey="id" pagination={false} scroll={{ x: 820 }} locale={{ emptyText: '暂无待处理合同' }} />
                 </Spin>

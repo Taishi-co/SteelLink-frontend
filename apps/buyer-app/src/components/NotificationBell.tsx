@@ -15,12 +15,11 @@ const typeMeta: Record<NotificationItem['type'], { color: string; label: string 
   system: { color: 'default', label: '系统' },
 }
 
-function notificationWebSocketURL(token: string) {
+function notificationWebSocketURL() {
   const base = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8080/api/v1' : '/api/v1')
   const url = new URL(base, window.location.origin)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   url.pathname = `${url.pathname.replace(/\/$/, '')}/notifications/ws`
-  url.searchParams.set('token', token)
   return url.toString()
 }
 
@@ -51,7 +50,7 @@ export default function NotificationBell() {
     const connect = () => {
       const latestToken = getBuyerToken()
       if (!latestToken) return
-      socket = new WebSocket(notificationWebSocketURL(latestToken))
+      socket = new WebSocket(notificationWebSocketURL())
       socket.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as { type?: string }

@@ -51,7 +51,7 @@ import type {
   LogisticsVehicle,
   LogisticsVehiclePayload,
 } from '@/services/fleetService'
-import { getLogisticsToken, hasLogisticsCapability, saveLogisticsToken } from '@/services/auth'
+import { getLogisticsToken, hasLogisticsCapability } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography
@@ -130,16 +130,15 @@ function App() {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
-    const token = urlParams.get('token')
     const tab = urlParams.get('tab')
-    if (token) {
-      saveLogisticsToken(token)
-    }
     if (isTabKey(tab)) {
       setActiveTab(tab)
     }
-    if (token || tab) {
-      window.history.replaceState({}, '', window.location.pathname)
+    if (urlParams.has('token') || tab) {
+      urlParams.delete('token')
+      urlParams.delete('tab')
+      const query = urlParams.toString()
+      window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
     }
     setTokenReady(true)
   }, [])

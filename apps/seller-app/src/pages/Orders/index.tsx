@@ -77,6 +77,7 @@ const statusMeta: Record<number, { color: string; text: string }> = {
   23: { color: 'gold', text: '待签署融资合同' },
   24: { color: 'volcano', text: '待重新选仓' },
   25: { color: 'volcano', text: '待重新发起物流' },
+  26: { color: 'geekblue', text: '待选择仓库' },
   27: { color: 'gold', text: '待签署物流合同' },
 }
 
@@ -265,22 +266,23 @@ const statusOptions = [
   { label: '待支付', value: 3 },
   { label: '待确认收款', value: 4 },
   { label: '待提货', value: 5 },
-  { label: '物流竞价中', value: 15 },
-  { label: '待确认物流', value: 16 },
+  { label: '物流竞价中', value: 16 },
+  { label: '待确认物流', value: 17 },
+  { label: '运输中', value: 18 },
   { label: '配送中', value: 6 },
   { label: '已送达', value: 7 },
   { label: '已完成', value: 8 },
   { label: '已取消', value: 9 },
 ]
 
-const activeOrderStatuses = [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25, 27]
+const activeOrderStatuses = [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25, 26, 27]
 
 const summaryStatusItems = [
   { key: 'active', label: '进行中', statuses: activeOrderStatuses },
   { key: 1, label: '待确认', statuses: [1] },
   { key: 4, label: '待确认收款', statuses: [4] },
   { key: 5, label: '待提货', statuses: [5] },
-  { key: 15, label: '物流竞价中', statuses: [15] },
+  { key: 16, label: '物流竞价中', statuses: [16] },
   { key: 8, label: '已完成', statuses: [8] },
 ] as const
 

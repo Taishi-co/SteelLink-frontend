@@ -44,7 +44,7 @@ import type {
   WarehouseResource,
   WarehouseResourcePayload,
 } from '@/services/warehouseResourceService'
-import { hasWarehouseCapability, saveWarehouseToken } from '@/services/auth'
+import { hasWarehouseCapability } from '@/services/auth'
 
 const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography
@@ -74,6 +74,7 @@ const statusMap: Record<number, { label: string; color: string }> = {
   24: { label: '待重新选仓', color: 'volcano' },
   25: { label: '待重新发起物流', color: 'volcano' },
   26: { label: '待选择仓库', color: 'geekblue' },
+  27: { label: '待签署物流合同', color: 'gold' },
 }
 
 const resourceStatusMap: Record<number, { label: string; color: string }> = {
@@ -126,16 +127,15 @@ function App() {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
-    const token = urlParams.get('token')
     const tab = urlParams.get('tab')
-    if (token) {
-      saveWarehouseToken(token)
-    }
     if (isTabKey(tab)) {
       setActiveTab(tab)
     }
-    if (token || tab) {
-      window.history.replaceState({}, '', window.location.pathname)
+    if (urlParams.has('token') || tab) {
+      urlParams.delete('token')
+      urlParams.delete('tab')
+      const query = urlParams.toString()
+      window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
     }
     setTokenReady(true)
   }, [])
