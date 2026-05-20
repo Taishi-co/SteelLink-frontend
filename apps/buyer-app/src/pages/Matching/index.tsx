@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
+  Alert,
   Button,
   Card,
   Col,
@@ -32,6 +33,7 @@ import {
 import { getBuyerToken } from '@/services/auth'
 import { supplyDemandService } from '@/services/supplyDemandService'
 import type { CreateSupplyDemandPayload, SupplyDemandPost, SupplyDemandStats, SupplyDemandType } from '@/services/supplyDemandService'
+import { useUserStore } from '@/stores'
 
 const { Title, Paragraph, Text } = Typography
 const { TextArea } = Input
@@ -135,6 +137,13 @@ function formatQuantity(post: SupplyDemandPost) {
   return `${post.quantity.toLocaleString('zh-CN')} ${post.unit || '吨'}`
 }
 
+function getPublisherLabel(post: SupplyDemandPost) {
+  if (post.publisherName) {
+    return post.publisherName
+  }
+  return post.enterpriseId > 0 ? '认证企业' : '实名个人'
+}
+
 function buildRecommendation(myPost: SupplyDemandPost, target: SupplyDemandPost): Recommendation {
   const sameCategory = myPost.category && myPost.category === target.category
   const sameCity = myPost.city && myPost.city === target.city
@@ -168,6 +177,7 @@ function buildRecommendations(myPosts: SupplyDemandPost[], publicPosts: SupplyDe
 }
 
 export default function MatchingPage() {
+  const { user, isLoggedIn } = useUserStore()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -182,7 +192,10 @@ export default function MatchingPage() {
   const [myPosts, setMyPosts] = useState<SupplyDemandPost[]>([])
   const [form] = Form.useForm<PostFormValues>()
 
-  const isLoggedIn = Boolean(getBuyerToken())
+  const hasToken = Boolean(getBuyerToken())
+  const identityVerified = user?.identityStatus === 2
+  const canPublish = isLoggedIn && hasToken && identityVerified
+  const publisherHint = user?.enterpriseCode ? '企业认证通过后展示加密企业名，否则按实名个人展示' : '实名个人发布后将展示为实名个人'
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -225,8 +238,12 @@ export default function MatchingPage() {
   const recommendations = useMemo(() => buildRecommendations(myPosts, posts), [myPosts, posts])
 
   const openCreate = (type: SupplyDemandType) => {
-    if (!isLoggedIn) {
+    if (!isLoggedIn || !hasToken) {
       message.warning('请先登录后再发布供求信息')
+      return
+    }
+    if (!identityVerified) {
+      message.warning('完成个人实名认证后即可发布供求信息')
       return
     }
     setDefaultType(type)
@@ -282,11 +299,11 @@ export default function MatchingPage() {
             <div>
               <Title level={1} className="!mb-3">供求信息</Title>
               <Paragraph className="text-lg text-gray-500 !mb-0">
-                聚合供需、仓储和物流线索，按品类、区域、价格和交付能力推荐可撮合商机。
+                聚合供需、仓储和物流线索，实名个人即可发布；已认证企业发布后展示加密企业名。
               </Paragraph>
             </div>
             <Space>
-              <Button icon={<UserOutlined />} disabled={!isLoggedIn}>
+              <Button icon={<UserOutlined />} disabled={!isLoggedIn || !hasToken}>
                 我的发布
               </Button>
               <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate('supply')}>
@@ -294,6 +311,15 @@ export default function MatchingPage() {
               </Button>
             </Space>
           </div>
+          {isLoggedIn && !identityVerified && (
+            <Alert
+              className="mt-5"
+              type="warning"
+              showIcon
+              message="完成个人实名认证后即可发布供求信息"
+              description="未实名账号仍可浏览公开供求线索；发布供应、求购、仓储或物流服务需要先通过个人实名认证。"
+            />
+          )}
         </div>
       </section>
 
@@ -317,6 +343,7 @@ export default function MatchingPage() {
                       <div>
                         <Tag color="blue">{item.type}</Tag>
                         <Title level={4} className="!mb-2 !mt-3">{item.target.title}</Title>
+                        <Text type="secondary">{getPublisherLabel(item.target)}</Text>
                       </div>
                       <Progress type="circle" percent={item.matchRate} size={64} />
                     </div>
@@ -362,7 +389,10 @@ export default function MatchingPage() {
                   <Col xs={24} md={8} key={item.id}>
                     <div className="rounded border border-gray-100 bg-gray-50 p-4">
                       <div className="flex items-start justify-between gap-3">
-                        <Text strong>{item.title}</Text>
+                        <div>
+                          <Text strong>{item.title}</Text>
+                          <div className="mt-1 text-xs text-gray-500">{getPublisherLabel(item)}</div>
+                        </div>
                         <Tag color={postTypeMeta[item.type].color}>{postTypeMeta[item.type].label}</Tag>
                       </div>
                       <div className="mt-3 flex justify-between text-sm text-gray-500">
@@ -391,7 +421,7 @@ export default function MatchingPage() {
                       <div className="mb-4 text-3xl text-primary-600">{item.icon}</div>
                       <Title level={4}>{item.action}</Title>
                       <Paragraph className="flex-1 text-gray-500">{item.description}</Paragraph>
-                      <Button type="primary" ghost={type !== 'supply'} onClick={() => openCreate(type)}>
+                      <Button type="primary" ghost={type !== 'supply'} disabled={isLoggedIn && !identityVerified} onClick={() => openCreate(type)}>
                         {item.action}
                       </Button>
                     </div>
@@ -420,6 +450,9 @@ export default function MatchingPage() {
                               <Text strong>{item.title}</Text>
                               <div className="mt-1 text-sm text-gray-500">
                                 {[formatRegion(item), formatQuantity(item), item.spec].filter(Boolean).join(' · ')}
+                              </div>
+                              <div className="mt-2 text-xs text-gray-400">
+                                发布主体：{getPublisherLabel(item)}
                               </div>
                             </div>
                             <Tag color={postTypeMeta[item.type].color}>{formatPrice(item)}</Tag>
@@ -461,6 +494,13 @@ export default function MatchingPage() {
         width={720}
       >
         <Form form={form} layout="vertical" initialValues={{ type: defaultType, unit: '吨', financing_required: false }}>
+          <Alert
+            className="mb-4"
+            type={canPublish ? 'info' : 'warning'}
+            showIcon
+            message={canPublish ? publisherHint : '完成个人实名认证后即可发布'}
+            description="联系信息仅按当前表单填写保存；公开列表展示发布主体时会使用实名个人或加密企业名。"
+          />
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="type" label="信息类型" rules={[{ required: true, message: '请选择信息类型' }]}>
