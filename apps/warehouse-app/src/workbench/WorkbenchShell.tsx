@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
-import { Badge, Button, Layout, List, Space, Typography } from 'antd'
-import { CalendarOutlined, HomeOutlined } from '@ant-design/icons'
+import { Badge, Layout, Menu, Typography } from 'antd'
+import { ArrowRightOutlined, CalendarOutlined, HomeOutlined } from '@ant-design/icons'
 import type { TabKey } from './config'
 
-const { Content, Header, Sider } = Layout
+const { Content, Sider } = Layout
 const { Text } = Typography
 
 interface MenuItem {
@@ -29,84 +29,76 @@ export function WorkbenchShell({
   onRefresh,
   onTabChange,
 }: WorkbenchShellProps) {
+  const buyerWorkbenchHref = import.meta.env.DEV
+    ? `${window.location.protocol || 'http:'}//${window.location.hostname || 'localhost'}:5173/dashboard`
+    : '/dashboard'
+
   return (
-    <Layout className="service-shell">
-      <Sider width={232} theme="light">
-        <div
-          style={{
-            height: 78,
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 24px',
-            borderBottom: '1px solid #eadcc7',
-            background: 'linear-gradient(135deg, rgba(255,253,248,.92), rgba(248,240,228,.72))',
-          }}
-        >
-          <Space>
-            <span style={{ display: 'inline-grid', width: 36, height: 36, placeItems: 'center', borderRadius: 16, background: '#214332', color: '#f3c17c', fontWeight: 900 }}>
-              R
-            </span>
-            <span>
-              <Text strong style={{ display: 'block', color: '#17221b' }}>锐联仓储</Text>
-              <Text style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', color: '#a4662c' }}>RecoLink</Text>
-            </span>
-          </Space>
-        </div>
-        <div style={{ padding: 16 }}>
-          <List
-            size="small"
-            dataSource={menuItems}
-            renderItem={(item) => (
-              <List.Item
-                className="service-nav-item"
-                style={{
-                  border: 0,
-                  padding: '11px 12px',
-                  borderRadius: 14,
-                  cursor: 'pointer',
-                  marginBottom: 6,
-                  background: activeTab === item.key ? '#214332' : 'transparent',
-                  color: activeTab === item.key ? '#fffaf1' : '#5f6b61',
-                }}
-                onClick={() => onTabChange(item.key)}
-              >
-                <Space>
-                  {item.icon}
-                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
+    <Layout className="dashboard-shell service-shell">
+      <Sider
+        width={220}
+        className="dashboard-sider"
+        style={{ position: 'fixed', inset: '0 auto 0 0', overflow: 'auto' }}
+        trigger={null}
+      >
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="dashboard-brand">
+            <div className="dashboard-brand-row">
+              <div className="dashboard-brand-mark">R</div>
+              <div>
+                <div className="dashboard-brand-title">锐联产业协同平台</div>
+                <div className="dashboard-brand-subtitle">RecoLink Workbench</div>
+              </div>
+            </div>
+          </div>
+          <div className="dashboard-account-card">
+            <div className="dashboard-account-eyebrow">当前工作台</div>
+            <div className="dashboard-account-title">仓储服务商</div>
+            <div className="dashboard-account-desc">仓库资源、出入库、库存快照与物流履约协同</div>
+          </div>
+          <nav className="dashboard-sidebar-nav">
+            <div className="dashboard-sidebar-section">业务</div>
+            <Menu
+              mode="inline"
+              selectedKeys={[activeTab]}
+              onClick={({ key }) => onTabChange(key as TabKey)}
+              items={menuItems.map((item) => ({
+                key: item.key,
+                icon: item.icon,
+                label: (
+                  <span>
                     {item.label}
-                    {!!badgeCounts[item.key] && <Badge count={badgeCounts[item.key]} style={{ marginLeft: 8 }} />}
-                  </Text>
-                </Space>
-              </List.Item>
-            )}
-          />
+                    {!!badgeCounts[item.key] && (
+                      <Badge count={badgeCounts[item.key]} style={{ marginLeft: 8 }} />
+                    )}
+                  </span>
+                ),
+              }))}
+              className="dashboard-menu"
+              style={{ border: 0, background: 'transparent' }}
+            />
+          </nav>
+          <div className="dashboard-sidebar-links">
+            <div className="dashboard-quick-link" onClick={onRefresh}>
+              <CalendarOutlined style={{ color: '#2f6b49' }} />
+              <span style={{ flex: 1, fontSize: 12, fontWeight: 650 }}>刷新当前页</span>
+            </div>
+            <a href={buyerWorkbenchHref}>
+              <div className="dashboard-quick-link">
+                <HomeOutlined style={{ color: '#2f6b49' }} />
+                <span style={{ flex: 1, fontSize: 12, fontWeight: 650 }}>返回买家工作台</span>
+                <ArrowRightOutlined style={{ color: '#a4662c', fontSize: 10 }} />
+              </div>
+            </a>
+          </div>
         </div>
       </Sider>
-      <Layout>
-        <Header
-          style={{
-            background: '#fff',
-            height: 64,
-            padding: '0 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <Text strong style={{ display: 'block', color: '#17221b', fontSize: 16 }}>仓储方工作台</Text>
-            <Text style={{ color: '#7a847a', fontSize: 12 }}>仓库资源、出入库、库存快照与物流履约协同</Text>
+      <Layout style={{ marginLeft: 220 }}>
+        <Content className="dashboard-content service-content">
+          <div className="dashboard-workbench-header">
+            <Text strong style={{ display: 'block', color: '#17221b', fontSize: 20 }}>工作台</Text>
+            <Text type="secondary">仓储服务商，欢迎回来！</Text>
           </div>
-          <Space>
-            <Button icon={<CalendarOutlined />} onClick={onRefresh}>
-              刷新
-            </Button>
-            <Button icon={<HomeOutlined />} href="/">
-              买家首页
-            </Button>
-          </Space>
-        </Header>
-        <Content className="service-content" style={{ padding: 24 }}>
           {children}
         </Content>
       </Layout>

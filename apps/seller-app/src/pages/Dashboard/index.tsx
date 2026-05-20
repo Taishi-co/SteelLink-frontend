@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Alert, Card, Typography, Table, Tag, Spin, Button, Space } from 'antd'
+import { Alert, Card, Typography, Table, Tag, Spin, Button, Row, Col } from 'antd'
 import {
   ShoppingCartOutlined,
   ExclamationCircleOutlined,
@@ -8,13 +8,15 @@ import {
   FileProtectOutlined,
   RiseOutlined,
   TruckOutlined,
+  ArrowRightOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { sellerOrderService, type SellerOrderInfo } from '@/services/orderService'
 import { sellerProductService } from '@/services/productService'
 import { getSellerUser } from '@/services/auth'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 
 const orderStatusMeta: Record<number, { color: string; text: string }> = {
   0: { color: 'default', text: '草稿' },
@@ -56,6 +58,11 @@ interface TodoItem {
   icon: React.ReactNode
   link: string
   actionText: string
+}
+
+function formatAmount(amount: number) {
+  if (amount >= 10000) return `¥${(amount / 10000).toFixed(1)}万`
+  return `¥${amount.toLocaleString('zh-CN')}`
 }
 
 function getSellerNextAction(order: SellerOrderInfo) {
@@ -141,6 +148,48 @@ export default function DashboardPage() {
       totalAmount,
     }
   })()
+
+  const pendingActionCount =
+    orderStats.pendingConfirm +
+    orderStats.pendingContract +
+    orderStats.pendingPaymentReview +
+    orderStats.pendingDelivery +
+    orderStats.pendingSellerConfirm +
+    orderStats.logisticsBidding +
+    orderStats.pendingLogisticsRestart +
+    orderStats.pendingLogisticsContract +
+    productRejected
+
+  const kpiCards = [
+    {
+      label: '有效订单金额',
+      value: formatAmount(orderStats.totalAmount),
+      icon: <ShoppingCartOutlined />,
+      accent: '#1e4fc2',
+      sub: '未取消订单总额',
+    },
+    {
+      label: '待处理',
+      value: String(pendingActionCount),
+      icon: <ExclamationCircleOutlined />,
+      accent: '#d97706',
+      sub: '订单/商品待办',
+    },
+    {
+      label: '可售商品',
+      value: String(productApproved),
+      icon: <CheckCircleOutlined />,
+      accent: '#059669',
+      sub: productCount ? `共 ${productCount} 个商品` : '暂无商品',
+    },
+    {
+      label: '履约中',
+      value: String(orderStats.inTransit),
+      icon: <TruckOutlined />,
+      accent: '#6366f1',
+      sub: '配送中/运输中订单',
+    },
+  ]
 
   const todos: TodoItem[] = [
     ...(orderStats.pendingConfirm > 0 ? [{
@@ -246,30 +295,37 @@ export default function DashboardPage() {
   ]
 
   const recentOrders = orders
-    .filter((order) => ![0, 8, 9].includes(order.status))
+    .filter((order) => ![0, 8, 9, 21].includes(order.status))
     .slice(0, 5)
 
-  const healthItems = [
+  const shortcuts = [
     {
-      label: '商品可售',
-      value: productApproved,
-      hint: productCount ? `共 ${productCount} 个商品` : '暂无商品',
-      status: productApproved > 0 ? '正常' : '待补充',
-      color: productApproved > 0 ? 'green' : 'orange',
+      icon: <PlusOutlined className="text-2xl" style={{ color: '#1e4fc2' }} />,
+      title: '发布商品',
+      desc: '维护商品资料和价格',
+      path: '/products',
+      color: '#eef3ff',
     },
     {
-      label: '商品驳回',
-      value: productRejected,
-      hint: productRejected > 0 ? '需要重新提交' : '暂无驳回',
-      status: productRejected > 0 ? '需处理' : '正常',
-      color: productRejected > 0 ? 'red' : 'green',
+      icon: <ShoppingCartOutlined className="text-2xl" style={{ color: '#d97706' }} />,
+      title: '订单管理',
+      desc: '确认、签署、收款',
+      path: '/orders',
+      color: '#fef3c7',
     },
     {
-      label: '履约中',
-      value: orderStats.inTransit,
-      hint: '配送中订单',
-      status: orderStats.inTransit > 0 ? '跟进中' : '无',
-      color: orderStats.inTransit > 0 ? 'blue' : 'default',
+      icon: <TruckOutlined className="text-2xl" style={{ color: '#059669' }} />,
+      title: '履约出库',
+      desc: '核销提货码',
+      path: '/fulfillment',
+      color: '#f0fdf4',
+    },
+    {
+      icon: <RiseOutlined className="text-2xl" style={{ color: '#7c3aed' }} />,
+      title: '竞价管理',
+      desc: '参与和管理竞价',
+      path: '/bidding',
+      color: '#f5f3ff',
     },
   ]
 
@@ -326,49 +382,37 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-w-0">
-      <Card className="mb-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <Title level={4} className="!mb-1">
-              今日工作台{user?.phone ? `，${user.phone}` : ''}
-            </Title>
-            <Paragraph className="!mb-0 !text-gray-500">
-              按待处理优先级进入商品、订单和履约页面，减少重复看数。
-            </Paragraph>
-          </div>
-          <Space>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate('/products')}
-            >
-              发布商品
-            </Button>
-            <Button
-              type="default"
-              icon={<RiseOutlined />}
-              onClick={() => navigate('/bidding')}
-            >
-              参与竞价
-            </Button>
-            <Button
-              type="default"
-              icon={<ShoppingCartOutlined />}
-              onClick={() => navigate('/orders')}
-            >
-              处理订单
-            </Button>
-          </Space>
-        </div>
-      </Card>
+    <div className="space-y-6 min-w-0">
+      <div>
+        <Title level={4} className="!mb-1">工作台</Title>
+        <Text className="text-gray-400">
+          {user?.phone || '卖家'}，欢迎回来！
+        </Text>
+      </div>
 
-      <Card className="mb-6" title={
-          <Space>
-            <ExclamationCircleOutlined className="text-orange-500" />
-            <span>待处理队列</span>
-          </Space>
-        }>
+      <Row gutter={[16, 16]}>
+        {kpiCards.map((card) => (
+          <Col key={card.label} xs={24} sm={12} lg={6}>
+            <Card className="rounded-xl hover:shadow-md transition-shadow" bodyStyle={{ padding: '20px' }}>
+              <div className="flex justify-between items-start mb-3">
+                <Text className="text-gray-500 text-sm">{card.label}</Text>
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center text-lg"
+                  style={{ background: card.accent + '1a', color: card.accent }}
+                >
+                  {card.icon}
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-gray-900 font-mono tracking-tight">
+                {card.value}
+              </div>
+              <Text className="text-xs text-gray-400 mt-1 block">{card.sub}</Text>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      <Card className="rounded-xl" title="待办聚合">
         {todos.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
             {todos.map((todo) => (
@@ -402,8 +446,8 @@ export default function DashboardPage() {
         )}
       </Card>
 
-      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <Card title="近期需跟进订单">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card title="近期订单" className="rounded-xl">
           {recentOrders.length > 0 ? (
             <Table
               columns={columns}
@@ -420,27 +464,23 @@ export default function DashboardPage() {
           )}
         </Card>
 
-        <Card title="经营状态">
+        <Card title="快捷入口" className="rounded-xl h-full">
           <div className="space-y-3">
-            {healthItems.map((item) => (
-              <div key={item.label} className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <Text className="font-medium text-gray-900">{item.label}</Text>
-                    <div className="mt-1 text-sm text-gray-500">{item.hint}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-semibold text-gray-900">{item.value}</div>
-                    <Tag color={item.color}>{item.status}</Tag>
-                  </div>
+            {shortcuts.map((item) => (
+              <div
+                key={item.path}
+                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:shadow-sm transition-shadow"
+                style={{ background: item.color }}
+                onClick={() => navigate(item.path)}
+              >
+                <div className="shrink-0">{item.icon}</div>
+                <div className="flex-1 min-w-0">
+                  <Text className="font-medium block">{item.title}</Text>
+                  <Text className="text-xs text-gray-400">{item.desc}</Text>
                 </div>
+                <ArrowRightOutlined className="text-gray-300 text-xs" />
               </div>
             ))}
-          </div>
-          <div className="mt-4 rounded-lg bg-blue-50 px-4 py-3">
-            <div className="text-sm font-medium text-blue-900">有效订单金额</div>
-            <div className="mt-1 text-2xl font-semibold text-blue-900">¥{orderStats.totalAmount.toLocaleString()}</div>
-            <div className="mt-1 text-sm text-blue-700">已完成 {orderStats.completed} 单，待支付 {orderStats.pendingPayment} 单</div>
           </div>
         </Card>
       </div>
