@@ -76,6 +76,7 @@ const statusMap: Record<number, { label: string; color: string }> = {
   24: { label: '待重新选仓', color: 'volcano' },
   25: { label: '待重新发起物流', color: 'volcano' },
   26: { label: '待选择仓库', color: 'geekblue' },
+  27: { label: '待签署物流合同', color: 'gold' },
 }
 
 const shipmentStatusText: Record<string, string> = {
@@ -220,13 +221,13 @@ function formatContractStatus(contractInfo?: { buyer_signed: boolean; seller_sig
 function getCurrentStep(status: number) {
   if (status === 0 || status === 1) return 0
   if (status === 12) return 1
-  if (status === 13 || status === 24 || status === 25) return 2
+  if (status === 13 || status === 24 || status === 26) return 2
   if (status === 14) return 3
   if (status === 15) return 4
   if (status === 2) return 5
   if (status === 3 || status === 22 || status === 23) return 6
   if (status === 4) return 6
-  if (status === 16 || status === 17 || status === 27) return 7
+  if (status === 16 || status === 17 || status === 25 || status === 27) return 7
   if (status === 5 || status === 6 || status === 18 || status === 7) return 8
   if (status === 19 || status === 20) return 9
   if (status === 8 || status === 21) return 10
@@ -338,7 +339,7 @@ function getStatusNotice(
       message: '下一步：等待仓储方确认仓库条件。',
     }
   }
-  if (status === 25) {
+  if (status === 26) {
     return {
       type: 'warning' as const,
       title: '当前状态：待选择仓库',
@@ -445,7 +446,7 @@ function getStatusNotice(
       message: '下一步：请按合同约定确认物流资源。',
     }
   }
-  if (status === 24) {
+  if (status === 25) {
     return {
       type: 'warning' as const,
       title: '当前状态：待重新发起物流',
@@ -686,7 +687,8 @@ export default function OrderDetailPage() {
       order?.status === 3 ||
       order?.status === 12 ||
       order?.status === 24 ||
-      order?.status === 25) &&
+      order?.status === 25 ||
+      order?.status === 26) &&
     !order?.payment_info?.voucher_url
 
   const openFinanceModal = () => {
@@ -1638,13 +1640,13 @@ export default function OrderDetailPage() {
                     上传支付凭证
                   </Button>
                 )}
-                {(order.status === 24 || order.status === 25) && (
+                {(order.status === 24 || order.status === 26) && (
                   <Button
                     type="primary"
                     icon={<EnvironmentOutlined />}
                     onClick={() => setWarehouseOpen(true)}
                   >
-                    {order.status === 25 ? '选择仓储方' : '重新选择仓储方'}
+                    {order.status === 26 ? '选择仓储方' : '重新选择仓储方'}
                   </Button>
                 )}
                 {order.status === 12 && (

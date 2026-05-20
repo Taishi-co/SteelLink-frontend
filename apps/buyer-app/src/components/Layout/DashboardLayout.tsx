@@ -20,7 +20,7 @@ import {
   CloudServerOutlined,
   MailOutlined,
 } from '@ant-design/icons'
-import { clearBuyerSession, getBuyerToken, hasEnterpriseAccess } from '@/services/auth'
+import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
 import { useUserStore } from '@/stores'
 import { getIdentityStatusLabel, certificationService } from '@/services/certificationService'
 import type { EnterpriseServicePermission } from '@/services/certificationService'
@@ -100,11 +100,9 @@ export default function DashboardLayout() {
   const location = useLocation()
   const { user, logout } = useUserStore()
   const sellerBaseURL = getCrossAppBaseURL(5174)
-  const sharedToken = getBuyerToken()
-  const tokenParam = sharedToken ? `?token=${encodeURIComponent(sharedToken)}` : ''
-  const financeWorkbenchHref = `${getCrossAppBaseURL(5177)}/finance/${tokenParam}`
-  const logisticsWorkbenchHref = `${getCrossAppBaseURL(5175)}/logistics/${tokenParam}`
-  const warehouseWorkbenchHref = `${getCrossAppBaseURL(5176)}/warehouse/${tokenParam}`
+  const financeWorkbenchHref = `${getCrossAppBaseURL(5177)}/finance/`
+  const logisticsWorkbenchHref = `${getCrossAppBaseURL(5175)}/logistics/`
+  const warehouseWorkbenchHref = `${getCrossAppBaseURL(5176)}/warehouse/`
 
   useEffect(() => {
     if (!hasEnterpriseAccess(user)) {

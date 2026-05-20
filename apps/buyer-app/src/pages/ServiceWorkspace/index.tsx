@@ -30,17 +30,13 @@ import {
   EnterpriseServiceApplicationPayload,
   EnterpriseServicePermission,
 } from '@/services/certificationService'
-import { getSellerCenterHref, getBuyerToken } from '@/services/auth'
+import { getSellerCenterHref } from '@/services/auth'
 import { uploadService } from '@/services/uploadService'
 import { getEffectiveServiceStatus, type ServiceKey } from '@/pages/Dashboard/serviceAccess'
 import { useUserStore } from '@/stores'
 
 function getWorkbenchHref(port: number, path: string, tab?: string) {
   const params = new URLSearchParams()
-  const sharedToken = getBuyerToken()
-  if (sharedToken) {
-    params.set('token', sharedToken)
-  }
   if (tab) {
     params.set('tab', tab)
   }

@@ -35,21 +35,27 @@ const statusMap: Record<number, { label: string; color: string }> = {
 }
 
 function getStatusAction(order: { status: number; payment_info?: { voucher_url?: string }; delivery_info?: { pickup_code?: string } }) {
-  if (order.status === 12) return '等待仓储方确认仓库条件'
-  if (order.status === 13) return '等待卖方确认条款'
-  if (order.status === 14) return '等待买方确认订单'
+  if (order.status === 12) return '请选择目的地仓储'
+  if (order.status === 13) return '等待仓储方确认仓库条件'
+  if (order.status === 14) return '等待卖方确认条款'
   if (order.status === 3) return '待买家上传支付凭证或申请融资'
-  if (order.status === 21) return '资金方风控审批中'
-  if (order.status === 22) return '请签署融资合同'
+  if (order.status === 21) return '已归档'
+  if (order.status === 22) return '资金方风控审批中'
+  if (order.status === 23) return '请签署融资合同'
   if (order.status === 4) return '支付完成，等待物流'
   if (order.status === 15) return '待买方确认订单'
   if (order.status === 16) return '物流竞价中，等待卖家选择'
   if (order.status === 5) return '待提货/运输'
   if (order.status === 17) return '卖家已选择物流，等待买家确认'
+  if (order.status === 24) return '请重新选择仓储方'
+  if (order.status === 25) return '等待卖方重新发起物流'
+  if (order.status === 26) return '请选择仓储方'
   if (order.status === 27) return '买家已确认，请签署物流合同'
   if (order.status === 7 || order.status === 6) return '待买家确认收货'
-  if (order.status === 18) return '已收货，等待对账'
-  if (order.status === 8 || order.status === 19 || order.status === 20) return '已完成'
+  if (order.status === 18) return '运输中，等待签收'
+  if (order.status === 19) return '已收货，等待对账'
+  if (order.status === 20) return '已对账，待归档'
+  if (order.status === 8) return '已完成'
   if (order.status === 9) return '已取消'
   return `状态${order.status}`
 }
@@ -66,8 +72,8 @@ export default function OrdersPage() {
     all: orders.length,
     pendingPayment: orders.filter((order) => order.status === 3).length,
     pendingDelivery: orders.filter((order) => order.status === 5).length,
-    delivering: orders.filter((order) => order.status === 6).length,
-    completed: orders.filter((order) => order.status === 8).length,
+    delivering: orders.filter((order) => [6, 18].includes(order.status)).length,
+    completed: orders.filter((order) => [8, 19, 20, 21].includes(order.status)).length,
   }
 
   return (
