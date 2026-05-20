@@ -38,6 +38,8 @@ interface SwitchSessionResponse {
   switch_token: string
 }
 
+type SwitchTarget = 'seller' | 'logistics' | 'warehouse' | 'finance'
+
 export interface BuyerLoginPayload {
   account: string
   password: string
@@ -52,6 +54,7 @@ export interface BuyerRegisterPayload {
 const TOKEN_KEY = 'buyer_token'
 const USER_KEY = 'buyer_user'
 const SELLER_TOKEN_KEY = 'seller_token'
+const SHARED_TOKEN_KEYS = [TOKEN_KEY, SELLER_TOKEN_KEY, 'logistics_token', 'warehouse_token', 'finance_token', 'token']
 export const BUYER_TOKEN_REFRESH_EVENT = 'buyer-token-refreshed'
 let memoryToken: string | null = null
 let memoryUser: User | null = null
@@ -87,6 +90,11 @@ function getStorageItem(keys: string[]) {
   for (const key of keys) {
     const value = localStorage.getItem(key) || sessionStorage.getItem(key) || getCookie(key)
     if (value) {
+      if (isTokenStorageKey(key) && isJwtExpired(value)) {
+        removeStorageItem(key)
+        removeCookie(key)
+        continue
+      }
       return value
     }
   }
@@ -98,14 +106,25 @@ function removeStorageItem(key: string) {
   sessionStorage.removeItem(key)
 }
 
+function isTokenStorageKey(key: string) {
+  return key === 'token' || key.endsWith('_token')
+}
+
+function isJwtExpired(token: string, skewSeconds = 30) {
+  const payload = parseJwtPayload(token)
+  const exp = payload?.exp
+  const expiresAt = typeof exp === 'number' ? exp : Number(exp || 0)
+  return !expiresAt || expiresAt * 1000 <= Date.now() + skewSeconds * 1000
+}
+
 export const buyerAuthService = {
   login: (payload: BuyerLoginPayload) =>
     api.post<unknown, ApiResponse<LoginResponse>>('/auth/login', payload),
   register: (payload: BuyerRegisterPayload) =>
     api.post<unknown, ApiResponse<LoginResponse>>('/auth/register', payload),
   me: () => api.get<unknown, ApiResponse<BuyerProfile>>('/users/me'),
-  createSwitchSession: () =>
-    api.post<unknown, ApiResponse<SwitchSessionResponse>>('/auth/switch-session', { target: 'seller' }),
+  createSwitchSession: (target: SwitchTarget = 'seller') =>
+    api.post<unknown, ApiResponse<SwitchSessionResponse>>('/auth/switch-session', { target }),
   consumeSwitchSession: (switchToken: string) =>
     api.post<unknown, ApiResponse<LoginResponse>>('/auth/switch-session/consume', { switch_token: switchToken, target: 'buyer' }),
 }
@@ -166,11 +185,19 @@ export function getBuyerUser(): User | null {
 }
 
 export function getBuyerToken() {
-  const token = getStorageItem([TOKEN_KEY]) || memoryToken
-  if (token) {
-    setCookie(TOKEN_KEY, token)
+  const storedToken = getStorageItem(SHARED_TOKEN_KEYS)
+  if (storedToken) {
+    memoryToken = storedToken
+    setStorageItem(TOKEN_KEY, storedToken)
+    setCookie(TOKEN_KEY, storedToken)
+    return storedToken
   }
-  return token
+  if (memoryToken && !isJwtExpired(memoryToken)) {
+    setCookie(TOKEN_KEY, memoryToken)
+    return memoryToken
+  }
+  memoryToken = null
+  return null
 }
 
 export function saveBuyerToken(token: string) {
@@ -239,4 +266,41 @@ export function getSellerCenterHref(path = '/seller/dashboard') {
     return `${base}${targetPath}`
   }
   return `${base}/seller/login?redirect=${encodeURIComponent(targetPath)}`
+}
+
+export async function openSellerCenter(path = '/seller/dashboard') {
+  const targetPath = path.startsWith('/seller') ? path : `/seller${path}`
+  const base = getCrossAppBaseURL(5174)
+
+  try {
+    const response = await buyerAuthService.createSwitchSession()
+    if (response.code === 0 && response.data?.switch_token) {
+      window.location.href = `${base}/seller/login?switch_token=${encodeURIComponent(response.data.switch_token)}&redirect=${encodeURIComponent(targetPath)}`
+      return
+    }
+  } catch {
+    // Fall back to the target app's own session handling below.
+  }
+
+  window.location.href = getSellerCenterHref(targetPath)
+}
+
+export async function openServiceWorkbench(target: Exclude<SwitchTarget, 'seller'>, port: number, path: string, tab?: string) {
+  const base = getCrossAppBaseURL(port)
+  const params = new URLSearchParams()
+  if (tab) {
+    params.set('tab', tab)
+  }
+
+  try {
+    const response = await buyerAuthService.createSwitchSession(target)
+    if (response.code === 0 && response.data?.switch_token) {
+      params.set('switch_token', response.data.switch_token)
+    }
+  } catch {
+    // Fall back to shared-token handling in the target workbench.
+  }
+
+  const query = params.toString()
+  window.location.href = `${base}${path}${query ? `?${query}` : ''}`
 }

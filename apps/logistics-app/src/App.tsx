@@ -56,7 +56,13 @@ import type {
   LogisticsVehicle,
   LogisticsVehiclePayload,
 } from '@/services/fleetService'
-import { getLogisticsToken, hasLogisticsCapability } from '@/services/auth'
+import {
+  getLogisticsToken,
+  hasLogisticsCapability,
+  logisticsAuthService,
+  saveLogisticsSession,
+  saveLogisticsToken,
+} from '@/services/auth'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -103,18 +109,46 @@ function App() {
   )
 
   useEffect(() => {
+    let cancelled = false
     const urlParams = new URLSearchParams(window.location.search)
+    const token = urlParams.get('token')
+    const switchToken = urlParams.get('switch_token')
     const tab = urlParams.get('tab')
-    if (isTabKey(tab)) {
-      setActiveTab(tab)
+
+    const prepareSession = async () => {
+      if (token) {
+        saveLogisticsToken(token)
+      }
+      if (switchToken) {
+        try {
+          const response = await logisticsAuthService.consumeSwitchSession(switchToken)
+          if (response.code !== 0 || !response.data) {
+            throw new Error(response.message || '切换登录失败')
+          }
+          saveLogisticsSession(response.data.access_token, response.data.user)
+        } catch {
+          message.error('切换到物流工作台失败，请重新从个人工作台进入')
+        }
+      }
+      if (isTabKey(tab)) {
+        setActiveTab(tab)
+      }
+      if (urlParams.has('token') || urlParams.has('switch_token') || tab) {
+        urlParams.delete('token')
+        urlParams.delete('switch_token')
+        urlParams.delete('tab')
+        const query = urlParams.toString()
+        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+      }
+      if (!cancelled) {
+        setTokenReady(true)
+      }
     }
-    if (urlParams.has('token') || tab) {
-      urlParams.delete('token')
-      urlParams.delete('tab')
-      const query = urlParams.toString()
-      window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+
+    void prepareSession()
+    return () => {
+      cancelled = true
     }
-    setTokenReady(true)
   }, [])
 
   const hasLogisticsSession = tokenReady && Boolean(getLogisticsToken())

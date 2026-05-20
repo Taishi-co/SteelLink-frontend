@@ -12,7 +12,7 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { clearBuyerSession, hasEnterpriseAccess } from '@/services/auth'
+import { clearBuyerSession, hasEnterpriseAccess, openSellerCenter } from '@/services/auth'
 import { getIdentityStatusLabel } from '@/services/certificationService'
 import { useUserStore } from '@/stores'
 import NotificationBell from '@/components/NotificationBell'
@@ -34,10 +34,8 @@ export default function HomeHeader() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, isLoggedIn, logout } = useUserStore()
-  const sellerBaseURL = import.meta.env.DEV ? 'http://localhost:5174' : ''
-
   const switchToSellerCenter = () => {
-    window.location.href = `${sellerBaseURL}/seller/dashboard`
+    void openSellerCenter('/seller/dashboard')
   }
 
   const handleLogout = () => {

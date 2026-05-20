@@ -11,6 +11,7 @@ import {
   getBuyerToken,
   hasEnterpriseAccess,
   normalizeBuyerUser,
+  openSellerCenter,
   updateBuyerSessionUser,
 } from '@/services/auth'
 import type { CreateEnterprisePayload, EnterpriseInfo } from '@/services/certificationService'
@@ -80,10 +81,8 @@ export default function EnterprisePage() {
   const navigate = useNavigate()
   const user = useUserStore((s) => s.user)
   const login = useUserStore((s) => s.login)
-  const sellerBaseURL = import.meta.env.DEV ? 'http://localhost:5174' : ''
-
   const switchToSellerCenter = () => {
-    window.location.href = `${sellerBaseURL}/seller/dashboard`
+    void openSellerCenter('/seller/dashboard')
   }
 
   const checkEnterprise = useCallback(async (enterpriseCode?: string) => {

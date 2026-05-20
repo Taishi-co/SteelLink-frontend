@@ -32,6 +32,10 @@ interface ApiResponse<T> {
   data: T
 }
 
+interface SwitchSessionResponse {
+  switch_token: string
+}
+
 export interface SellerLoginPayload {
   account: string
   password: string
@@ -48,6 +52,7 @@ const TOKEN_KEY = 'seller_token'
 const USER_KEY = 'seller_user'
 const ENTERPRISE_ROLE_KEY = 'seller_enterprise_role'
 const BUYER_TOKEN_KEY = 'buyer_token'
+const SHARED_TOKEN_KEYS = [TOKEN_KEY, BUYER_TOKEN_KEY, 'logistics_token', 'warehouse_token', 'finance_token', 'token']
 
 function setCookie(name: string, value: string) {
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; SameSite=Lax`
@@ -71,6 +76,11 @@ function getStorageItem(keys: string[]) {
   for (const key of keys) {
     const value = localStorage.getItem(key) || sessionStorage.getItem(key) || getCookie(key)
     if (value) {
+      if (isTokenStorageKey(key) && isJwtExpired(value)) {
+        removeStorageItem(key)
+        removeCookie(key)
+        continue
+      }
       return value
     }
   }
@@ -81,10 +91,28 @@ function removeCookie(name: string) {
   document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`
 }
 
+function removeStorageItem(key: string) {
+  localStorage.removeItem(key)
+  sessionStorage.removeItem(key)
+}
+
+function isTokenStorageKey(key: string) {
+  return key === 'token' || key.endsWith('_token')
+}
+
+function isJwtExpired(token: string, skewSeconds = 30) {
+  const payload = parseJwtPayload(token)
+  const exp = payload?.exp
+  const expiresAt = typeof exp === 'number' ? exp : Number(exp || 0)
+  return !expiresAt || expiresAt * 1000 <= Date.now() + skewSeconds * 1000
+}
+
 export const sellerAuthService = {
   login: (payload: SellerLoginPayload) => api.post<unknown, ApiResponse<LoginResponse>>('/auth/login', payload),
   register: (payload: SellerRegisterPayload) => api.post<unknown, ApiResponse<LoginResponse>>('/auth/register', payload),
   me: () => api.get<unknown, ApiResponse<SellerUser>>('/users/me'),
+  createSwitchSession: () =>
+    api.post<unknown, ApiResponse<SwitchSessionResponse>>('/auth/switch-session', { target: 'buyer' }),
   consumeSwitchSession: (switchToken: string) =>
     api.post<unknown, ApiResponse<LoginResponse>>('/auth/switch-session/consume', { switch_token: switchToken, target: 'seller' }),
 }
@@ -163,7 +191,13 @@ export function clearSellerSession() {
 }
 
 export function getSellerToken() {
-  return getStorageItem([TOKEN_KEY])
+  const token = getStorageItem(SHARED_TOKEN_KEYS)
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token)
+    sessionStorage.setItem(TOKEN_KEY, token)
+    setCookie(TOKEN_KEY, token)
+  }
+  return token
 }
 
 export function getSellerUser(): SellerUser | null {
@@ -227,11 +261,35 @@ export function hasSavedBuyerSession() {
   return Boolean(getStorageItem([BUYER_TOKEN_KEY]))
 }
 
+function getCrossAppBaseURL(port: number) {
+  if (!import.meta.env.DEV) {
+    return ''
+  }
+  return `${window.location.protocol || 'http:'}//${window.location.hostname || 'localhost'}:${port}`
+}
+
 export function getBuyerCenterHref(path = '/dashboard') {
   const targetPath = path.startsWith('/') ? path : `/${path}`
-  const base = import.meta.env.DEV ? 'http://localhost:5173' : ''
+  const base = getCrossAppBaseURL(5173)
   if (hasSavedBuyerSession()) {
     return `${base}${targetPath}`
   }
   return `${base}/login?redirect=${encodeURIComponent(targetPath)}`
+}
+
+export async function openBuyerCenter(path = '/dashboard') {
+  const targetPath = path.startsWith('/') ? path : `/${path}`
+  const base = getCrossAppBaseURL(5173)
+
+  try {
+    const response = await sellerAuthService.createSwitchSession()
+    if (response.code === 0 && response.data?.switch_token) {
+      window.location.href = `${base}/login?switch_token=${encodeURIComponent(response.data.switch_token)}&redirect=${encodeURIComponent(targetPath)}`
+      return
+    }
+  } catch {
+    // Fall back to the target app's own session handling below.
+  }
+
+  window.location.href = getBuyerCenterHref(targetPath)
 }

@@ -30,24 +30,10 @@ import {
   EnterpriseServiceApplicationPayload,
   EnterpriseServicePermission,
 } from '@/services/certificationService'
-import { getSellerCenterHref } from '@/services/auth'
+import { openSellerCenter, openServiceWorkbench } from '@/services/auth'
 import { uploadService } from '@/services/uploadService'
 import { getEffectiveServiceStatus, type ServiceKey } from '@/pages/Dashboard/serviceAccess'
 import { useUserStore } from '@/stores'
-
-function getWorkbenchHref(port: number, path: string, tab?: string) {
-  const params = new URLSearchParams()
-  if (tab) {
-    params.set('tab', tab)
-  }
-  const query = params.toString()
-  if (!import.meta.env.DEV) {
-    return `${path}${query ? `?${query}` : ''}`
-  }
-  const protocol = window.location.protocol || 'http:'
-  const hostname = window.location.hostname || 'localhost'
-  return `${protocol}//${hostname}:${port}${path}${query ? `?${query}` : ''}`
-}
 
 const SHARED_PERMISSIONS_KEY = 'enterprise_service_permissions'
 
@@ -61,7 +47,7 @@ const serviceConfig: Record<
     description: string
     enterpriseRole: string
     icon: React.ReactNode
-    actions: Array<{ label: string; href: () => string }>
+    actions: Array<{ label: string; href?: () => string; onClick?: () => void }>
   }
 > = {
   sales: {
@@ -70,9 +56,9 @@ const serviceConfig: Record<
     enterpriseRole: '供应商',
     icon: <ShopOutlined />,
     actions: [
-      { label: '进入卖家中心', href: () => getSellerCenterHref('/seller/dashboard') },
-      { label: '参与竞价', href: () => getSellerCenterHref('/seller/bidding') },
-      { label: '商品管理', href: () => getSellerCenterHref('/seller/products') },
+      { label: '进入卖家中心', onClick: () => void openSellerCenter('/seller/dashboard') },
+      { label: '参与竞价', onClick: () => void openSellerCenter('/seller/bidding') },
+      { label: '商品管理', onClick: () => void openSellerCenter('/seller/products') },
     ],
   },
   procurement: {
@@ -91,8 +77,8 @@ const serviceConfig: Record<
     enterpriseRole: '物流方',
     icon: <TruckOutlined />,
     actions: [
-      { label: '进入物流管理中心', href: () => getWorkbenchHref(5175, '/logistics/') },
-      { label: '运力资源管理', href: () => getWorkbenchHref(5175, '/logistics/', 'resources') },
+      { label: '进入物流管理中心', onClick: () => void openServiceWorkbench('logistics', 5175, '/logistics/') },
+      { label: '运力资源管理', onClick: () => void openServiceWorkbench('logistics', 5175, '/logistics/', 'resources') },
     ],
   },
   warehouse: {
@@ -101,8 +87,8 @@ const serviceConfig: Record<
     enterpriseRole: '仓储方',
     icon: <HomeOutlined />,
     actions: [
-      { label: '进入仓储管理中心', href: () => getWorkbenchHref(5176, '/warehouse/') },
-      { label: '仓储资源管理', href: () => getWorkbenchHref(5176, '/warehouse/', 'resources') },
+      { label: '进入仓储管理中心', onClick: () => void openServiceWorkbench('warehouse', 5176, '/warehouse/') },
+      { label: '仓储资源管理', onClick: () => void openServiceWorkbench('warehouse', 5176, '/warehouse/', 'resources') },
     ],
   },
   finance: {
@@ -111,8 +97,8 @@ const serviceConfig: Record<
     enterpriseRole: '资金方',
     icon: <BankOutlined />,
     actions: [
-      { label: '进入资金方工作台', href: () => getWorkbenchHref(5177, '/finance/') },
-      { label: '金融产品管理', href: () => getWorkbenchHref(5177, '/finance/', 'products') },
+      { label: '进入资金方工作台', onClick: () => void openServiceWorkbench('finance', 5177, '/finance/') },
+      { label: '金融产品管理', onClick: () => void openServiceWorkbench('finance', 5177, '/finance/', 'products') },
     ],
   },
 }
@@ -263,11 +249,17 @@ export default function ServiceWorkspace() {
             {status === 2 ? (
               <Space direction="vertical" className="w-full">
                 {config.actions.map((action) => (
-                  <a key={action.label} href={action.href()}>
-                    <Button type="primary" block icon={<CheckCircleOutlined />}>
+                  action.href ? (
+                    <a key={action.label} href={action.href()}>
+                      <Button type="primary" block icon={<CheckCircleOutlined />}>
+                        {action.label}
+                      </Button>
+                    </a>
+                  ) : (
+                    <Button key={action.label} type="primary" block icon={<CheckCircleOutlined />} onClick={action.onClick}>
                       {action.label}
                     </Button>
-                  </a>
+                  )
                 ))}
               </Space>
             ) : (
