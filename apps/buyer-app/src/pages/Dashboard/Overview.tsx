@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Row, Col, Card, Typography, Tag, Spin, Empty } from 'antd'
+import { Alert, Row, Col, Card, Typography, Tag, Spin, Empty } from 'antd'
 import {
   DollarOutlined,
   ClockCircleOutlined,
@@ -11,8 +11,10 @@ import {
   UnorderedListOutlined,
   ArrowRightOutlined,
   RightOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons'
 import api from '@/services/api'
+import { orderService, type OrderInfo } from '@/services/orderService'
 import { useUserStore } from '@/stores'
 import { getIdentityStatusLabel } from '@/services/certificationService'
 
@@ -57,6 +59,27 @@ interface RecentOrderRaw {
 interface DashboardRaw {
   stats?: DashboardRawStats
   recent_orders?: RecentOrderRaw[]
+}
+
+interface TodoOrder {
+  id: number
+  orderNo: string
+  status: number
+  amount: number
+  productName: string
+}
+
+interface TodoItem {
+  key: string
+  title: string
+  description: string
+  count: number
+  amount: number
+  icon: ReactNode
+  color: string
+  actionText: string
+  firstOrderId: number
+  sampleOrderNo: string
 }
 
 const ORDER_STATUS_MAP: Record<number, { label: string; color: string }> = {
@@ -108,6 +131,7 @@ export default function DashboardOverview() {
     stockQuantity: 0,
   })
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
+  const [allOrders, setAllOrders] = useState<OrderInfo[]>([])
 
   useEffect(() => {
     fetchDashboard()
@@ -116,9 +140,12 @@ export default function DashboardOverview() {
   const fetchDashboard = async () => {
     try {
       setLoading(true)
-      const res = await api.get<unknown, { code: number; data?: DashboardRaw }>('/users/me/dashboard')
-      if (res.code === 0 && res.data) {
-        const raw = res.data
+      const [dashboardRes, orderRes] = await Promise.allSettled([
+        api.get<unknown, { code: number; data?: DashboardRaw }>('/users/me/dashboard'),
+        orderService.list(),
+      ])
+      if (dashboardRes.status === 'fulfilled' && dashboardRes.value.code === 0 && dashboardRes.value.data) {
+        const raw = dashboardRes.value.data
         setStats({
           inTransitAmount: raw.stats?.in_transit_amount ?? raw.stats?.inTransitAmount ?? 0,
           pendingPaymentCount: raw.stats?.pending_payment_count ?? raw.stats?.pendingPaymentCount ?? 0,
@@ -134,6 +161,9 @@ export default function DashboardOverview() {
           product_name: o.product_name,
         }))
         setRecentOrders(orders)
+      }
+      if (orderRes.status === 'fulfilled') {
+        setAllOrders(orderRes.value.list || [])
       }
     } catch (error) {
       void error
@@ -204,6 +234,82 @@ export default function DashboardOverview() {
     },
   ]
 
+  const todoSource: TodoOrder[] = allOrders.length > 0
+    ? allOrders.map((order) => ({
+        id: order.id,
+        orderNo: order.order_no,
+        status: order.status,
+        amount: order.tax_total_amount || order.total_amount || 0,
+        productName: order.items?.[0]?.product_name || '商品',
+      }))
+    : recentOrders.map((order) => ({
+        id: order.id,
+        orderNo: order.order_no,
+        status: order.status,
+        amount: order.total_amount || 0,
+        productName: order.product_name || '商品',
+      }))
+
+  const todoRules = [
+    {
+      key: 'warehouse',
+      title: '仓储选择待处理',
+      description: '选择或重选收货仓，推动仓储确认',
+      statuses: [12, 24, 26],
+      icon: <InboxOutlined />,
+      color: '#7c3aed',
+      actionText: '选择仓储',
+    },
+    {
+      key: 'buyer-confirm',
+      title: '买方确认待处理',
+      description: '核对卖方确认结果后继续合同与支付',
+      statuses: [15],
+      icon: <CheckCircleOutlined />,
+      color: '#2563eb',
+      actionText: '确认订单',
+    },
+    {
+      key: 'contract',
+      title: '合同签署待处理',
+      description: '完成采购合同或物流合同签署',
+      statuses: [2, 27],
+      icon: <SafetyCertificateOutlined />,
+      color: '#d97706',
+      actionText: '去签署',
+    },
+    {
+      key: 'payment',
+      title: '支付/融资待处理',
+      description: '上传支付凭证，或从订单申请融资',
+      statuses: [3, 23],
+      icon: <BankOutlined />,
+      color: '#059669',
+      actionText: '处理资金',
+    },
+    {
+      key: 'logistics',
+      title: '物流确认待处理',
+      description: '确认物流报价、跟进运输并完成签收',
+      statuses: [17, 18, 6, 7],
+      icon: <ClockCircleOutlined />,
+      color: '#0891b2',
+      actionText: '跟进物流',
+    },
+  ]
+
+  const todoItems: TodoItem[] = todoRules.flatMap((rule) => {
+    const matched = todoSource.filter((order) => rule.statuses.includes(order.status))
+    if (matched.length === 0) return []
+    return [{
+      ...rule,
+      count: matched.length,
+      amount: matched.reduce((sum, order) => sum + order.amount, 0),
+      firstOrderId: matched[0].id,
+      sampleOrderNo: matched[0].orderNo,
+    }]
+  })
+
   return (
     <div className="space-y-6">
       <div>
@@ -239,6 +345,54 @@ export default function DashboardOverview() {
           ))}
         </Row>
       </Spin>
+
+      <Card
+        title={
+          <div className="flex items-center justify-between">
+            <span>待办聚合</span>
+            <a className="text-sm flex items-center gap-1" onClick={() => navigate('/dashboard/orders')}>
+              订单中心 <RightOutlined className="text-[10px]" />
+            </a>
+          </div>
+        }
+        className="rounded-xl"
+      >
+        {todoItems.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {todoItems.map((todo) => (
+              <button
+                key={todo.key}
+                type="button"
+                className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-left transition hover:border-blue-200 hover:bg-blue-50"
+                onClick={() => navigate(`/dashboard/orders/${todo.firstOrderId}`)}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 text-2xl" style={{ color: todo.color }}>{todo.icon}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <Text className="font-medium text-gray-900">{todo.title}</Text>
+                      <Text className="text-2xl font-semibold text-gray-900">{todo.count}</Text>
+                    </div>
+                    <div className="mt-1 text-sm text-gray-500">{todo.description}</div>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <Text className="text-xs text-gray-400">样例 {todo.sampleOrderNo}</Text>
+                      <Text className="text-xs font-medium text-gray-500">{formatAmount(todo.amount)}</Text>
+                    </div>
+                    <div className="mt-3 text-sm font-medium text-blue-600">{todo.actionText}</div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Alert
+            type="success"
+            showIcon
+            message="当前没有买方待办"
+            description="可继续浏览资源、发起采购，或进入订单中心查看历史交易。"
+          />
+        )}
+      </Card>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={16}>

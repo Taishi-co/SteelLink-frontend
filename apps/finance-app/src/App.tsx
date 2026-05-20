@@ -1,89 +1,31 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Col, Form, Input, InputNumber, Layout, List, Modal, Row, Select, Space, Spin, Steps, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Col, Form, Input, InputNumber, List, Modal, Row, Select, Space, Spin, Steps, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   AuditOutlined,
-  BankOutlined,
   DollarCircleOutlined,
   FileSearchOutlined,
-  HomeOutlined,
-  SafetyCertificateOutlined,
   EditOutlined,
   DeleteOutlined,
-  DotChartOutlined,
-  ControlOutlined,
 } from '@ant-design/icons'
+import { CapabilityDeniedState, LoadingState } from '@/workbench/AccessState'
+import {
+  getFinancingStepInfo,
+  isTabKey,
+  menuGroups,
+  menuItems,
+  productStatusMap,
+  statusMap,
+  warehouseReceiptPledgeStatusMap,
+  type TabKey,
+} from '@/workbench/config'
+import { WorkbenchShell } from '@/workbench/WorkbenchShell'
 import { financeOrderService } from '@/services/orderService'
 import type { CollateralMonitorInfo, OrderInfo, WarehouseReceiptPledgeInfo } from '@/services/orderService'
 import { financeService, type AuthorizedWarehouseInfo, type FinanceServiceItem, type WarehouseServiceItem } from '@/services/financeService'
 import { hasFinanceCapability } from '@/services/auth'
 
-const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography
-
-const statusMap: Record<number, { label: string; color: string }> = {
-  0: { label: '草稿', color: 'default' },
-  1: { label: '待确认', color: 'orange' },
-  2: { label: '待签合同', color: 'cyan' },
-  3: { label: '待付款', color: 'gold' },
-  4: { label: '待确认收款', color: 'purple' },
-  5: { label: '待提货', color: 'geekblue' },
-  6: { label: '配送中', color: 'cyan' },
-  7: { label: '已送达', color: 'green' },
-  8: { label: '已完成', color: 'success' },
-  9: { label: '已终止', color: 'red' },
-  10: { label: '已冻结', color: 'volcano' },
-  11: { label: '异常', color: 'red' },
-  12: { label: '待选择目的地仓储', color: 'geekblue' },
-  13: { label: '待仓库确认', color: 'orange' },
-  14: { label: '待卖方确认', color: 'blue' },
-  15: { label: '待买方确认', color: 'blue' },
-  16: { label: '物流竞价中', color: 'processing' },
-  17: { label: '待确认物流', color: 'blue' },
-  18: { label: '运输中', color: 'cyan' },
-  19: { label: '已收货', color: 'green' },
-  20: { label: '已对账', color: 'success' },
-  21: { label: '已归档', color: 'default' },
-  22: { label: '融资审批中', color: 'purple' },
-  23: { label: '待签署融资合同', color: 'magenta' },
-  24: { label: '待重新选仓', color: 'volcano' },
-  25: { label: '待重新发起物流', color: 'volcano' },
-  26: { label: '待选择仓库', color: 'geekblue' },
-  27: { label: '待签署物流合同', color: 'gold' },
-}
-
-type TabKey = 'products' | 'risk-review' | 'debt-contract' | 'disburse' | 'pledge' | 'warehouse-receipt-pledge' | 'collateral-monitor' | 'release-pledge' | 'finance-flow' | 'all'
-
-function isTabKey(value: string | null): value is TabKey {
-  return Boolean(value && [
-    'products',
-    'risk-review',
-    'debt-contract',
-    'disburse',
-    'pledge',
-    'warehouse-receipt-pledge',
-    'collateral-monitor',
-    'release-pledge',
-    'finance-flow',
-    'all',
-  ].includes(value))
-}
-const productStatusMap: Record<number, { label: string; color: string }> = {
-  1: { label: '待审核', color: 'processing' },
-  2: { label: '已通过', color: 'success' },
-  3: { label: '已驳回', color: 'error' },
-  4: { label: '已下线', color: 'default' },
-}
-
-const warehouseReceiptPledgeStatusMap: Record<string, { label: string; color: string }> = {
-  submitted: { label: '待风控', color: 'processing' },
-  risk_approved: { label: '风控通过', color: 'cyan' },
-  risk_rejected: { label: '已驳回', color: 'red' },
-  agreement_signed: { label: '协议已签', color: 'blue' },
-  disbursed: { label: '已放款', color: 'green' },
-  releasing: { label: '释放中', color: 'purple' },
-  released: { label: '已释放', color: 'default' },
-}
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('products')
@@ -647,24 +589,6 @@ function App() {
     },
   ]
 
-  const getFinancingStepInfo = (status?: string) => {
-    const stepDefinitions = [
-      { key: 'submitted', title: '申请提交', owner: '买方', hint: '提交融资申请' },
-      { key: 'risk_approved', title: '风控审批', owner: '资金方', hint: '风控审核通过' },
-      { key: 'buyer_confirmed', title: '确认方案', owner: '买方', hint: '确认授信方案' },
-      { key: 'contract_generated', title: '上传合同', owner: '双方', hint: '上传债务质押合同' },
-      { key: 'buyer_signed_fee_paid', title: '支付手续费', owner: '买方', hint: '支付融资手续费' },
-      { key: 'disbursed', title: '付款完成', owner: '资金方', hint: '付款凭证同步给卖方' },
-      { key: 'logistics_collateral', title: '物流入仓', owner: '卖方/物流/仓储', hint: '发起物流并送达监管仓' },
-      { key: 'pledged', title: '确认收货质押', owner: '资金方', hint: '确认监管收货后完成质押' },
-      { key: 'released', title: '质押释放', owner: '资金方', hint: '释放货权质押' },
-    ]
-    const statusOrder = ['submitted', 'risk_approved', 'buyer_confirmed', 'contract_generated', 'buyer_signed_fee_paid', 'disbursed', 'logistics_collateral', 'pledged', 'released']
-    const currentKey = status === 'disbursed' ? 'logistics_collateral' : status
-    const currentStep = currentKey ? statusOrder.indexOf(currentKey) : -1
-    return { stepDefinitions, currentStep }
-  }
-
   const debtColumns: ColumnsType<OrderInfo> = [
     { title: '订单号', dataIndex: 'order_no', key: 'order_no', width: 160 },
     { title: '买方', dataIndex: 'buyer_name', key: 'buyer_name', width: 120 },
@@ -1009,189 +933,42 @@ function App() {
     },
   ]
 
-  const menuItems = [
-    { key: 'products' as TabKey, label: '产品管理', icon: <BankOutlined />, group: 'product' },
-    { key: 'risk-review' as TabKey, label: '风控审批', icon: <AuditOutlined />, group: 'approval' },
-    { key: 'debt-contract' as TabKey, label: '债务合同', icon: <FileSearchOutlined />, group: 'contract' },
-    { key: 'disburse' as TabKey, label: '放款管理', icon: <DollarCircleOutlined />, group: 'contract' },
-    { key: 'pledge' as TabKey, label: '货权质押', icon: <SafetyCertificateOutlined />, group: 'pledge' },
-    { key: 'warehouse-receipt-pledge' as TabKey, label: '仓单质押', icon: <SafetyCertificateOutlined />, group: 'pledge' },
-    { key: 'collateral-monitor' as TabKey, label: '货权监控', icon: <ControlOutlined />, group: 'pledge' },
-    { key: 'release-pledge' as TabKey, label: '质押释放', icon: <EditOutlined />, group: 'pledge' },
-    { key: 'finance-flow' as TabKey, label: '融资流程', icon: <DotChartOutlined />, group: 'center' },
-    { key: 'all' as TabKey, label: '订单中心', icon: <FileSearchOutlined />, group: 'center' },
-  ]
-
   if (!tokenReady) {
-    return (
-      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size="large" />
-      </Layout>
-    )
+    return <LoadingState />
   }
 
   if (!hasFinanceCapability()) {
-    return (
-      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Card style={{ maxWidth: 480, textAlign: 'center' }}>
-          <SafetyCertificateOutlined style={{ fontSize: 48, color: '#faad14', marginBottom: 16 }} />
-          <Title level={4}>需要资金服务商权限</Title>
-          <Paragraph type="secondary">当前账户未开通资金服务商能力，请联系平台管理员申请开通。</Paragraph>
-        </Card>
-      </Layout>
-    )
+    return <CapabilityDeniedState />
+  }
+
+  const refreshActiveTab = () => {
+    if (activeTab === 'products') {
+      void fetchProducts()
+    } else if (activeTab === 'risk-review') {
+      void fetchRiskOrders()
+    } else if (activeTab === 'debt-contract' || activeTab === 'disburse') {
+      void fetchDebtOrders()
+    } else if (activeTab === 'warehouse-receipt-pledge') {
+      void fetchWarehouseReceiptPledges()
+    } else if (activeTab === 'collateral-monitor') {
+      void fetchCollateralMonitor()
+    } else {
+      void fetchAll()
+    }
   }
 
   return (
-    <Layout className="service-shell">
-      <Sider width={232} theme="light">
-        <div style={{ height: 78, display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: '1px solid #eadcc7', background: 'linear-gradient(135deg, rgba(255,253,248,.92), rgba(248,240,228,.72))' }}>
-          <Space>
-            <span style={{ display: 'inline-grid', width: 36, height: 36, placeItems: 'center', borderRadius: 16, background: '#214332', color: '#f3c17c', fontWeight: 900 }}>R</span>
-            <span>
-              <Text strong style={{ display: 'block', color: '#17221b' }}>锐联资金</Text>
-              <Text style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', color: '#a4662c' }}>RecoLink</Text>
-            </span>
-          </Space>
-        </div>
-        <div style={{ padding: 16 }}>
-          <div className="space-y-2">
-            <div className="px-3 py-2">
-              <Text className="text-xs font-medium text-slate-500">产品管理</Text>
-            </div>
-            {menuItems.filter((item) => item.group === 'product').map((item) => (
-              <List.Item
-                key={item.key}
-                className="service-nav-item"
-                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
-                onClick={() => setActiveTab(item.key)}
-              >
-                <Space>
-                  {item.icon}
-                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
-                    {item.label}
-                  </Text>
-                </Space>
-              </List.Item>
-            ))}
-            
-            <div className="border-t border-slate-200 my-2" />
-            
-            <div className="px-3 py-2">
-              <Text className="text-xs font-medium text-slate-500">融资审批</Text>
-            </div>
-            {menuItems.filter((item) => item.group === 'approval').map((item) => (
-              <List.Item
-                key={item.key}
-                className="service-nav-item"
-                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
-                onClick={() => setActiveTab(item.key)}
-              >
-                <Space>
-                  {item.icon}
-                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
-                    {item.label}
-                    {item.key === 'risk-review' && riskOrders.length > 0 && (
-                      <Badge count={riskOrders.length} style={{ marginLeft: 8 }} />
-                    )}
-                  </Text>
-                </Space>
-              </List.Item>
-            ))}
-            
-            <div className="border-t border-slate-200 my-2" />
-            
-            <div className="px-3 py-2">
-              <Text className="text-xs font-medium text-slate-500">合同放款</Text>
-            </div>
-            {menuItems.filter((item) => item.group === 'contract').map((item) => (
-              <List.Item
-                key={item.key}
-                className="service-nav-item"
-                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
-                onClick={() => setActiveTab(item.key)}
-              >
-                <Space>
-                  {item.icon}
-                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
-                    {item.label}
-                    {item.key === 'debt-contract' && debtOrders.length > 0 && (
-                      <Badge count={debtOrders.length} style={{ marginLeft: 8 }} />
-                    )}
-                  </Text>
-                </Space>
-              </List.Item>
-            ))}
-            
-            <div className="border-t border-slate-200 my-2" />
-            
-            <div className="px-3 py-2">
-              <Text className="text-xs font-medium text-slate-500">质押管理</Text>
-            </div>
-            {menuItems.filter((item) => item.group === 'pledge').map((item) => (
-              <List.Item
-                key={item.key}
-                className="service-nav-item"
-                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
-                onClick={() => setActiveTab(item.key)}
-              >
-                <Space>
-                  {item.icon}
-                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
-                    {item.label}
-                  </Text>
-                </Space>
-              </List.Item>
-            ))}
-            
-            <div className="border-t border-slate-200 my-2" />
-            
-            <div className="px-3 py-2">
-              <Text className="text-xs font-medium text-slate-500">订单中心</Text>
-            </div>
-            {menuItems.filter((item) => item.group === 'center').map((item) => (
-              <List.Item
-                key={item.key}
-                className="service-nav-item"
-                style={{ border: 0, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', marginBottom: 6, background: activeTab === item.key ? '#214332' : 'transparent', color: activeTab === item.key ? '#fffaf1' : '#5f6b61' }}
-                onClick={() => setActiveTab(item.key)}
-              >
-                <Space>
-                  {item.icon}
-                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
-                    {item.label}
-                  </Text>
-                </Space>
-              </List.Item>
-            ))}
-          </div>
-        </div>
-      </Sider>
-      <Layout>
-        <Header style={{ background: 'rgba(255,253,248,.92)', height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <Text strong style={{ display: 'block', color: '#17221b', fontSize: 16 }}>资金服务方工作台</Text>
-            <Text style={{ color: '#7a847a', fontSize: 12 }}>金融产品、风控审批、债务合同、放款与质押监控</Text>
-          </div>
-          <Space>
-            <Button icon={<AuditOutlined />} onClick={() => { 
-              if (activeTab === 'products') fetchProducts(); 
-              else if (activeTab === 'risk-review') fetchRiskOrders(); 
-              else if (activeTab === 'debt-contract') fetchDebtOrders();
-              else if (activeTab === 'disburse') fetchDebtOrders();
-              else if (activeTab === 'pledge') fetchAll();
-              else if (activeTab === 'warehouse-receipt-pledge') fetchWarehouseReceiptPledges();
-              else if (activeTab === 'collateral-monitor') fetchCollateralMonitor();
-              else if (activeTab === 'release-pledge') fetchAll();
-              else if (activeTab === 'finance-flow') fetchAll();
-              else fetchAll(); 
-            }}>
-              刷新
-            </Button>
-            <Button icon={<HomeOutlined />} href="/">买家首页</Button>
-          </Space>
-        </Header>
-        <Content className="service-content" style={{ padding: 24 }}>
+    <WorkbenchShell
+      activeTab={activeTab}
+      badgeCounts={{
+        'debt-contract': debtOrders.length,
+        'risk-review': riskOrders.length,
+      }}
+      menuGroups={menuGroups}
+      menuItems={menuItems}
+      onRefresh={refreshActiveTab}
+      onTabChange={setActiveTab}
+    >
           {activeTab === 'products' && (
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -2228,9 +2005,7 @@ function App() {
               </Form.Item>
             </Form>
           </Modal>
-        </Content>
-      </Layout>
-    </Layout>
+    </WorkbenchShell>
   )
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Avatar, Button, Dropdown, Layout, Menu, Space, Typography } from 'antd'
+import { Avatar, Layout, Menu, Tooltip, Typography } from 'antd'
 import {
+  ArrowRightOutlined,
   BankOutlined,
   DashboardOutlined,
   HomeOutlined,
@@ -18,7 +19,7 @@ import {
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { clearSellerSession, getSellerUser, isIdentityVerified, hasEnterprise, hasEnterprisePending, isSellerReady, sellerAuthService, sellerHasService, updateSellerUser } from '@/services/auth'
 
-const { Content, Header, Sider } = Layout
+const { Content, Sider } = Layout
 const { Text } = Typography
 export default function SellerLayout() {
   const location = useLocation()
@@ -90,17 +91,9 @@ export default function SellerLayout() {
     navigate(key)
   }
 
-  const userMenuItems = [
-    { key: 'profile', label: '当前账号', icon: <UserOutlined /> },
-    { type: 'divider' as const },
-    { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, danger: true },
-  ]
-
-  const handleUserMenuClick = ({ key }: { key: string }) => {
-    if (key === 'logout') {
-      clearSellerSession()
-      navigate('/login', { replace: true })
-    }
+  const handleLogout = () => {
+    clearSellerSession()
+    navigate('/login', { replace: true })
   }
 
   const defaultPath = ready ? '/dashboard' : '/identity'
@@ -110,51 +103,80 @@ export default function SellerLayout() {
   }
 
   return (
-    <Layout className="seller-shell min-w-0">
-      <Sider width={220} className="seller-sider shrink-0">
-        <div className="flex h-[78px] items-center border-b border-[#eadcc7] px-5">
-          <Space>
-            <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[#214332] font-black text-[#f3c17c]">R</span>
-            <span>
-              <Text className="block text-[15px] font-black text-[#17221b]">锐联卖家</Text>
-              <Text className="text-[10px] font-bold tracking-[0.14em] text-[#a4662c]">RecoLink</Text>
-            </span>
-          </Space>
-        </div>
-        {!ready && (
-          <div className="px-4 py-3 mx-3 mt-3 bg-orange-50 rounded-lg border border-orange-100">
-            <Text className="text-xs text-orange-600 block">
-              {!identityOk ? '请先完成实名认证' : enterprisePending ? '企业审核中，审核通过后即可使用全部功能' : '请完成企业入驻'}
-            </Text>
+    <Layout className="dashboard-shell seller-shell min-w-0">
+      <Sider
+        width={220}
+        className="dashboard-sider fixed bottom-0 left-0 top-0 z-50 overflow-auto"
+        trigger={null}
+      >
+        <div className="h-full flex flex-col">
+          <div className="dashboard-brand px-5 py-5">
+            <div className="flex items-center gap-2.5">
+              <div className="dashboard-brand-mark flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl font-black">
+                R
+              </div>
+              <div>
+                <div className="text-[15px] font-black tracking-[-0.02em] text-[#17221b]">锐联产业协同平台</div>
+                <div className="text-[10px] font-bold tracking-[0.16em] text-[#a4662c]">RecoLink Workbench</div>
+              </div>
+            </div>
           </div>
-        )}
-        <Menu
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={handleMenuClick}
-          className="seller-menu h-[calc(100vh-78px)] border-none !bg-transparent px-2 pt-3 [&_.ant-menu-item]:!my-1 [&_.ant-menu-item]:!h-10 [&_.ant-menu-item]:!rounded-xl [&_.ant-menu-item]:!leading-10"
-        />
-      </Sider>
-      <Layout className="min-w-0">
-        <Header className="flex h-16 items-center justify-between border-b border-[#eadcc7] bg-[#fffdf8]/90 px-6 shadow-[0_10px_30px_rgba(64,44,25,.06)] backdrop-blur-xl">
-          <div>
-            <Text className="block text-base font-black text-[#17221b]">卖家后台</Text>
-            <Text className="text-xs text-[#7a847a]">商品、竞价、订单、履约与店铺设置</Text>
+          <div className="dashboard-account-card mx-3 mb-1 mt-3 rounded-2xl px-3 py-3">
+            <div className="mb-1 text-[10px] font-bold tracking-[0.14em] text-[#a4662c]">当前工作台</div>
+            <div className="truncate text-xs font-semibold text-[#17221b]">卖家中心</div>
+            <div className="mt-1.5 text-[9px] text-[#7a847a]">
+              商品、竞价、订单、履约与资金服务
+            </div>
           </div>
-          <Space size="middle">
+          {!ready && (
+            <div className="mx-3 mt-3 rounded-2xl border border-orange-100 bg-orange-50 px-3 py-3">
+              <Text className="block text-xs text-orange-600">
+                {!identityOk ? '请先完成实名认证' : enterprisePending ? '企业审核中，审核通过后即可使用全部功能' : '请完成企业入驻'}
+              </Text>
+            </div>
+          )}
+          <nav className="flex-1 overflow-y-auto px-2.5 pt-2">
+            <div className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-[#a4662c]">
+              业务
+            </div>
+            <Menu
+              mode="inline"
+              selectedKeys={[location.pathname]}
+              items={menuItems}
+              onClick={handleMenuClick}
+              className="dashboard-menu !border-none !bg-transparent [&_.ant-menu-item]:!my-1 [&_.ant-menu-item]:!h-10 [&_.ant-menu-item]:!rounded-xl [&_.ant-menu-item]:!leading-10"
+            />
+          </nav>
+          <div className="mb-2 px-2.5">
             <a href={`${buyerBaseURL}/dashboard`}>
-              <Button icon={<HomeOutlined />} className="rounded-full border-[#d0b991] bg-white">买家首页</Button>
+              <div className="dashboard-quick-link flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2">
+                <HomeOutlined className="text-sm text-[#2f6b49]" />
+                <span className="flex-1 text-xs font-semibold">返回买家工作台</span>
+                <ArrowRightOutlined className="text-[10px] text-[#a4662c]" />
+              </div>
             </a>
-            <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
-              <Space className="cursor-pointer rounded-full border border-[#dfd0ba] bg-white/70 px-3 py-2 shadow-sm">
-                <Avatar icon={<UserOutlined />} className="bg-[#c47b34]" />
-                <Text className="font-semibold text-[#17221b]">{user?.phone || '卖家账号'}</Text>
-              </Space>
-            </Dropdown>
-          </Space>
-        </Header>
-        <Content className="seller-content m-7 min-h-[calc(100vh-120px)] min-w-0 overflow-x-hidden p-7">
+          </div>
+          <div className="border-t border-[#eadcc7] px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Avatar size={28} icon={<UserOutlined />} className="shrink-0 bg-[#c47b34]" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-semibold text-[#17221b]">
+                  {user?.phone || '卖家账号'}
+                </div>
+                <div className="truncate text-[10px] text-[#7a847a]">卖家后台</div>
+              </div>
+              <Tooltip title="退出登录">
+                <LogoutOutlined
+                  className="cursor-pointer text-xs text-[#7a847a] transition-colors hover:text-[#b45324]"
+                  onClick={handleLogout}
+                />
+              </Tooltip>
+            </div>
+          </div>
+        </div>
+      </Sider>
+      <Layout className="min-w-0 transition-all duration-200" style={{ marginLeft: 220 }}>
+        <Content className="dashboard-content min-w-0 overflow-x-hidden">
           <Outlet />
         </Content>
       </Layout>

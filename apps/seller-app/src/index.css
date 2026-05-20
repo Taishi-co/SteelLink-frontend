@@ -46,6 +46,105 @@ body {
     linear-gradient(180deg, #fffaf1 0%, #f4efe6 48%, #efe3d1 100%);
 }
 
+.dashboard-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(196, 123, 52, 0.13), transparent 34%),
+    linear-gradient(180deg, #fffaf1 0%, #f4efe6 48%, #efe3d1 100%);
+}
+
+.dashboard-sider.ant-layout-sider {
+  border-right: 1px solid #eadcc7;
+  background: rgba(255, 250, 241, 0.96) !important;
+  box-shadow: 18px 0 44px rgba(64, 44, 25, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.dashboard-brand {
+  border-bottom: 1px solid #eadcc7;
+  background: linear-gradient(135deg, rgba(255, 253, 248, 0.88), rgba(248, 240, 228, 0.72));
+}
+
+.dashboard-brand-mark {
+  background: #214332;
+  color: #f3c17c;
+  box-shadow: 0 10px 22px rgba(33, 67, 50, 0.18);
+}
+
+.dashboard-account-card {
+  border: 1px solid #eadcc7;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 12px 28px rgba(64, 44, 25, 0.06);
+}
+
+.dashboard-menu.ant-menu {
+  color: #5f6b61;
+}
+
+.dashboard-menu.ant-menu .ant-menu-item {
+  color: #5f6b61 !important;
+  font-weight: 650;
+}
+
+.dashboard-menu.ant-menu .ant-menu-item-selected {
+  background: #214332 !important;
+  color: #fffaf1 !important;
+  box-shadow: 0 12px 26px rgba(33, 67, 50, 0.16);
+}
+
+.dashboard-menu.ant-menu .ant-menu-item:hover {
+  background: #f8f0e4 !important;
+  color: #9f5f23 !important;
+}
+
+.dashboard-menu.ant-menu .ant-menu-item-selected:hover {
+  background: #214332 !important;
+  color: #fffaf1 !important;
+}
+
+.dashboard-quick-link {
+  border: 1px solid #eadcc7;
+  background: rgba(255, 255, 255, 0.62);
+  color: #38463b;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.dashboard-quick-link:hover {
+  transform: translateY(-2px);
+  border-color: #d0a56e;
+  box-shadow: 0 12px 26px rgba(64, 44, 25, 0.12);
+}
+
+.dashboard-content {
+  min-height: 100vh;
+  background: transparent;
+  padding: 28px;
+}
+
+.dashboard-content .ant-card {
+  border-color: #eadcc7;
+  border-radius: 24px;
+  background: #fffaf1;
+  box-shadow: 0 12px 32px rgba(64, 44, 25, 0.06);
+  overflow: hidden;
+}
+
+.dashboard-content .ant-card-head {
+  border-bottom-color: #eadcc7;
+  color: #17221b;
+  font-weight: 800;
+}
+
+.dashboard-content .ant-table-thead > tr > th {
+  background: #f8f0e4 !important;
+  color: #38463b;
+  font-weight: 800;
+}
+
+.dashboard-content .ant-table-tbody > tr > td {
+  border-bottom-color: #eadcc7;
+}
+
 .seller-sider.ant-layout-sider {
   border-right: 1px solid #eadcc7;
   background: rgba(255, 250, 241, 0.96) !important;
