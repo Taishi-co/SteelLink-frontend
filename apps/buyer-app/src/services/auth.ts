@@ -47,8 +47,6 @@ export interface BuyerRegisterPayload {
 
 const TOKEN_KEY = 'token'
 const USER_KEY = 'buyer_user'
-const SELLER_USER_KEY = 'seller_user'
-const SELLER_ENTERPRISE_ROLE_KEY = 'seller_enterprise_role'
 export const BUYER_TOKEN_REFRESH_EVENT = 'buyer-token-refreshed'
 let memoryToken: string | null = null
 let memoryUser: User | null = null
@@ -123,27 +121,14 @@ export function saveBuyerSession(token: string, profile: BuyerProfile) {
   memoryUser = normalizeBuyerUser(profile)
   setStorageItem(TOKEN_KEY, token)
   setStorageItem(USER_KEY, JSON.stringify(memoryUser))
-  setStorageItem(SELLER_USER_KEY, JSON.stringify(profile))
   setCookie(TOKEN_KEY, token)
   setCookie(USER_KEY, JSON.stringify(memoryUser))
-  setCookie(SELLER_USER_KEY, JSON.stringify(profile))
-
-  const payload = parseJwtPayload(token)
-  if (payload?.enterprise_role) {
-    setStorageItem(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-    setCookie(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-  } else {
-    removeStorageItem(SELLER_ENTERPRISE_ROLE_KEY)
-    removeCookie(SELLER_ENTERPRISE_ROLE_KEY)
-  }
 }
 
 export function updateBuyerSessionUser(profile: BuyerProfile) {
   memoryUser = normalizeBuyerUser(profile)
   setStorageItem(USER_KEY, JSON.stringify(memoryUser))
-  setStorageItem(SELLER_USER_KEY, JSON.stringify(profile))
   setCookie(USER_KEY, JSON.stringify(memoryUser))
-  setCookie(SELLER_USER_KEY, JSON.stringify(profile))
 }
 
 export function getBuyerUser(): User | null {
@@ -188,14 +173,6 @@ export function saveBuyerToken(token: string) {
     setCookie(USER_KEY, JSON.stringify(updatedUser))
   }
 
-  if (payload?.enterprise_role) {
-    setStorageItem(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-    setCookie(SELLER_ENTERPRISE_ROLE_KEY, payload.enterprise_role as string)
-  } else {
-    removeStorageItem(SELLER_ENTERPRISE_ROLE_KEY)
-    removeCookie(SELLER_ENTERPRISE_ROLE_KEY)
-  }
-
   window.dispatchEvent(new Event(BUYER_TOKEN_REFRESH_EVENT))
 }
 
@@ -204,12 +181,8 @@ export function clearBuyerSession() {
   memoryUser = null
   removeStorageItem(TOKEN_KEY)
   removeStorageItem(USER_KEY)
-  removeStorageItem(SELLER_USER_KEY)
-  removeStorageItem(SELLER_ENTERPRISE_ROLE_KEY)
   removeCookie(TOKEN_KEY)
   removeCookie(USER_KEY)
-  removeCookie(SELLER_USER_KEY)
-  removeCookie(SELLER_ENTERPRISE_ROLE_KEY)
 }
 
 export function isEnterpriseToken() {

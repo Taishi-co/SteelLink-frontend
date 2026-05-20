@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import HomeLayout from '@/components/Layout/HomeLayout'
 import MainLayout from '@/components/Layout/MainLayout'
@@ -27,6 +27,7 @@ const BiddingPage = lazy(() => import('@/pages/Bidding'))
 const BiddingModulePage = lazy(() => import('@/pages/BiddingModule'))
 const ProcurementDetailPage = lazy(() => import('@/pages/ProcurementDetail'))
 const PersonalWorkspacePage = lazy(() => import('@/pages/PersonalWorkspace'))
+const NotificationsPage = lazy(() => import('@/pages/Notifications'))
 const DashboardMarket = lazy(() => import('@/pages/Dashboard/Market'))
 const DashboardServices = lazy(() => import('@/pages/Dashboard/Services'))
 const DashboardFinance = lazy(() => import('@/pages/Dashboard/Finance'))
@@ -58,59 +59,62 @@ function RouteFallback() {
   )
 }
 
+function lazyPage(element: ReactNode) {
+  return <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+}
+
 export function AppRouter() {
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
+    <Routes>
+      <Route path="/login" element={lazyPage(<LoginPage />)} />
 
-        <Route path="/" element={<HomeLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="mall" element={<MallPage />} />
-          <Route path="warehouses" element={<WarehouseMallPage />} />
-          <Route path="warehouses/:id" element={<WarehouseDetailPage />} />
-          <Route path="logistics-services" element={<LogisticsMallPage />} />
-          <Route path="logistics-services/:id" element={<LogisticsDetailPage />} />
-          <Route path="matching" element={<MatchingPage />} />
-          <Route path="service-market" element={<ServiceMarketPage />} />
-          <Route path="ai-procurement" element={<AiProcurementPage />} />
-          <Route path="ai-procurement/:step" element={<AiProcurementPage />} />
-          <Route path="bidding" element={<BiddingPage />} />
-          <Route path="procurement" element={<ProcurementPage />} />
-          <Route path="procurement/:id" element={<ProcurementDetailPage />} />
-          <Route path="supply" element={<SupplyPage />} />
-          <Route path="about" element={<AboutPage />} />
-          <Route path="enterprise" element={<EnterpriseIntroPage />} />
-        </Route>
+      <Route path="/" element={<HomeLayout />}>
+        <Route index element={lazyPage(<HomePage />)} />
+        <Route path="mall" element={lazyPage(<MallPage />)} />
+        <Route path="warehouses" element={lazyPage(<WarehouseMallPage />)} />
+        <Route path="warehouses/:id" element={lazyPage(<WarehouseDetailPage />)} />
+        <Route path="logistics-services" element={lazyPage(<LogisticsMallPage />)} />
+        <Route path="logistics-services/:id" element={lazyPage(<LogisticsDetailPage />)} />
+        <Route path="matching" element={lazyPage(<MatchingPage />)} />
+        <Route path="service-market" element={lazyPage(<ServiceMarketPage />)} />
+        <Route path="ai-procurement" element={lazyPage(<AiProcurementPage />)} />
+        <Route path="ai-procurement/:step" element={lazyPage(<AiProcurementPage />)} />
+        <Route path="bidding" element={lazyPage(<BiddingPage />)} />
+        <Route path="procurement" element={lazyPage(<ProcurementPage />)} />
+        <Route path="procurement/:id" element={lazyPage(<ProcurementDetailPage />)} />
+        <Route path="supply" element={<SupplyPage />} />
+        <Route path="about" element={lazyPage(<AboutPage />)} />
+        <Route path="enterprise" element={lazyPage(<EnterpriseIntroPage />)} />
+      </Route>
 
-        <Route path="/" element={<MainLayout />}>
-          <Route path="products" element={<ProductsPage />} />
-          <Route path="products/:id" element={<ProductDetailPage />} />
-          <Route path="cart" element={<CartPage />} />
-          <Route path="favorites" element={<FavoritesPage />} />
-          <Route path="checkout" element={<CheckoutPage />} />
-          <Route path="orders" element={<OrdersPage />} />
-          <Route path="orders/:id" element={<OrderDetailPage />} />
-        </Route>
+      <Route path="/" element={<MainLayout />}>
+        <Route path="products" element={lazyPage(<ProductsPage />)} />
+        <Route path="products/:id" element={lazyPage(<ProductDetailPage />)} />
+        <Route path="cart" element={lazyPage(<CartPage />)} />
+        <Route path="favorites" element={lazyPage(<FavoritesPage />)} />
+        <Route path="checkout" element={lazyPage(<CheckoutPage />)} />
+        <Route path="orders" element={lazyPage(<OrdersPage />)} />
+        <Route path="orders/:id" element={lazyPage(<OrderDetailPage />)} />
+      </Route>
 
-        <Route path="/dashboard" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
-          <Route index element={<PersonalWorkspacePage />} />
-          <Route path="market" element={<DashboardMarket />} />
-          <Route path="services" element={<DashboardServices />} />
-          <Route path="bidding" element={<BiddingModulePage />} />
-          <Route path="orders" element={<OrdersPage />} />
-          <Route path="orders/:id" element={<OrderDetailPage />} />
-          <Route path="identity" element={<IdentityPage />} />
-          <Route path="enterprise" element={<EnterprisePage />} />
-          <Route path="finance" element={<DashboardFinance />} />
-          <Route path="logistics" element={<DashboardLogistics />} />
-          <Route path="warehouse" element={<DashboardWarehouse />} />
-          <Route path="services/:service" element={<ServiceWorkspacePage />} />
-          <Route path="warehouse-resources" element={<WarehouseManagePage />} />
-          <Route path="logistics-resources" element={<LogisticsManagePage />} />
-          <Route path="finance-products" element={<FinanceManagePage />} />
-        </Route>
-      </Routes>
-    </Suspense>
+      <Route path="/dashboard" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
+        <Route index element={lazyPage(<PersonalWorkspacePage />)} />
+        <Route path="market" element={lazyPage(<DashboardMarket />)} />
+        <Route path="services" element={lazyPage(<DashboardServices />)} />
+        <Route path="bidding" element={lazyPage(<BiddingModulePage />)} />
+        <Route path="orders" element={lazyPage(<OrdersPage />)} />
+        <Route path="orders/:id" element={lazyPage(<OrderDetailPage />)} />
+        <Route path="notifications" element={lazyPage(<NotificationsPage />)} />
+        <Route path="identity" element={lazyPage(<IdentityPage />)} />
+        <Route path="enterprise" element={lazyPage(<EnterprisePage />)} />
+        <Route path="finance" element={lazyPage(<DashboardFinance />)} />
+        <Route path="logistics" element={lazyPage(<DashboardLogistics />)} />
+        <Route path="warehouse" element={lazyPage(<DashboardWarehouse />)} />
+        <Route path="services/:service" element={lazyPage(<ServiceWorkspacePage />)} />
+        <Route path="warehouse-resources" element={lazyPage(<WarehouseManagePage />)} />
+        <Route path="logistics-resources" element={lazyPage(<LogisticsManagePage />)} />
+        <Route path="finance-products" element={lazyPage(<FinanceManagePage />)} />
+      </Route>
+    </Routes>
   )
 }

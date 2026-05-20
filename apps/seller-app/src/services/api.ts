@@ -33,7 +33,7 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      clearSellerSession()
+      clearSellerSession({ preserveBuyerSession: true })
       const currentPath = window.location.pathname + window.location.search
       window.location.href = `/seller/login?redirect=${encodeURIComponent(currentPath)}`
     }
