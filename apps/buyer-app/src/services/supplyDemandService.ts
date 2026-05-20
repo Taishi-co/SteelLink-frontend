@@ -29,6 +29,8 @@ export interface SupplyDemandPost {
   matchAmount: number
   status: number
   enterpriseId: number
+  publisherType: 'personal' | 'enterprise'
+  publisherName: string
   createdBy: number
   createdAt: string
   updatedAt: string
@@ -60,6 +62,8 @@ interface BackendSupplyDemandPost {
   match_amount: number
   status: number
   enterprise_id: number
+  publisher_type?: 'personal' | 'enterprise'
+  publisher_name?: string
   created_by: number
   created_at: string
   updated_at: string
@@ -152,6 +156,8 @@ function mapPost(post: BackendSupplyDemandPost): SupplyDemandPost {
     matchAmount: post.match_amount,
     status: post.status,
     enterpriseId: post.enterprise_id,
+    publisherType: post.publisher_type || (post.enterprise_id > 0 ? 'enterprise' : 'personal'),
+    publisherName: post.publisher_name || (post.enterprise_id > 0 ? '认证企业' : '实名个人'),
     createdBy: post.created_by,
     createdAt: post.created_at,
     updatedAt: post.updated_at,
