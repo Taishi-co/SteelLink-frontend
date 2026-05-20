@@ -81,7 +81,7 @@ const defaultParsed: ParsedInstruction = {
 }
 
 function formatMoney(value?: number) {
-  if (!value) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) {
     return '待计算'
   }
   return `¥${value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`
@@ -165,6 +165,21 @@ function applyLogisticsOption(product: MatchedProduct, option: LogisticsOption):
 
 function hasPendingLogisticsResolution(items: MatchedProduct[]) {
   return items.some((item) => item.logistics_match_status === 'no_match' || item.logistics_match_status === 'destination_missing')
+}
+
+function isOrderableProduct(item: MatchedProduct) {
+  return Number(item.product_id || 0) > 0
+}
+
+function getApiErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === 'object') {
+    const response = (error as { response?: { data?: { message?: string } } }).response
+    const messageText = response?.data?.message
+    if (messageText) {
+      return messageText
+    }
+  }
+  return fallback
 }
 
 function mergeParsedInstruction(base: ParsedInstruction, values: Partial<ParsedInstruction>): ParsedInstruction {
@@ -294,9 +309,9 @@ export default function AiProcurementPage() {
 
   const updateResult = (patch: Partial<AIProcurementParseResult>) => {
     setResult((prev) => ({
-      parsed: patch.parsed || prev?.parsed || defaultParsed,
-      matched_products: patch.matched_products || prev?.matched_products || [],
-      order_draft: patch.order_draft || prev?.order_draft || {
+      parsed: patch.parsed ?? prev?.parsed ?? defaultParsed,
+      matched_products: patch.matched_products ?? prev?.matched_products ?? [],
+      order_draft: patch.order_draft ?? prev?.order_draft ?? {
         order_no: '',
         product_name: '',
         quantity: 0,
@@ -305,9 +320,9 @@ export default function AiProcurementPage() {
         payment_method: '',
         delivery_note: '',
       },
-      finance_plans: patch.finance_plans || prev?.finance_plans || [],
-      audit_items: patch.audit_items || prev?.audit_items || [],
-      stages: patch.stages || prev?.stages || [],
+      finance_plans: patch.finance_plans ?? prev?.finance_plans ?? [],
+      audit_items: patch.audit_items ?? prev?.audit_items ?? [],
+      stages: patch.stages ?? prev?.stages ?? [],
     }))
   }
 
@@ -338,7 +353,7 @@ export default function AiProcurementPage() {
       navigate('/ai-procurement/1')
       message.success('采购指令解析完成，请确认参数')
     } catch (error) {
-      message.error('采购指令解析失败')
+      message.error(getApiErrorMessage(error, '采购指令解析失败'))
     } finally {
       setBusy(false)
     }
@@ -366,7 +381,7 @@ export default function AiProcurementPage() {
       navigate('/ai-procurement/2')
       message.success('参数已确认，商品召回完成')
     } catch (error) {
-      message.error('确认参数或召回商品失败')
+      message.error(getApiErrorMessage(error, '确认参数或召回商品失败'))
     } finally {
       setBusy(false)
     }
@@ -376,6 +391,10 @@ export default function AiProcurementPage() {
     const selectedQuantity = sumSelectedQuantity(selectedProducts)
     if (selectedProducts.length === 0) {
       message.warning('请选择至少一个商品')
+      return
+    }
+    if (selectedProducts.some((item) => !isOrderableProduct(item))) {
+      message.warning('参考采购方案不能直接下单，请选择有商品编号的现货商品')
       return
     }
     const parsedForRequest = getLatestParsedInstruction()
@@ -392,12 +411,13 @@ export default function AiProcurementPage() {
       setSelectedProducts(matched.matched_products)
       updateResult({
         parsed: parsedForRequest,
+        matched_products: matched.matched_products,
         stages: matched.stages,
       })
       navigate('/ai-procurement/3')
       message.success('物流仓储方案匹配完成')
     } catch (error) {
-      message.error('物流仓储匹配失败')
+      message.error(getApiErrorMessage(error, '物流仓储匹配失败'))
     } finally {
       setBusy(false)
     }
@@ -425,13 +445,17 @@ export default function AiProcurementPage() {
           quantity: sumSelectedQuantity(selectedProducts),
         },
       })
+      const procurementResult = getResultFromProcurement(response.procurement)
       setCurrentProcurement(response.procurement)
-      setResult(getResultFromProcurement(response.procurement))
+      setResult(procurementResult)
+      setSelectedProducts(procurementResult.matched_products.filter((product) => product.selected))
       setSelectedFinanceServiceId(response.procurement.finance_plans.find((item) => item.selected)?.finance_service_id)
       if (response.procurement.financing_required) {
         const financeMatched = await aiProcurementService.matchFinance(response.procurement.id, true)
+        const financeResult = getResultFromProcurement(financeMatched)
         setCurrentProcurement(financeMatched)
-        setResult(getResultFromProcurement(financeMatched))
+        setResult(financeResult)
+        setSelectedProducts(financeResult.matched_products.filter((product) => product.selected))
         setSelectedFinanceServiceId(financeMatched.finance_plans[0]?.finance_service_id)
         navigate('/ai-procurement/5')
       } else {
@@ -439,7 +463,7 @@ export default function AiProcurementPage() {
       }
       message.success('真实订单已生成')
     } catch (error) {
-      message.error('订单生成失败，请确认商品库存和企业认证状态')
+      message.error(getApiErrorMessage(error, '订单生成失败，请确认商品库存和企业认证状态'))
     } finally {
       setBusy(false)
     }
@@ -453,8 +477,10 @@ export default function AiProcurementPage() {
     setBusy(true)
     try {
       const procurement = await aiProcurementService.matchFinance(currentProcurement.id, required, financeServiceId)
+      const procurementResult = getResultFromProcurement(procurement)
       setCurrentProcurement(procurement)
-      setResult(getResultFromProcurement(procurement))
+      setResult(procurementResult)
+      setSelectedProducts(procurementResult.matched_products.filter((product) => product.selected))
       const selectedID = procurement.finance_plans.find((item) => item.selected)?.finance_service_id
       setSelectedFinanceServiceId(selectedID || procurement.finance_plans[0]?.finance_service_id)
       if (required && !financeServiceId && procurement.finance_plans.length > 0) {
@@ -465,7 +491,7 @@ export default function AiProcurementPage() {
       navigate('/ai-procurement/6')
       message.success(required ? '融资方案匹配完成' : '已跳过融资匹配')
     } catch (error) {
-      message.error('融资匹配失败')
+      message.error(getApiErrorMessage(error, '融资匹配失败'))
     } finally {
       setBusy(false)
     }
@@ -485,7 +511,7 @@ export default function AiProcurementPage() {
         message.success(saveHistory ? '已提交审核并保存到历史AI采购' : '已提交审核，本次信息不保存到历史AI采购')
         navigate('/ai-procurement')
       })
-      .catch(() => message.error('提交审核失败'))
+      .catch((error) => message.error(getApiErrorMessage(error, '提交审核失败')))
       .finally(() => setSubmitting(false))
   }
 
@@ -534,6 +560,10 @@ export default function AiProcurementPage() {
   }
 
   const handleToggleProduct = (product: MatchedProduct) => {
+    if (!isOrderableProduct(product)) {
+      message.warning('该条是参考采购方案，未绑定真实现货商品，不能直接下单')
+      return
+    }
     setSelectedProducts((prev) => {
       const exists = prev.some((item) => item.product_id === product.product_id)
       if (exists) {
@@ -598,7 +628,7 @@ export default function AiProcurementPage() {
       message.success('已发布物流需求，可在供需撮合查看')
       navigate('/matching')
     } catch (error) {
-      message.error('物流需求发布失败')
+      message.error(getApiErrorMessage(error, '物流需求发布失败'))
     } finally {
       setBusy(false)
     }
@@ -1025,7 +1055,7 @@ function renderStepContent(props: {
                     <Text strong>{item.product_name}</Text>
                     <div className="mt-1 text-sm text-gray-500">{item.steel_mill || '-'} · {item.category || '-'} · {item.match_reason}</div>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <Tag>{item.product_no}</Tag>
+                      {isOrderableProduct(item) ? <Tag>{item.product_no}</Tag> : <Tag color="orange">参考方案</Tag>}
                       <Tag>可用 {item.available_qty || item.quantity}</Tag>
                       {item.delivery_days ? <Tag>{item.delivery_days}天交付</Tag> : null}
                     </div>
@@ -1037,11 +1067,20 @@ function renderStepContent(props: {
                   </div>
                   <Space>
                     <Button onClick={() => showProductDetail(item)}>详情</Button>
-                    <Button type={selectedProducts.some((product) => product.product_id === item.product_id) ? 'primary' : 'default'} onClick={() => props.onToggleProduct(item)}>
+                    <Button
+                      disabled={!isOrderableProduct(item)}
+                      type={selectedProducts.some((product) => product.product_id === item.product_id) ? 'primary' : 'default'}
+                      onClick={() => props.onToggleProduct(item)}
+                    >
                       {selectedProducts.some((product) => product.product_id === item.product_id) ? '已选' : '选择'}
                     </Button>
                   </Space>
                 </div>
+                {!isOrderableProduct(item) && (
+                  <div className="mt-3 rounded border border-orange-100 bg-orange-50 p-3 text-sm text-orange-700">
+                    当前仅生成参考采购方案，未匹配到可下单现货。请返回调整参数，或发布供求信息等待供应商响应。
+                  </div>
+                )}
                 {selectedProducts.some((product) => product.product_id === item.product_id) && (
                   <div className="mt-4 max-w-xs">
                     <InputNumber
