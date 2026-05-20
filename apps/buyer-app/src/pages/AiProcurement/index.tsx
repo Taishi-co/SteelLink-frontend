@@ -456,17 +456,22 @@ export default function AiProcurementPage() {
       setSelectedProducts(procurementResult.matched_products.filter((product) => product.selected))
       setSelectedFinanceServiceId(response.procurement.finance_plans.find((item) => item.selected)?.finance_service_id)
       if (response.procurement.financing_required) {
-        const financeMatched = await aiProcurementService.matchFinance(response.procurement.id, true)
-        const financeResult = getResultFromProcurement(financeMatched)
-        setCurrentProcurement(financeMatched)
-        setResult(financeResult)
-        setSelectedProducts(financeResult.matched_products.filter((product) => product.selected))
-        setSelectedFinanceServiceId(financeMatched.finance_plans[0]?.finance_service_id)
+        try {
+          const financeMatched = await aiProcurementService.matchFinance(response.procurement.id, true)
+          const financeResult = getResultFromProcurement(financeMatched)
+          setCurrentProcurement(financeMatched)
+          setResult(financeResult)
+          setSelectedProducts(financeResult.matched_products.filter((product) => product.selected))
+          setSelectedFinanceServiceId(financeMatched.finance_plans[0]?.finance_service_id)
+          message.success('真实订单已生成，融资产品已召回')
+        } catch (financeError) {
+          message.warning(getApiErrorMessage(financeError, '真实订单已生成，融资方案召回失败，可稍后重试'))
+        }
         navigate('/ai-procurement/5')
       } else {
         navigate('/ai-procurement/6')
+        message.success('真实订单已生成')
       }
-      message.success('真实订单已生成')
     } catch (error) {
       message.error(getApiErrorMessage(error, '订单生成失败，请确认商品库存和企业认证状态'))
     } finally {
