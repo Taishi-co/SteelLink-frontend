@@ -114,11 +114,13 @@ function getResultFromProcurement(procurement: AIProcurementInfo): AIProcurement
 }
 
 function toOrderFormPayload(values: OrderFormPayload): OrderFormPayload {
+  const destWarehouseServiceId = Number(values.dest_warehouse_service_id || 0)
   return {
     quantity: Number(values.quantity || 0),
     contact_name: values.contact_name,
     contact_phone: values.contact_phone,
     warehouse_name: values.warehouse_name,
+    dest_warehouse_service_id: destWarehouseServiceId > 0 ? destWarehouseServiceId : undefined,
     delivery_address: values.delivery_address,
     delivery_method: values.delivery_method,
     payment_method: values.payment_method,
@@ -290,6 +292,7 @@ export default function AiProcurementPage() {
       orderForm.setFieldsValue({
         quantity: sumSelectedQuantity(selectedProducts),
         warehouse_name: selectedProducts.map((item) => item.origin_warehouse_name || String(item.warehouse?.warehouse_name || '')).filter(Boolean).join('；'),
+        dest_warehouse_service_id: result?.parsed.delivery_warehouse_id,
         delivery_address: result?.parsed.delivery_address || '',
         payment_method: '线上合同 + 对公转账',
         delivery_method: '平台协同配送',
@@ -436,12 +439,14 @@ export default function AiProcurementPage() {
         message.warning('请先确认参数')
         return
       }
+      const destWarehouseServiceId = Number(parsedForRequest.delivery_warehouse_id || values.dest_warehouse_service_id || 0)
       const response = await aiProcurementService.generateOrder({
         prompt,
         parsed: parsedForRequest,
         selected_products: selectedProducts,
         order_form: {
           ...toOrderFormPayload(values),
+          dest_warehouse_service_id: destWarehouseServiceId > 0 ? destWarehouseServiceId : undefined,
           quantity: sumSelectedQuantity(selectedProducts),
         },
       })
@@ -451,17 +456,22 @@ export default function AiProcurementPage() {
       setSelectedProducts(procurementResult.matched_products.filter((product) => product.selected))
       setSelectedFinanceServiceId(response.procurement.finance_plans.find((item) => item.selected)?.finance_service_id)
       if (response.procurement.financing_required) {
-        const financeMatched = await aiProcurementService.matchFinance(response.procurement.id, true)
-        const financeResult = getResultFromProcurement(financeMatched)
-        setCurrentProcurement(financeMatched)
-        setResult(financeResult)
-        setSelectedProducts(financeResult.matched_products.filter((product) => product.selected))
-        setSelectedFinanceServiceId(financeMatched.finance_plans[0]?.finance_service_id)
+        try {
+          const financeMatched = await aiProcurementService.matchFinance(response.procurement.id, true)
+          const financeResult = getResultFromProcurement(financeMatched)
+          setCurrentProcurement(financeMatched)
+          setResult(financeResult)
+          setSelectedProducts(financeResult.matched_products.filter((product) => product.selected))
+          setSelectedFinanceServiceId(financeMatched.finance_plans[0]?.finance_service_id)
+          message.success('真实订单已生成，融资产品已召回')
+        } catch (financeError) {
+          message.warning(getApiErrorMessage(financeError, '真实订单已生成，融资方案召回失败，可稍后重试'))
+        }
         navigate('/ai-procurement/5')
       } else {
         navigate('/ai-procurement/6')
+        message.success('真实订单已生成')
       }
-      message.success('真实订单已生成')
     } catch (error) {
       message.error(getApiErrorMessage(error, '订单生成失败，请确认商品库存和企业认证状态'))
     } finally {
@@ -1211,6 +1221,7 @@ function renderStepContent(props: {
                 <Col xs={24} md={8}><Form.Item name="contact_name" label="联系人" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="warehouse_name" label="卖家发货仓库" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                <Form.Item name="dest_warehouse_service_id" hidden><InputNumber /></Form.Item>
                 <Col xs={24} md={12}><Form.Item name="delivery_method" label="物流方式" rules={[{ required: true }]}><Radio.Group><Radio value="平台协同配送">平台协同配送</Radio><Radio value="物流服务商协商">物流服务商协商</Radio><Radio value="自行提货">自行提货</Radio></Radio.Group></Form.Item></Col>
                 <Col xs={24}><Form.Item name="delivery_address" label="收货地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name="payment_method" label="付款方式" rules={[{ required: true }]}><Input /></Form.Item></Col>
