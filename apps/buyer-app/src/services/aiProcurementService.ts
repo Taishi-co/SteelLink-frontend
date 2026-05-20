@@ -213,54 +213,150 @@ interface GenerateOrderResponse {
   order_draft: OrderDraft
 }
 
+const AI_REQUEST_TIMEOUT_MS = 120000
+
+const aiRequestConfig = {
+  timeout: AI_REQUEST_TIMEOUT_MS,
+}
+
+const emptyParsedInstruction: ParsedInstruction = {
+  product_name: '',
+  category: '',
+  quantity: 0,
+  unit: '',
+  usage: '',
+  financing_required: false,
+  keywords: [],
+  confidence: 0,
+}
+
+const emptyOrderDraft: OrderDraft = {
+  order_no: '',
+  product_name: '',
+  quantity: 0,
+  unit: '',
+  estimated_amount: 0,
+  payment_method: '',
+  delivery_note: '',
+  orders: [],
+}
+
+function normalizeArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : []
+}
+
+function normalizeParsedInstruction(value?: ParsedInstruction | null): ParsedInstruction {
+  return {
+    ...emptyParsedInstruction,
+    ...(value || {}),
+    keywords: normalizeArray(value?.keywords),
+  }
+}
+
+function normalizeOrderDraft(value?: OrderDraft | null): OrderDraft {
+  return {
+    ...emptyOrderDraft,
+    ...(value || {}),
+    orders: normalizeArray(value?.orders),
+  }
+}
+
+function normalizeParseResult(value: AIProcurementParseResult): AIProcurementParseResult {
+  return {
+    parsed: normalizeParsedInstruction(value?.parsed),
+    matched_products: normalizeArray(value?.matched_products),
+    order_draft: normalizeOrderDraft(value?.order_draft),
+    finance_plans: normalizeArray(value?.finance_plans),
+    audit_items: normalizeArray(value?.audit_items),
+    stages: normalizeArray(value?.stages),
+  }
+}
+
+function normalizeProcurementInfo(value: AIProcurementInfo): AIProcurementInfo {
+  return {
+    ...value,
+    parsed_instruction: normalizeParsedInstruction(value?.parsed_instruction),
+    matched_products: normalizeArray(value?.matched_products),
+    order_draft: normalizeOrderDraft(value?.order_draft),
+    finance_plans: normalizeArray(value?.finance_plans),
+    audit_items: normalizeArray(value?.audit_items),
+    stages: normalizeArray(value?.stages),
+    history_saved: Boolean(value?.history_saved),
+  }
+}
+
+function normalizeGenerateOrderResponse(value: GenerateOrderResponse): GenerateOrderResponse {
+  const procurement = normalizeProcurementInfo(value.procurement)
+  return {
+    procurement,
+    order_draft: normalizeOrderDraft(value.order_draft || procurement.order_draft),
+  }
+}
+
 export const aiProcurementService = {
   parse: async (prompt: string) => {
-    const response = await api.post<ApiResponse<AIProcurementParseResult>, ApiResponse<AIProcurementParseResult>>('/ai-procurements/parse', { prompt })
-    return response.data
+    const response = await api.post<ApiResponse<AIProcurementParseResult>, ApiResponse<AIProcurementParseResult>>('/ai-procurements/parse', { prompt }, aiRequestConfig)
+    return normalizeParseResult(response.data)
   },
 
   confirmInstruction: async (prompt: string, parsed: ParsedInstruction) => {
-    const response = await api.post<ApiResponse<AIProcurementParseResult>, ApiResponse<AIProcurementParseResult>>('/ai-procurements/confirm-instruction', { prompt, parsed })
-    return response.data
+    const response = await api.post<ApiResponse<AIProcurementParseResult>, ApiResponse<AIProcurementParseResult>>('/ai-procurements/confirm-instruction', { prompt, parsed }, aiRequestConfig)
+    return normalizeParseResult(response.data)
   },
 
   matchProducts: async (parsed: ParsedInstruction) => {
-    const response = await api.post<ApiResponse<MatchProductsResponse>, ApiResponse<MatchProductsResponse>>('/ai-procurements/match-products', { parsed })
-    return response.data
+    const response = await api.post<ApiResponse<MatchProductsResponse>, ApiResponse<MatchProductsResponse>>('/ai-procurements/match-products', { parsed }, aiRequestConfig)
+    return {
+      matched_products: normalizeArray(response.data.matched_products),
+      stages: normalizeArray(response.data.stages),
+    }
   },
 
   matchLogisticsWarehouse: async (payload: { parsed: ParsedInstruction; selected_products: MatchedProduct[] }) => {
-    const response = await api.post<ApiResponse<MatchLogisticsWarehouseResponse>, ApiResponse<MatchLogisticsWarehouseResponse>>('/ai-procurements/match-logistics-warehouse', payload)
-    return response.data
+    const response = await api.post<ApiResponse<MatchLogisticsWarehouseResponse>, ApiResponse<MatchLogisticsWarehouseResponse>>('/ai-procurements/match-logistics-warehouse', payload, aiRequestConfig)
+    return {
+      matched_products: normalizeArray(response.data.matched_products),
+      stages: normalizeArray(response.data.stages),
+    }
   },
 
   generateOrder: async (payload: { prompt: string; parsed: ParsedInstruction; selected_product?: MatchedProduct; selected_products?: MatchedProduct[]; order_form: OrderFormPayload }) => {
-    const response = await api.post<ApiResponse<GenerateOrderResponse>, ApiResponse<GenerateOrderResponse>>('/ai-procurements/generate-order', payload)
-    return response.data
+    const response = await api.post<ApiResponse<GenerateOrderResponse>, ApiResponse<GenerateOrderResponse>>('/ai-procurements/generate-order', payload, aiRequestConfig)
+    return normalizeGenerateOrderResponse(response.data)
   },
 
   matchFinance: async (id: number, financingRequired: boolean, selectedFinanceServiceId?: number) => {
-    const response = await api.post<ApiResponse<AIProcurementInfo>, ApiResponse<AIProcurementInfo>>(`/ai-procurements/${id}/match-finance`, {
-      financing_required: financingRequired,
-      selected_finance_service_id: selectedFinanceServiceId,
-    })
-    return response.data
+    const response = await api.post<ApiResponse<AIProcurementInfo>, ApiResponse<AIProcurementInfo>>(
+      `/ai-procurements/${id}/match-finance`,
+      {
+        financing_required: financingRequired,
+        selected_finance_service_id: selectedFinanceServiceId,
+      },
+      aiRequestConfig,
+    )
+    return normalizeProcurementInfo(response.data)
   },
 
   create: async (prompt: string) => {
-    const response = await api.post<ApiResponse<AIProcurementInfo>, ApiResponse<AIProcurementInfo>>('/ai-procurements', { prompt })
-    return response.data
+    const response = await api.post<ApiResponse<AIProcurementInfo>, ApiResponse<AIProcurementInfo>>('/ai-procurements', { prompt }, aiRequestConfig)
+    return normalizeProcurementInfo(response.data)
   },
 
   listMine: async (params?: { page?: number; page_size?: number; keyword?: string; status?: string }) => {
     const response = await api.get<ApiResponse<AIProcurementListResponse>, ApiResponse<AIProcurementListResponse>>('/ai-procurements/mine', { params })
-    return response.data
+    return {
+      ...response.data,
+      list: normalizeArray(response.data.list).map(normalizeProcurementInfo),
+      total: response.data.total || 0,
+      page: response.data.page || params?.page || 1,
+      page_size: response.data.page_size || params?.page_size || 10,
+    }
   },
 
   submitReview: async (id: number, saveHistory = true) => {
     const response = await api.post<ApiResponse<AIProcurementInfo>, ApiResponse<AIProcurementInfo>>(`/ai-procurements/${id}/submit-review`, {
       save_history: saveHistory,
-    })
-    return response.data
+    }, aiRequestConfig)
+    return normalizeProcurementInfo(response.data)
   },
 }
