@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
   Alert,
-  Badge,
   Button,
   Card,
   Col,
   Form,
   Input,
   InputNumber,
-  Layout,
   List,
   Modal,
   Row,
@@ -24,10 +22,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import {
   CarOutlined,
-  HomeOutlined,
-  RocketOutlined,
   SafetyCertificateOutlined,
-  EnvironmentOutlined,
   DollarCircleOutlined,
   PlusOutlined,
   EditOutlined,
@@ -37,6 +32,16 @@ import {
   ClockCircleOutlined,
   FileTextOutlined,
 } from '@ant-design/icons'
+import { CapabilityDeniedState, LoadingState, MissingSessionState } from '@/workbench/AccessState'
+import {
+  getLogisticsStepInfo,
+  isTabKey,
+  logisticsOrderStatusMap,
+  menuItems,
+  resourceStatusMap,
+  type TabKey,
+} from '@/workbench/config'
+import { WorkbenchShell } from '@/workbench/WorkbenchShell'
 import { logisticsOrderService, logisticsFulfillmentService } from '@/services/orderService'
 import type { OrderInfo, LogisticsOrder, FulfillmentDocumentInfo } from '@/services/orderService'
 import { logisticsResourceService } from '@/services/logisticsResourceService'
@@ -53,38 +58,7 @@ import type {
 } from '@/services/fleetService'
 import { getLogisticsToken, hasLogisticsCapability } from '@/services/auth'
 
-const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography
-
-const resourceStatusMap: Record<number, { label: string; color: string }> = {
-  1: { label: '待审核', color: 'orange' },
-  2: { label: '已通过', color: 'success' },
-  3: { label: '已驳回', color: 'error' },
-  4: { label: '已下线', color: 'default' },
-}
-
-const logisticsOrderStatusMap: Record<string, { label: string; color: string }> = {
-  task_created: { label: '运输任务已创建', color: 'default' },
-  pickup_scheduled: { label: '提货已预约', color: 'processing' },
-  arrival_signed_in: { label: '已到场签到', color: 'blue' },
-  outbound_confirmed: { label: '已出库确认', color: 'cyan' },
-  loading_confirmed: { label: '已装货确认', color: 'cyan' },
-  in_transit: { label: '运输中', color: 'geekblue' },
-  arrival_confirmed: { label: '已到货确认', color: 'green' },
-  receipt_signed: { label: '已验收签收', color: 'green' },
-  inbound_completed: { label: '已入库完成', color: 'success' },
-  completed: { label: '履约完成', color: 'success' },
-  pending: { label: '待接单', color: 'default' },
-  accepted: { label: '已接单', color: 'processing' },
-  delivered: { label: '已送达', color: 'green' },
-  cancelled: { label: '已取消', color: 'error' },
-}
-
-type TabKey = 'dashboard' | 'bidding' | 'logistics-flow' | 'resources' | 'fleet'
-
-function isTabKey(value: string | null): value is TabKey {
-  return Boolean(value && ['dashboard', 'bidding', 'logistics-flow', 'resources', 'fleet'].includes(value))
-}
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
@@ -574,183 +548,43 @@ function App() {
     },
   ]
 
-  const getLogisticsStepInfo = (status: string) => {
-    const stepDefinitions = [
-      { key: 'task_created', title: '运输任务', owner: '系统', hint: '运输任务已创建' },
-      { key: 'pickup_scheduled', title: '提货预约', owner: '物流方', hint: '预约提货时间' },
-      { key: 'arrival_signed_in', title: '到场签到', owner: '物流方', hint: '车辆到达仓库签到' },
-      { key: 'outbound_confirmed', title: '出库确认', owner: '仓储方', hint: '仓库执行出库操作' },
-      { key: 'loading_confirmed', title: '装货确认', owner: '物流方', hint: '确认货物装载完毕' },
-      { key: 'in_transit', title: '运输中', owner: '物流方', hint: '货物在途运输' },
-      { key: 'arrival_confirmed', title: '到货确认', owner: '物流方', hint: '到达目的地确认' },
-      { key: 'inbound_completed', title: '收货仓验货入库', owner: '仓储方', hint: '收货仓验货并上传入库资料' },
-      { key: 'receipt_signed', title: '确认收货', owner: '买方/资金方', hint: '查看入库资料后确认收货' },
-      { key: 'completed', title: '履约结束', owner: '系统', hint: '物流履约流程结束' },
-    ]
-    const statusOrder = ['task_created', 'pickup_scheduled', 'arrival_signed_in', 'outbound_confirmed', 'loading_confirmed', 'in_transit', 'arrival_confirmed', 'inbound_completed', 'receipt_signed', 'completed']
-    
-    let completedStep = statusOrder.indexOf(status)
-    if (completedStep === -1) {
-      if (status === 'pending') completedStep = 0
-      else if (status === 'accepted') completedStep = 1
-    }
-    
-    const currentStep = Math.min(completedStep + 1, stepDefinitions.length - 1)
-    
-    return { stepDefinitions, currentStep }
-  }
-
-  const menuItems = [
-    { key: 'dashboard' as TabKey, label: '工作台概览', icon: <RocketOutlined /> },
-    { key: 'bidding' as TabKey, label: '竞价与接单', icon: <DollarCircleOutlined /> },
-    { key: 'logistics-flow' as TabKey, label: '物流流程', icon: <CarOutlined /> },
-    { key: 'resources' as TabKey, label: '运力资源管理', icon: <AppstoreOutlined /> },
-    { key: 'fleet' as TabKey, label: '司机车辆档案', icon: <SafetyCertificateOutlined /> },
-  ]
-
   if (!tokenReady) {
-    return (
-      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size="large" />
-      </Layout>
-    )
+    return <LoadingState />
   }
 
   if (!hasLogisticsCapability()) {
-    return (
-      <Layout
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Card style={{ maxWidth: 480, textAlign: 'center' }}>
-          <SafetyCertificateOutlined style={{ fontSize: 48, color: '#faad14', marginBottom: 16 }} />
-          <Title level={4}>需要物流服务商权限</Title>
-          <Paragraph type="secondary">
-            当前账户未开通物流服务商能力，请联系平台管理员申请开通。
-          </Paragraph>
-        </Card>
-      </Layout>
-    )
+    return <CapabilityDeniedState />
   }
 
   if (!hasLogisticsSession) {
-    return (
-      <Layout
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Card style={{ maxWidth: 480, textAlign: 'center' }}>
-          <SafetyCertificateOutlined style={{ fontSize: 48, color: '#1677ff', marginBottom: 16 }} />
-          <Title level={4}>未获取到登录会话</Title>
-          <Paragraph type="secondary">
-            当前页面没有拿到可用 token，所以不会继续请求物流数据。请从已登录的业务端进入，或先在同 host 下完成登录。
-          </Paragraph>
-        </Card>
-      </Layout>
-    )
+    return <MissingSessionState />
+  }
+
+  const refreshActiveTab = () => {
+    if (activeTab === 'dashboard') {
+      void fetchBidding()
+      void fetchLogisticsOrders()
+      void fetchResources()
+      void fetchFleet()
+    } else if (activeTab === 'bidding') {
+      void fetchBidding()
+    } else if (activeTab === 'logistics-flow') {
+      void fetchLogisticsOrders()
+    } else if (activeTab === 'resources') {
+      void fetchResources()
+    } else if (activeTab === 'fleet') {
+      void fetchFleet()
+    }
   }
 
   return (
-    <Layout className="service-shell">
-      <Sider width={232} theme="light">
-        <div
-          style={{
-            height: 78,
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 24px',
-            borderBottom: '1px solid #eadcc7',
-            background: 'linear-gradient(135deg, rgba(255,253,248,.92), rgba(248,240,228,.72))',
-          }}
-        >
-          <Space>
-            <span style={{ display: 'inline-grid', width: 36, height: 36, placeItems: 'center', borderRadius: 16, background: '#214332', color: '#f3c17c', fontWeight: 900 }}>
-              R
-            </span>
-            <span>
-              <Text strong style={{ display: 'block', color: '#17221b' }}>锐联物流</Text>
-              <Text style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', color: '#a4662c' }}>RecoLink</Text>
-            </span>
-          </Space>
-        </div>
-        <div style={{ padding: 16 }}>
-          <List
-            size="small"
-            dataSource={menuItems}
-            renderItem={(item) => (
-              <List.Item
-                className="service-nav-item"
-                style={{
-                  border: 0,
-                  padding: '11px 12px',
-                  borderRadius: 14,
-                  cursor: 'pointer',
-                  marginBottom: 6,
-                  background: activeTab === item.key ? '#214332' : 'transparent',
-                  color: activeTab === item.key ? '#fffaf1' : '#5f6b61',
-                }}
-                onClick={() => setActiveTab(item.key)}
-              >
-                <Space>
-                  {item.icon}
-                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
-                    {item.label}
-                    {item.key === 'bidding' && biddingOrders.length > 0 && (
-                      <Badge count={biddingOrders.length} style={{ marginLeft: 8 }} />
-                    )}
-                  </Text>
-                </Space>
-              </List.Item>
-            )}
-          />
-        </div>
-      </Sider>
-      <Layout>
-        <Header
-          style={{
-            background: '#fff',
-            height: 64,
-            padding: '0 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <Text strong style={{ display: 'block', color: '#17221b', fontSize: 16 }}>物流方工作台</Text>
-            <Text style={{ color: '#7a847a', fontSize: 12 }}>竞价接单、物流流转、运力资源与司机车辆档案</Text>
-          </div>
-          <Space>
-            <Button
-              icon={<EnvironmentOutlined />}
-              onClick={() => {
-                if (activeTab === 'dashboard') {
-                  fetchBidding()
-                  fetchLogisticsOrders()
-                  fetchResources()
-                  fetchFleet()
-                } else if (activeTab === 'bidding') fetchBidding()
-                else if (activeTab === 'logistics-flow') fetchLogisticsOrders()
-                else if (activeTab === 'resources') fetchResources()
-                else if (activeTab === 'fleet') fetchFleet()
-              }}
-            >
-              刷新
-            </Button>
-            <Button icon={<HomeOutlined />} href="/">
-              买家首页
-            </Button>
-          </Space>
-        </Header>
-        <Content className="service-content" style={{ padding: 24 }}>
+    <WorkbenchShell
+      activeTab={activeTab}
+      badgeCounts={{ bidding: biddingOrders.length }}
+      menuItems={menuItems}
+      onRefresh={refreshActiveTab}
+      onTabChange={setActiveTab}
+    >
           {activeTab === 'dashboard' && (
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -1699,9 +1533,7 @@ function App() {
               </Form.Item>
             </Form>
           </Modal>
-        </Content>
-      </Layout>
-    </Layout>
+    </WorkbenchShell>
   )
 }
 

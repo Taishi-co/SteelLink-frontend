@@ -29,6 +29,22 @@ const orderStatusMeta: Record<number, { color: string; text: string }> = {
   9: { color: 'red', text: '已取消' },
   10: { color: 'volcano', text: '已冻结' },
   11: { color: 'magenta', text: '异常' },
+  12: { color: 'geekblue', text: '待买方选择目的仓' },
+  13: { color: 'purple', text: '待仓库确认' },
+  14: { color: 'orange', text: '待卖方确认' },
+  15: { color: 'blue', text: '待买方确认' },
+  16: { color: 'cyan', text: '物流竞价中' },
+  17: { color: 'gold', text: '待确认物流' },
+  18: { color: 'processing', text: '运输中' },
+  19: { color: 'green', text: '已收货' },
+  20: { color: 'success', text: '已对账' },
+  21: { color: 'default', text: '已归档' },
+  22: { color: 'purple', text: '融资审批中' },
+  23: { color: 'gold', text: '待签署融资合同' },
+  24: { color: 'volcano', text: '待重新选仓' },
+  25: { color: 'volcano', text: '待重新发起物流' },
+  26: { color: 'geekblue', text: '待选择仓库' },
+  27: { color: 'gold', text: '待签署物流合同' },
 }
 
 interface TodoItem {
@@ -40,6 +56,19 @@ interface TodoItem {
   icon: React.ReactNode
   link: string
   actionText: string
+}
+
+function getSellerNextAction(order: SellerOrderInfo) {
+  if (order.status === 14) return { text: '确认仓储条款', link: '/orders' }
+  if (order.status === 2) return { text: '签署销售合同', link: '/orders' }
+  if (order.status === 4) return { text: '确认收款', link: '/orders' }
+  if (order.status === 5) return { text: '提货/出库', link: '/fulfillment' }
+  if (order.status === 16) return { text: '查看物流报价', link: '/orders' }
+  if (order.status === 25) return { text: '重新发起物流', link: '/orders' }
+  if (order.status === 27) return { text: '签署物流合同', link: '/orders' }
+  if (order.status === 18) return { text: '跟踪运输', link: '/orders' }
+  if (order.status === 1) return { text: '确认订单', link: '/orders' }
+  return { text: '查看订单', link: '/orders' }
 }
 
 export default function DashboardPage() {
@@ -87,13 +116,30 @@ export default function DashboardPage() {
     const pendingPayment = orders.filter(o => o.status === 3).length
     const pendingPaymentReview = orders.filter(o => o.status === 4).length
     const pendingDelivery = orders.filter(o => o.status === 5).length
-    const inTransit = orders.filter(o => o.status === 6).length
-    const completed = orders.filter(o => o.status === 8).length
+    const pendingSellerConfirm = orders.filter(o => o.status === 14).length
+    const logisticsBidding = orders.filter(o => o.status === 16).length
+    const pendingLogisticsRestart = orders.filter(o => o.status === 25).length
+    const pendingLogisticsContract = orders.filter(o => o.status === 27).length
+    const inTransit = orders.filter(o => [6, 18].includes(o.status)).length
+    const completed = orders.filter(o => [8, 19, 20, 21].includes(o.status)).length
     const totalAmount = orders
       .filter(o => o.status !== 0 && o.status !== 9)
       .reduce((sum, o) => sum + (o.total_amount || 0), 0)
 
-    return { pendingConfirm, pendingContract, pendingPayment, pendingPaymentReview, pendingDelivery, inTransit, completed, totalAmount }
+    return {
+      pendingConfirm,
+      pendingContract,
+      pendingPayment,
+      pendingPaymentReview,
+      pendingDelivery,
+      pendingSellerConfirm,
+      logisticsBidding,
+      pendingLogisticsRestart,
+      pendingLogisticsContract,
+      inTransit,
+      completed,
+      totalAmount,
+    }
   })()
 
   const todos: TodoItem[] = [
@@ -127,6 +173,16 @@ export default function DashboardPage() {
       link: '/orders',
       actionText: '核对凭证',
     }] : []),
+    ...(orderStats.pendingSellerConfirm > 0 ? [{
+      key: 'seller-confirm',
+      text: '待确认仓储条款',
+      description: '仓储方已确认，卖方需确认交付条款',
+      count: orderStats.pendingSellerConfirm,
+      color: '#f97316',
+      icon: <ExclamationCircleOutlined />,
+      link: '/orders',
+      actionText: '确认条款',
+    }] : []),
     ...(orderStats.pendingDelivery > 0 ? [{
       key: 'delivery',
       text: '待提货订单',
@@ -136,6 +192,36 @@ export default function DashboardPage() {
       icon: <TruckOutlined />,
       link: '/fulfillment',
       actionText: '去核销',
+    }] : []),
+    ...(orderStats.logisticsBidding > 0 ? [{
+      key: 'logistics-bidding',
+      text: '物流竞价中',
+      description: '查看报价进展，必要时结束竞价并选择物流',
+      count: orderStats.logisticsBidding,
+      color: '#0891b2',
+      icon: <RiseOutlined />,
+      link: '/orders',
+      actionText: '查看报价',
+    }] : []),
+    ...(orderStats.pendingLogisticsRestart > 0 ? [{
+      key: 'logistics-restart',
+      text: '待重新发起物流',
+      description: '无运力反馈后重新发起物流竞价',
+      count: orderStats.pendingLogisticsRestart,
+      color: '#ef4444',
+      icon: <TruckOutlined />,
+      link: '/orders',
+      actionText: '重新发起',
+    }] : []),
+    ...(orderStats.pendingLogisticsContract > 0 ? [{
+      key: 'logistics-contract',
+      text: '待签署物流合同',
+      description: '确认物流合同后开放后续提货资料',
+      count: orderStats.pendingLogisticsContract,
+      color: '#d97706',
+      icon: <FileProtectOutlined />,
+      link: '/orders',
+      actionText: '去签署',
     }] : []),
     ...(productPending > 0 ? [{
       key: 'product-review',
@@ -215,6 +301,18 @@ export default function DashboardPage() {
       render: (status: number) => {
         const meta = orderStatusMeta[status]
         return meta ? <Tag color={meta.color}>{meta.text}</Tag> : <Tag>{status}</Tag>
+      },
+    },
+    {
+      title: '下一步',
+      key: 'next',
+      render: (_: unknown, record: SellerOrderInfo) => {
+        const action = getSellerNextAction(record)
+        return (
+          <Button type="link" size="small" onClick={() => navigate(action.link)}>
+            {action.text}
+          </Button>
+        )
       },
     },
   ]

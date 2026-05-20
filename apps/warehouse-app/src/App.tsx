@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
-  Badge,
   Button,
   Card,
   Col,
   Descriptions,
   Form,
   InputNumber,
-  Layout,
   List,
   Modal,
   Row,
@@ -26,7 +24,6 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   DatabaseOutlined,
-  HomeOutlined,
   InboxOutlined,
   SafetyCertificateOutlined,
   CalendarOutlined,
@@ -35,8 +32,10 @@ import {
   EditOutlined,
   DeleteOutlined,
   AppstoreOutlined,
-  DashboardOutlined,
 } from '@ant-design/icons'
+import { CapabilityDeniedState, LoadingState } from '@/workbench/AccessState'
+import { isTabKey, menuItems, resourceStatusMap, statusMap, type TabKey } from '@/workbench/config'
+import { WorkbenchShell } from '@/workbench/WorkbenchShell'
 import { warehouseOrderService, warehouseMovementService, warehouseInventoryService, warehouseLogisticsService } from '@/services/orderService'
 import type { LogisticsOrder, OrderInfo, WarehouseInventorySnapshot, WarehouseMovement } from '@/services/orderService'
 import { warehouseResourceService } from '@/services/warehouseResourceService'
@@ -46,49 +45,8 @@ import type {
 } from '@/services/warehouseResourceService'
 import { hasWarehouseCapability } from '@/services/auth'
 
-const { Content, Header, Sider } = Layout
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
-
-const statusMap: Record<number, { label: string; color: string }> = {
-  0: { label: '待确认', color: 'default' },
-  12: { label: '待选择目的地仓储', color: 'geekblue' },
-  13: { label: '待仓库确认', color: 'orange' },
-  14: { label: '待卖方确认', color: 'blue' },
-  15: { label: '待买方确认', color: 'blue' },
-  2: { label: '待签合同', color: 'cyan' },
-  3: { label: '待付款', color: 'gold' },
-  4: { label: '待确认收款', color: 'purple' },
-  5: { label: '待提货', color: 'geekblue' },
-  16: { label: '物流竞价中', color: 'processing' },
-  17: { label: '待确认物流', color: 'blue' },
-  18: { label: '运输中', color: 'cyan' },
-  6: { label: '已发货', color: 'cyan' },
-  7: { label: '已到货', color: 'green' },
-  19: { label: '已收货', color: 'green' },
-  8: { label: '已完成', color: 'success' },
-  20: { label: '已对账', color: 'success' },
-  21: { label: '已归档', color: 'default' },
-  22: { label: '融资审批中', color: 'purple' },
-  23: { label: '待签署融资合同', color: 'magenta' },
-  24: { label: '待重新选仓', color: 'volcano' },
-  25: { label: '待重新发起物流', color: 'volcano' },
-  26: { label: '待选择仓库', color: 'geekblue' },
-  27: { label: '待签署物流合同', color: 'gold' },
-}
-
-const resourceStatusMap: Record<number, { label: string; color: string }> = {
-  1: { label: '待审核', color: 'orange' },
-  2: { label: '已通过', color: 'success' },
-  3: { label: '已驳回', color: 'error' },
-  4: { label: '已下线', color: 'default' },
-}
-
-type TabKey = 'dashboard' | 'pending' | 'movements' | 'logistics' | 'inventory' | 'resources' | 'all'
-
-function isTabKey(value: string | null): value is TabKey {
-  return Boolean(value && ['dashboard', 'pending', 'movements', 'logistics', 'inventory', 'resources', 'all'].includes(value))
-}
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard')
@@ -570,141 +528,44 @@ function App() {
     },
   ]
 
-  const menuItems = [
-    { key: 'dashboard' as TabKey, label: '工作台概览', icon: <DashboardOutlined /> },
-    { key: 'pending' as TabKey, label: '待确认订单', icon: <ExclamationCircleOutlined /> },
-    { key: 'movements' as TabKey, label: '出入库管理', icon: <DatabaseOutlined /> },
-    { key: 'logistics' as TabKey, label: '物流履约协同', icon: <SafetyCertificateOutlined /> },
-    { key: 'inventory' as TabKey, label: '库存快照', icon: <SafetyCertificateOutlined /> },
-    { key: 'resources' as TabKey, label: '仓库资源管理', icon: <AppstoreOutlined /> },
-    { key: 'all' as TabKey, label: '全部订单', icon: <InboxOutlined /> },
-  ]
-
   if (!tokenReady) {
-    return (
-      <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size="large" />
-      </Layout>
-    )
+    return <LoadingState />
   }
 
   if (!hasWarehouseCapability()) {
-    return (
-      <Layout
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Card style={{ maxWidth: 480, textAlign: 'center' }}>
-          <SafetyCertificateOutlined style={{ fontSize: 48, color: '#faad14', marginBottom: 16 }} />
-          <Title level={4}>需要仓储服务商权限</Title>
-          <Paragraph type="secondary">
-            当前账户未开通仓储服务商能力，请联系平台管理员申请开通。
-          </Paragraph>
-        </Card>
-      </Layout>
-    )
+    return <CapabilityDeniedState />
+  }
+
+  const refreshActiveTab = () => {
+    if (activeTab === 'dashboard') {
+      void fetchPending()
+      void fetchMovements()
+      void fetchLogisticsOrders()
+      void fetchResources()
+      void fetchAll()
+    } else if (activeTab === 'pending') {
+      void fetchPending()
+    } else if (activeTab === 'movements') {
+      void fetchMovements()
+    } else if (activeTab === 'logistics') {
+      void fetchLogisticsOrders()
+    } else if (activeTab === 'inventory') {
+      void fetchInventory()
+    } else if (activeTab === 'resources') {
+      void fetchResources()
+    } else {
+      void fetchAll()
+    }
   }
 
   return (
-    <Layout className="service-shell">
-      <Sider width={232} theme="light">
-        <div
-          style={{
-            height: 78,
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 24px',
-            borderBottom: '1px solid #eadcc7',
-            background: 'linear-gradient(135deg, rgba(255,253,248,.92), rgba(248,240,228,.72))',
-          }}
-        >
-          <Space>
-            <span style={{ display: 'inline-grid', width: 36, height: 36, placeItems: 'center', borderRadius: 16, background: '#214332', color: '#f3c17c', fontWeight: 900 }}>
-              R
-            </span>
-            <span>
-              <Text strong style={{ display: 'block', color: '#17221b' }}>锐联仓储</Text>
-              <Text style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', color: '#a4662c' }}>RecoLink</Text>
-            </span>
-          </Space>
-        </div>
-        <div style={{ padding: 16 }}>
-          <List
-            size="small"
-            dataSource={menuItems}
-            renderItem={(item) => (
-              <List.Item
-                className="service-nav-item"
-                style={{
-                  border: 0,
-                  padding: '11px 12px',
-                  borderRadius: 14,
-                  cursor: 'pointer',
-                  marginBottom: 6,
-                  background: activeTab === item.key ? '#214332' : 'transparent',
-                  color: activeTab === item.key ? '#fffaf1' : '#5f6b61',
-                }}
-                onClick={() => setActiveTab(item.key)}
-              >
-                <Space>
-                  {item.icon}
-                  <Text style={{ color: activeTab === item.key ? '#fffaf1' : '#5f6b61', fontWeight: 650 }}>
-                    {item.label}
-                    {item.key === 'pending' && pendingOrders.length > 0 && (
-                      <Badge count={pendingOrders.length} style={{ marginLeft: 8 }} />
-                    )}
-                  </Text>
-                </Space>
-              </List.Item>
-            )}
-          />
-        </div>
-      </Sider>
-      <Layout>
-        <Header
-          style={{
-            background: '#fff',
-            height: 64,
-            padding: '0 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <Text strong style={{ display: 'block', color: '#17221b', fontSize: 16 }}>仓储方工作台</Text>
-            <Text style={{ color: '#7a847a', fontSize: 12 }}>仓库资源、出入库、库存快照与物流履约协同</Text>
-          </div>
-          <Space>
-            <Button
-              icon={<CalendarOutlined />}
-              onClick={() => {
-                if (activeTab === 'dashboard') {
-                  fetchPending()
-                  fetchMovements()
-                  fetchLogisticsOrders()
-                  fetchResources()
-                  fetchAll()
-                } else if (activeTab === 'pending') fetchPending()
-                else if (activeTab === 'movements') fetchMovements()
-                else if (activeTab === 'logistics') fetchLogisticsOrders()
-                else if (activeTab === 'inventory') fetchInventory()
-                else if (activeTab === 'resources') fetchResources()
-                else fetchAll()
-              }}
-            >
-              刷新
-            </Button>
-            <Button icon={<HomeOutlined />} href="/">
-              买家首页
-            </Button>
-          </Space>
-        </Header>
-        <Content className="service-content" style={{ padding: 24 }}>
+    <WorkbenchShell
+      activeTab={activeTab}
+      badgeCounts={{ pending: pendingOrders.length }}
+      menuItems={menuItems}
+      onRefresh={refreshActiveTab}
+      onTabChange={setActiveTab}
+    >
           {activeTab === 'dashboard' && (
             <>
               <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -1497,9 +1358,7 @@ function App() {
               )}
             </Spin>
           </Modal>
-        </Content>
-      </Layout>
-    </Layout>
+    </WorkbenchShell>
   )
 }
 
