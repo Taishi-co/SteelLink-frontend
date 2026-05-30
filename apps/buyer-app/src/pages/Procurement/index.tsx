@@ -8,6 +8,11 @@ import type { ProcurementActivity, ProcurementStats } from '@/services/marketSer
 const { Title, Paragraph, Text } = Typography
 
 const statusMeta: Record<string, { label: string; color: string }> = {
+  pending_seller: { label: '待卖家确认', color: 'gold' },
+  active: { label: '参团中', color: 'green' },
+  ended: { label: '已截止', color: 'blue' },
+  order_created: { label: '已生成订单', color: 'purple' },
+  seller_rejected: { label: '卖家拒绝', color: 'red' },
   preparing: { label: '筹备中', color: 'gold' },
   signup: { label: '企业报名', color: 'blue' },
   bidding: { label: '竞价报价', color: 'purple' },
@@ -110,6 +115,8 @@ export default function ProcurementPage() {
               placeholder="活动阶段"
               options={[
                 { label: '全部阶段', value: '' },
+                { label: '参团中', value: 'active' },
+                { label: '已生成订单', value: 'order_created' },
                 { label: '筹备中', value: 'preparing' },
                 { label: '企业报名', value: 'signup' },
                 { label: '竞价报价', value: 'bidding' },
@@ -148,16 +155,16 @@ export default function ProcurementPage() {
                         <Row gutter={[12, 12]}>
                           <Col span={12}><Text type="secondary">集采品类</Text><div className="mt-1 font-semibold">{activity.category}</div></Col>
                           <Col span={12}><Text type="secondary">采购标的</Text><div className="mt-1 font-semibold">{activity.target}</div></Col>
-                          <Col span={12}><Text type="secondary">目标数量</Text><div className="mt-1 font-semibold">{formatQuantity(activity.targetQuantity, activity.unit)}</div></Col>
-                          <Col span={12}><Text type="secondary">预算区间</Text><div className="mt-1 font-semibold text-red-500">{activity.budgetDisplay}</div></Col>
+                          <Col span={12}><Text type="secondary">成团门槛</Text><div className="mt-1 font-semibold">{formatQuantity(activity.minGroupQuantity || activity.targetQuantity, activity.unit)}</div></Col>
+                          <Col span={12}><Text type="secondary">集采价</Text><div className="mt-1 font-semibold text-red-500">{activity.groupPrice ? `¥${activity.groupPrice.toLocaleString('zh-CN')}` : activity.budgetDisplay}</div></Col>
                           <Col span={12}><Text type="secondary">当前阶段</Text><div className="mt-1 font-semibold">{activity.stage}</div></Col>
                           <Col span={12}><Text type="secondary">开标日期</Text><div className="mt-1 font-semibold">{activity.openDate}</div></Col>
                         </Row>
                         <Progress percent={activity.progress} />
                         <Row gutter={[12, 12]}>
                           <Col span={8}><Statistic title="参采企业" value={activity.participatingCount} suffix="家" /></Col>
-                          <Col span={8}><Statistic title="收到报价" value={activity.quoteCount} suffix="份" /></Col>
-                          <Col span={8}><Statistic title="已签合同" value={activity.contractCount} suffix="份" /></Col>
+                          <Col span={8}><Statistic title="归集需求" value={activity.demandQuantity} suffix={activity.unit} /></Col>
+                          <Col span={8}><Statistic title="订单状态" value={activity.masterOrderId ? 1 : 0} suffix="笔" /></Col>
                         </Row>
                         <Link to={`/procurement/${activity.id}`} className="mt-auto">
                           <Button type="primary" icon={<ArrowRightOutlined />}>进入详情</Button>

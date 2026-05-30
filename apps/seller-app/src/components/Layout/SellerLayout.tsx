@@ -69,6 +69,7 @@ export default function SellerLayout() {
     if (sellerHasService('sales')) {
       items.push({ key: '/products', icon: <ShopOutlined />, label: '商品管理' })
       items.push({ key: '/bidding', icon: <RiseOutlined />, label: '参与竞价' })
+      items.push({ key: '/group-procurement', icon: <TeamOutlined />, label: '集采申请' })
     }
     if (sellerHasService('warehouse')) {
       items.push({ key: '/warehouses', icon: <BankOutlined />, label: '仓库管理' })

@@ -19,6 +19,7 @@ import { aiProcurementService } from '@/services/aiProcurementService'
 import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
 import { serviceOfferService } from '@/services/serviceOfferService'
 import { supplyDemandService } from '@/services/supplyDemandService'
+import { marketService, type ProcurementActivity } from '@/services/marketService'
 import type {
   AIProcurementInfo,
   AIProcurementParseResult,
@@ -247,6 +248,8 @@ export default function AiProcurementPage() {
   const [mine, setMine] = useState<AIProcurementInfo[]>([])
   const [warehouses, setWarehouses] = useState<WarehouseServiceItem[]>([])
   const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
+  const [groupProcurements, setGroupProcurements] = useState<ProcurementActivity[]>([])
+  const [groupRequesting, setGroupRequesting] = useState(false)
   const isLoggedIn = Boolean(getBuyerToken())
 
   const loadMine = useCallback(async () => {
@@ -375,11 +378,13 @@ export default function AiProcurementPage() {
       const confirmedParsed = mergeParsedInstruction(confirmed.parsed, parsedForRequest)
       instructionForm.setFieldsValue(confirmedParsed)
       const matched = await aiProcurementService.matchProducts(confirmedParsed)
+      const activeGroups = await marketService.listProcurements({ page: 1, page_size: 6, category: confirmedParsed.category, status: 'active' })
       updateResult({
         parsed: confirmedParsed,
         matched_products: matched.matched_products,
         stages: matched.stages,
       })
+      setGroupProcurements(activeGroups.list)
       setSelectedProducts([])
       navigate('/ai-procurement/2')
       message.success('参数已确认，商品召回完成')
@@ -476,6 +481,31 @@ export default function AiProcurementPage() {
       message.error(getApiErrorMessage(error, '订单生成失败，请确认商品库存和企业认证状态'))
     } finally {
       setBusy(false)
+    }
+  }
+
+  const handleRequestGroupProcurement = async () => {
+    const parsedForRequest = getLatestParsedInstruction()
+    if (!parsedForRequest) {
+      message.warning('请先确认采购参数')
+      return
+    }
+    setGroupRequesting(true)
+    try {
+      await marketService.requestGroupProcurement({
+        source: 'ai',
+        category: parsedForRequest.category,
+        product_name: parsedForRequest.product_name,
+        quantity: parsedForRequest.quantity,
+        unit: parsedForRequest.unit,
+        delivery_address: parsedForRequest.delivery_address,
+        remark: `AI采购申请发起集采：${prompt}`,
+      })
+      message.success('已向管理端提交集采申请')
+    } catch (error) {
+      message.error(getApiErrorMessage(error, '集采申请提交失败'))
+    } finally {
+      setGroupRequesting(false)
     }
   }
 
@@ -738,6 +768,8 @@ export default function AiProcurementPage() {
             result={result}
             currentProcurement={currentProcurement}
             selectedProducts={selectedProducts}
+            groupProcurements={groupProcurements}
+            groupRequesting={groupRequesting}
             selectedFinanceServiceId={selectedFinanceServiceId}
             onSelectedFinanceServiceChange={setSelectedFinanceServiceId}
             busy={busy}
@@ -753,6 +785,7 @@ export default function AiProcurementPage() {
             onPublishLogisticsDemand={handlePublishLogisticsDemand}
             onNegotiateLogistics={handleNegotiateLogistics}
             onConfirmProduct={handleConfirmProduct}
+            onRequestGroupProcurement={handleRequestGroupProcurement}
             onGenerateOrder={handleGenerateOrder}
             onMatchFinance={handleMatchFinance}
             onSubmitReview={handleSubmitReview}
@@ -863,6 +896,8 @@ function StepPage({
   result,
   currentProcurement,
   selectedProducts,
+  groupProcurements,
+  groupRequesting,
   selectedFinanceServiceId,
   onSelectedFinanceServiceChange,
   busy,
@@ -878,6 +913,7 @@ function StepPage({
   onPublishLogisticsDemand,
   onNegotiateLogistics,
   onConfirmProduct,
+  onRequestGroupProcurement,
   onGenerateOrder,
   onMatchFinance,
   onSubmitReview,
@@ -886,6 +922,8 @@ function StepPage({
   result: AIProcurementParseResult | null
   currentProcurement: AIProcurementInfo | null
   selectedProducts: MatchedProduct[]
+  groupProcurements: ProcurementActivity[]
+  groupRequesting: boolean
   selectedFinanceServiceId?: number
   onSelectedFinanceServiceChange: (id?: number) => void
   busy: boolean
@@ -901,6 +939,7 @@ function StepPage({
   onPublishLogisticsDemand: (product: MatchedProduct) => Promise<void>
   onNegotiateLogistics: (product: MatchedProduct) => void
   onConfirmProduct: () => Promise<void>
+  onRequestGroupProcurement: () => Promise<void>
   onGenerateOrder: () => Promise<void>
   onMatchFinance: (required: boolean, financeServiceId?: number) => Promise<void>
   onSubmitReview: () => void
@@ -931,6 +970,8 @@ function StepPage({
           result,
           currentProcurement,
           selectedProducts,
+          groupProcurements,
+          groupRequesting,
           selectedFinanceServiceId,
           onSelectedFinanceServiceChange,
           busy,
@@ -946,6 +987,7 @@ function StepPage({
           onPublishLogisticsDemand,
           onNegotiateLogistics,
           onConfirmProduct,
+          onRequestGroupProcurement,
           onGenerateOrder,
           onMatchFinance,
           onSubmitReview,
@@ -960,6 +1002,8 @@ function renderStepContent(props: {
   result: AIProcurementParseResult
   currentProcurement: AIProcurementInfo | null
   selectedProducts: MatchedProduct[]
+  groupProcurements: ProcurementActivity[]
+  groupRequesting: boolean
   selectedFinanceServiceId?: number
   onSelectedFinanceServiceChange: (id?: number) => void
   busy: boolean
@@ -975,11 +1019,12 @@ function renderStepContent(props: {
   onPublishLogisticsDemand: (product: MatchedProduct) => Promise<void>
   onNegotiateLogistics: (product: MatchedProduct) => void
   onConfirmProduct: () => Promise<void>
+  onRequestGroupProcurement: () => Promise<void>
   onGenerateOrder: () => Promise<void>
   onMatchFinance: (required: boolean, financeServiceId?: number) => Promise<void>
   onSubmitReview: () => void
 }) {
-  const { activeStep, result, currentProcurement, selectedProducts, selectedFinanceServiceId, busy, submitting, instructionForm, orderForm, warehouses, categoryOptions } = props
+  const { activeStep, result, currentProcurement, selectedProducts, groupProcurements, groupRequesting, selectedFinanceServiceId, busy, submitting, instructionForm, orderForm, warehouses, categoryOptions } = props
 
   if (activeStep === 1) {
     return (
@@ -1056,6 +1101,32 @@ function renderStepContent(props: {
   if (activeStep === 2) {
     return (
       <Card title="选择召回商品">
+        <Card size="small" className="mb-4" title="可选集采订单">
+          {groupProcurements.length > 0 ? (
+            <Space direction="vertical" size="middle" className="w-full">
+              {groupProcurements.map((item) => (
+                <div key={item.id} className="grid gap-3 rounded border border-green-100 bg-green-50 p-4 md:grid-cols-[1fr_auto] md:items-center">
+                  <div>
+                    <Text strong>{item.title}</Text>
+                    <div className="mt-1 text-sm text-gray-600">
+                      {item.productName || item.target} · 集采价 ¥{item.groupPrice || 0} / {item.unit || '吨'} · 已归集 {item.demandQuantity || 0}{item.unit || '吨'}
+                    </div>
+                  </div>
+                  <Link to={`/procurement/${item.id}`}>
+                    <Button type="primary">去参团</Button>
+                  </Link>
+                </div>
+              ))}
+            </Space>
+          ) : (
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <Text type="secondary">当前品类暂无进行中的集采，可向管理端提交发起申请，或继续选择现货商品生成订单。</Text>
+              <Button loading={groupRequesting} onClick={() => void props.onRequestGroupProcurement()}>
+                申请发起集采
+              </Button>
+            </div>
+          )}
+        </Card>
         {result.matched_products.length > 0 ? (
           <Space direction="vertical" size="middle" className="w-full">
             {result.matched_products.map((item) => (
