@@ -635,7 +635,7 @@ export default function AiProcurementPage() {
         ].join('\n'),
         tags: ['AI采购', '物流需求'],
       })
-      message.success('已发布物流需求，可在供需撮合查看')
+      message.success('物流需求已提交审核，审核通过后将在供需撮合展示')
       navigate('/matching')
     } catch (error) {
       message.error(getApiErrorMessage(error, '物流需求发布失败'))

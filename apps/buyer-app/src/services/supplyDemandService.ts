@@ -28,6 +28,9 @@ export interface SupplyDemandPost {
   matchCount: number
   matchAmount: number
   status: number
+  auditRemark: string
+  auditorId: number
+  auditedAt?: string | null
   enterpriseId: number
   publisherType: 'personal' | 'enterprise'
   publisherName: string
@@ -61,6 +64,9 @@ interface BackendSupplyDemandPost {
   match_count: number
   match_amount: number
   status: number
+  audit_remark?: string
+  auditor_id?: number
+  audited_at?: string | null
   enterprise_id: number
   publisher_type?: 'personal' | 'enterprise'
   publisher_name?: string
@@ -101,6 +107,7 @@ export interface SupplyDemandListParams {
   page?: number
   page_size?: number
   type?: SupplyDemandType
+  status?: number
   keyword?: string
   category?: string
   province?: string
@@ -155,6 +162,9 @@ function mapPost(post: BackendSupplyDemandPost): SupplyDemandPost {
     matchCount: post.match_count,
     matchAmount: post.match_amount,
     status: post.status,
+    auditRemark: post.audit_remark || '',
+    auditorId: post.auditor_id || 0,
+    auditedAt: post.audited_at,
     enterpriseId: post.enterprise_id,
     publisherType: post.publisher_type || (post.enterprise_id > 0 ? 'enterprise' : 'personal'),
     publisherName: post.publisher_name || (post.enterprise_id > 0 ? '认证企业' : '实名个人'),
