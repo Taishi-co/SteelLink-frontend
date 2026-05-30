@@ -45,6 +45,11 @@ function formatDateTime(value?: string) {
   return new Date(value).toLocaleString('zh-CN')
 }
 
+function formatLocalDateTimeInput(value: Date) {
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}`
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   const maybe = error as { response?: { data?: { message?: string } }; message?: string }
   return maybe.response?.data?.message || maybe.message || fallback
@@ -83,7 +88,7 @@ export default function SellerGroupProcurementPage() {
       group_price: item.groupPrice || undefined,
       min_group_quantity: item.minGroupQuantity || item.targetQuantity || undefined,
       max_group_quantity: item.maxGroupQuantity || undefined,
-      ended_at: defaultEnd.toISOString().slice(0, 16).replace('T', ' '),
+      ended_at: formatLocalDateTimeInput(defaultEnd),
       delivery_days: item.deliveryDays || 3,
       remark: item.sellerRemark,
     })
