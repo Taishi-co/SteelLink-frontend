@@ -71,7 +71,18 @@ export default function ProcurementDetailPage() {
     }
     setLoading(true)
     try {
-      setActivity(await marketService.getProcurement(activityID))
+      const publicActivity = await marketService.getProcurement(activityID)
+      let nextActivity = publicActivity
+      try {
+        const mine = await marketService.listMyProcurements({ page: 1, page_size: 20, keyword: publicActivity.procurementNo })
+        const joined = mine.list.find((item) => item.id === publicActivity.id)
+        if (joined?.participants?.length) {
+          nextActivity = { ...publicActivity, participants: joined.participants }
+        }
+      } catch {
+        // Public detail should remain usable for anonymous visitors.
+      }
+      setActivity(nextActivity)
     } catch (error) {
       message.error('集采活动详情加载失败，请确认后端服务已启动')
     } finally {
@@ -97,6 +108,7 @@ export default function ProcurementDetailPage() {
         remark: values.remark,
       })
       setActivity(updated)
+      joinForm.resetFields()
       message.success('已参与本次集采')
     } catch (error) {
       const maybe = error as { response?: { data?: { message?: string } } }
@@ -130,7 +142,8 @@ export default function ProcurementDetailPage() {
     { label: '卖家', value: activity.sellerName || '-' },
     { label: '截止时间', value: activity.endedAt ? new Date(activity.endedAt).toLocaleString('zh-CN') : activity.openDate },
   ] : []
-  const canJoin = activity?.status === 'active' && (!activity.endedAt || new Date(activity.endedAt).getTime() > Date.now())
+  const myParticipant = activity?.participants?.[0]
+  const canJoin = activity?.status === 'active' && !myParticipant && (!activity.endedAt || new Date(activity.endedAt).getTime() > Date.now())
   const currentStep = activity ? flowStep(activity.status) : 0
 
   return (
@@ -198,7 +211,29 @@ export default function ProcurementDetailPage() {
                 <Row gutter={[24, 24]}>
                   <Col xs={24} lg={14}>
                     <Card title="参与集采">
-                      {canJoin ? (
+                      {myParticipant ? (
+                        <Alert
+                          type="success"
+                          showIcon
+                          message="已参与本次集采"
+                          description={(
+                            <Space direction="vertical" size={4}>
+                              <Text>参团量：{formatQuantity(myParticipant.quantity, myParticipant.unit || activity.unit)}，金额：¥{myParticipant.totalAmount.toLocaleString('zh-CN')}</Text>
+                              <Text type="secondary">收货信息：{myParticipant.contactName} {myParticipant.contactPhone}，{myParticipant.deliveryAddress}</Text>
+                              <Text type="secondary">{myParticipant.childOrderNo ? `子订单：${myParticipant.childOrderNo}` : '集采截止并成团后，平台会生成对应子订单。'}</Text>
+                            </Space>
+                          )}
+                          action={myParticipant.childOrderId ? (
+                            <Link to={`/dashboard/orders/${myParticipant.childOrderId}`}>
+                              <Button size="small" type="primary">查看子订单</Button>
+                            </Link>
+                          ) : (
+                            <Link to="/dashboard/procurements">
+                              <Button size="small">我的集采</Button>
+                            </Link>
+                          )}
+                        />
+                      ) : canJoin ? (
                         <Form form={joinForm} layout="vertical" initialValues={{ quantity: activity.minGroupQuantity || 1, agreement_signed: false }}>
                           <Row gutter={16}>
                             <Col xs={24} md={8}>
@@ -269,7 +304,12 @@ export default function ProcurementDetailPage() {
                       </Card>
 
                       <Card title="下一步">
-                        {canJoin ? (
+                        {myParticipant ? (
+                          <Space direction="vertical">
+                            <Text strong><CheckCircleOutlined /> 已完成参团</Text>
+                            <Text type="secondary">{myParticipant.childOrderNo ? `子订单：${myParticipant.childOrderNo}` : '等待集采截止或平台主动结束后生成子订单。'}</Text>
+                          </Space>
+                        ) : canJoin ? (
                           <Space direction="vertical">
                             <Text strong><ShoppingCartOutlined /> 填写参团数量和收货地址</Text>
                             <Text type="secondary">参团后管理端会在截止或主动结束时统一生成母子订单。</Text>
