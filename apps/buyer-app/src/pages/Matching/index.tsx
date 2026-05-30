@@ -88,6 +88,15 @@ const postTypeOptions = [
   { label: '物流服务', value: 'logistics' },
 ]
 
+const postStatusMeta: Record<number, { label: string; color: string }> = {
+  0: { label: '草稿', color: 'default' },
+  1: { label: '审核通过', color: 'success' },
+  2: { label: '已撮合', color: 'cyan' },
+  3: { label: '已关闭', color: 'default' },
+  4: { label: '待审核', color: 'processing' },
+  5: { label: '已驳回', color: 'error' },
+}
+
 const statCards = [
   { label: '已发布信息数', key: 'publishedCount', hint: '供应、求购与服务信息' },
   { label: '撮合成功数', key: 'matchedCount', hint: '有效撮合信息' },
@@ -264,7 +273,7 @@ export default function MatchingPage() {
         type: values.type || defaultType,
         tags: values.tags || [],
       })
-      message.success('供求信息已发布')
+      message.success('供求信息已提交审核，审核通过后将在商城展示')
       setModalOpen(false)
       form.resetFields()
       await loadData()
@@ -299,7 +308,7 @@ export default function MatchingPage() {
             <div>
               <Title level={1} className="!mb-3">供求信息</Title>
               <Paragraph className="text-lg text-gray-500 !mb-0">
-                聚合供需、仓储和物流线索，实名个人即可发布；已认证企业发布后展示加密企业名。
+                聚合供需、仓储和物流线索，完成个人实名认证后可提交发布；平台审核通过后对外展示。
               </Paragraph>
             </div>
             <Space>
@@ -317,7 +326,7 @@ export default function MatchingPage() {
               type="warning"
               showIcon
               message="完成个人实名认证后即可发布供求信息"
-              description="未实名账号仍可浏览公开供求线索；发布供应、求购、仓储或物流服务需要先通过个人实名认证。"
+              description="未实名账号仍可浏览公开供求线索；发布供应、求购、仓储或物流服务需要先通过个人实名认证，提交后由平台审核。"
             />
           )}
         </div>
@@ -393,8 +402,16 @@ export default function MatchingPage() {
                           <Text strong>{item.title}</Text>
                           <div className="mt-1 text-xs text-gray-500">{getPublisherLabel(item)}</div>
                         </div>
-                        <Tag color={postTypeMeta[item.type].color}>{postTypeMeta[item.type].label}</Tag>
+                        <Space size={4} wrap>
+                          <Tag color={postTypeMeta[item.type].color}>{postTypeMeta[item.type].label}</Tag>
+                          <Tag color={postStatusMeta[item.status]?.color}>{postStatusMeta[item.status]?.label || '未知'}</Tag>
+                        </Space>
                       </div>
+                      {item.status === 5 && item.auditRemark && (
+                        <div className="mt-3 rounded bg-red-50 px-3 py-2 text-sm text-red-600">
+                          驳回原因：{item.auditRemark}
+                        </div>
+                      )}
                       <div className="mt-3 flex justify-between text-sm text-gray-500">
                         <span>{formatPostDate(item.createdAt)}</span>
                         <span>{item.matchCount} 条意向</span>
@@ -498,8 +515,8 @@ export default function MatchingPage() {
             className="mb-4"
             type={canPublish ? 'info' : 'warning'}
             showIcon
-            message={canPublish ? publisherHint : '完成个人实名认证后即可发布'}
-            description="联系信息仅按当前表单填写保存；公开列表展示发布主体时会使用实名个人或加密企业名。"
+            message={canPublish ? publisherHint : '完成个人实名认证后即可提交'}
+            description="提交后先进入平台审核，审核通过后才会在商城公开展示；公开列表展示发布主体时会使用实名个人或加密企业名。"
           />
           <Row gutter={16}>
             <Col span={12}>
