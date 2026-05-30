@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Descriptions, Drawer, Empty, Form, Input, InputNumber, Row, Col, Space, Spin, Statistic, Tag, Typography, message } from 'antd'
-import { CheckOutlined, CloseOutlined, TeamOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Descriptions, Drawer, Empty, Form, Input, InputNumber, Progress, Row, Col, Space, Spin, Statistic, Steps, Tag, Typography, message } from 'antd'
+import { CheckCircleOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, EyeOutlined, FileDoneOutlined, SendOutlined, ShopOutlined, TeamOutlined } from '@ant-design/icons'
 import { marketService, ProcurementActivity } from '@/services/marketService'
 
 const { Title, Paragraph, Text } = Typography
@@ -13,9 +13,31 @@ const statusMeta: Record<string, { color: string; text: string }> = {
   seller_rejected: { color: 'red', text: '已拒绝' },
 }
 
+const flowSteps = [
+  { title: '平台发起', description: '收到集采申请', icon: <SendOutlined /> },
+  { title: '卖家确认', description: '填写价格规则', icon: <CheckCircleOutlined /> },
+  { title: '买家参团', description: '商城公开归集', icon: <TeamOutlined /> },
+  { title: '管理成单', description: '生成母子订单', icon: <FileDoneOutlined /> },
+  { title: '订单履约', description: '进入订单流程', icon: <ShopOutlined /> },
+]
+
 function statusTag(status: string) {
   const meta = statusMeta[status] || { color: 'default', text: status || '-' }
   return <Tag color={meta.color}>{meta.text}</Tag>
+}
+
+function flowStep(status: string) {
+  if (status === 'pending_seller' || status === 'seller_rejected') return 1
+  if (status === 'active' || status === 'ended') return 2
+  if (status === 'order_created') return 4
+  return 0
+}
+
+function groupProgress(item: ProcurementActivity) {
+  if (item.status === 'order_created') return 100
+  const threshold = item.minGroupQuantity || item.targetQuantity || 0
+  if (threshold <= 0) return 0
+  return Math.min(100, Math.round((item.demandQuantity / threshold) * 100))
 }
 
 function formatDateTime(value?: string) {
@@ -119,9 +141,9 @@ export default function SellerGroupProcurementPage() {
 
       <Spin spinning={loading}>
         <Row gutter={[16, 16]}>
-          <Col xs={24} md={8}><Card><Statistic title="待确认" value={pendingCount} suffix="场" /></Card></Col>
-          <Col xs={24} md={8}><Card><Statistic title="参团中" value={activeCount} suffix="场" /></Card></Col>
-          <Col xs={24} md={8}><Card><Statistic title="已成单" value={orderedCount} suffix="场" /></Card></Col>
+          <Col xs={24} md={8}><Card><Statistic title="待确认" value={pendingCount} suffix="场" prefix={<ClockCircleOutlined />} /></Card></Col>
+          <Col xs={24} md={8}><Card><Statistic title="参团中" value={activeCount} suffix="场" prefix={<TeamOutlined />} /></Card></Col>
+          <Col xs={24} md={8}><Card><Statistic title="已成单" value={orderedCount} suffix="场" prefix={<FileDoneOutlined />} /></Card></Col>
         </Row>
 
         <section className="mt-6">
@@ -141,12 +163,15 @@ export default function SellerGroupProcurementPage() {
                       </div>
                       <Row gutter={[12, 12]}>
                         <Col span={12}><Text type="secondary">商品ID</Text><div className="font-semibold">{item.productId}</div></Col>
-                        <Col span={12}><Text type="secondary">目标量</Text><div className="font-semibold">{item.targetQuantity}{item.unit || '吨'}</div></Col>
+                        <Col span={12}><Text type="secondary">成团门槛</Text><div className="font-semibold">{item.minGroupQuantity || item.targetQuantity}{item.unit || '吨'}</div></Col>
                         <Col span={12}><Text type="secondary">集采价</Text><div className="font-semibold">¥{item.groupPrice || 0}</div></Col>
                         <Col span={12}><Text type="secondary">已归集</Text><div className="font-semibold">{item.demandQuantity || 0}{item.unit || '吨'}</div></Col>
                       </Row>
+                      <Progress percent={groupProgress(item)} format={(percent) => `${percent}%成团`} />
                       {item.status === 'pending_seller' ? <Alert type="warning" showIcon message="请确认价格和成团规则后开放给买家参团" /> : null}
-                      <Button type="primary" icon={<TeamOutlined />} onClick={() => openDetail(item)}>查看处理</Button>
+                      <Button type={item.status === 'pending_seller' ? 'primary' : 'default'} icon={item.status === 'pending_seller' ? <CheckOutlined /> : <EyeOutlined />} onClick={() => openDetail(item)}>
+                        {item.status === 'pending_seller' ? '处理申请' : '查看进度'}
+                      </Button>
                     </Space>
                   </Card>
                 </Col>
@@ -161,10 +186,21 @@ export default function SellerGroupProcurementPage() {
       <Drawer title="集采申请详情" open={!!selected} onClose={() => setSelected(null)} width={760}>
         {selected ? (
           <Space direction="vertical" size="large" className="w-full">
+            <Card size="small">
+              <Steps
+                current={flowStep(selected.status)}
+                items={flowSteps.map((step) => ({
+                  title: step.title,
+                  description: step.description,
+                  icon: step.icon,
+                }))}
+              />
+            </Card>
             <Descriptions bordered column={2} size="small">
               <Descriptions.Item label="状态">{statusTag(selected.status)}</Descriptions.Item>
               <Descriptions.Item label="商品">{selected.productName}</Descriptions.Item>
               <Descriptions.Item label="目标数量">{selected.targetQuantity}{selected.unit || '吨'}</Descriptions.Item>
+              <Descriptions.Item label="成团门槛">{selected.minGroupQuantity || selected.targetQuantity}{selected.unit || '吨'}</Descriptions.Item>
               <Descriptions.Item label="当前参团">{selected.demandQuantity}{selected.unit || '吨'}</Descriptions.Item>
               <Descriptions.Item label="截止时间">{formatDateTime(selected.endedAt)}</Descriptions.Item>
               <Descriptions.Item label="母订单">{selected.masterOrderNo || '-'}</Descriptions.Item>
@@ -187,7 +223,14 @@ export default function SellerGroupProcurementPage() {
                   </Space>
                 </Form>
               </Card>
-            ) : null}
+            ) : (
+              <Alert
+                type={selected.status === 'order_created' ? 'success' : 'info'}
+                showIcon
+                message={selected.status === 'order_created' ? '本次集采已生成订单' : '当前集采正在按平台流程推进'}
+                description={selected.masterOrderNo ? `母订单：${selected.masterOrderNo}` : '买家参团和订单生成由平台管理端统一处理。'}
+              />
+            )}
           </Space>
         ) : null}
       </Drawer>

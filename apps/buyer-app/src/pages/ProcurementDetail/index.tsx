@@ -1,20 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Alert, Button, Card, Checkbox, Col, Empty, Form, Input, InputNumber, Row, Segmented, Select, Space, Spin, Statistic, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
+import { Alert, Button, Card, Checkbox, Col, Empty, Form, Input, InputNumber, Row, Space, Spin, Statistic, Steps, Tag, Timeline, Typography, message } from 'antd'
 import {
   ArrowLeftOutlined,
-  AuditOutlined,
-  BankOutlined,
   CheckCircleOutlined,
-  CloudUploadOutlined,
+  ClockCircleOutlined,
   FileDoneOutlined,
-  FileProtectOutlined,
   FormOutlined,
-  InboxOutlined,
-  SafetyCertificateOutlined,
   ShopOutlined,
+  ShoppingCartOutlined,
   TeamOutlined,
-  TrophyOutlined,
 } from '@ant-design/icons'
 import { marketService } from '@/services/marketService'
 import type { ProcurementActivity } from '@/services/marketService'
@@ -22,32 +17,43 @@ import type { ProcurementActivity } from '@/services/marketService'
 const { Title, Paragraph, Text } = Typography
 
 const processStages = [
-  { title: '集采筹备', icon: <FormOutlined /> },
-  { title: '企业报名', icon: <TeamOutlined /> },
-  { title: '竞价报价', icon: <ShopOutlined /> },
-  { title: '评审定标', icon: <TrophyOutlined /> },
-  { title: '合同签约', icon: <FileProtectOutlined /> },
-  { title: '履约备货', icon: <CloudUploadOutlined /> },
-  { title: '货款结算', icon: <BankOutlined /> },
-  { title: '成交归档', icon: <FileDoneOutlined /> },
-  { title: '售后评价', icon: <SafetyCertificateOutlined /> },
+  { title: '平台发起', description: '管理端选择商品', icon: <FormOutlined /> },
+  { title: '卖家确认', description: '价格和成团规则', icon: <CheckCircleOutlined /> },
+  { title: '买家参团', description: '签协议和收货地址', icon: <TeamOutlined /> },
+  { title: '管理成单', description: '生成母子订单', icon: <FileDoneOutlined /> },
+  { title: '订单履约', description: '按订单流转', icon: <ShopOutlined /> },
 ]
 
-const subStages = ['提交需求', '平台审核', '发布上线']
-const stageIndexMap: Record<string, number> = {
-  集采筹备: 0,
-  企业报名: 1,
-  竞价报价: 2,
-  评审定标: 3,
-  合同签约: 4,
-  履约备货: 5,
-  货款结算: 6,
-  成交归档: 7,
-  售后评价: 8,
+const statusMeta: Record<string, { color: string; text: string }> = {
+  pending_seller: { color: 'gold', text: '待卖家确认' },
+  active: { color: 'green', text: '参团中' },
+  ended: { color: 'blue', text: '已截止' },
+  order_created: { color: 'purple', text: '已生成订单' },
+  seller_rejected: { color: 'red', text: '卖家拒绝' },
+  closed: { color: 'default', text: '已关闭' },
 }
 
 function formatQuantity(value: number, unit: string) {
   return `${value.toLocaleString('zh-CN')} ${unit || '吨'}`
+}
+
+function statusTag(status: string) {
+  const meta = statusMeta[status] || { color: 'default', text: status || '-' }
+  return <Tag color={meta.color}>{meta.text}</Tag>
+}
+
+function flowStep(status: string) {
+  if (status === 'pending_seller' || status === 'seller_rejected') return 1
+  if (status === 'active' || status === 'ended') return 2
+  if (status === 'order_created') return 4
+  return 0
+}
+
+function groupProgress(activity: ProcurementActivity) {
+  if (activity.status === 'order_created') return 100
+  const threshold = activity.minGroupQuantity || activity.targetQuantity || 0
+  if (threshold <= 0) return activity.progress || 0
+  return Math.min(100, Math.round((activity.demandQuantity / threshold) * 100))
 }
 
 export default function ProcurementDetailPage() {
@@ -125,6 +131,7 @@ export default function ProcurementDetailPage() {
     { label: '截止时间', value: activity.endedAt ? new Date(activity.endedAt).toLocaleString('zh-CN') : activity.openDate },
   ] : []
   const canJoin = activity?.status === 'active' && (!activity.endedAt || new Date(activity.endedAt).getTime() > Date.now())
+  const currentStep = activity ? flowStep(activity.status) : 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -139,18 +146,17 @@ export default function ProcurementDetailPage() {
                 </Link>
                 <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <Space className="mb-4" size="small">
-                      <Tag color="blue">牵</Tag>
-                      <Text type="secondary">牵头方</Text>
-                      <Tag color="purple">平</Tag>
-                      <Text type="secondary">平台运营</Text>
+                    <Space className="mb-4" size="small" wrap>
+                      <Tag color="blue">平台集采</Tag>
+                      {statusTag(activity.status)}
+                      {activity.masterOrderNo ? <Tag color="purple">母订单 {activity.masterOrderNo}</Tag> : null}
                     </Space>
                     <Title level={1} className="!mb-3">{activity.title}</Title>
                     <Paragraph className="text-lg text-gray-500 !mb-0">
-                      编号：{activity.procurementNo} | 牵头方：{activity.leaderName}
+                      编号：{activity.procurementNo} | 商品：{activity.productName || activity.target} | 卖家：{activity.sellerName || '-'}
                     </Paragraph>
                   </div>
-                  <Tag color="gold" className="px-4 py-2 text-base">{activity.stage}</Tag>
+                  <Tag color="green" className="px-4 py-2 text-base">{activity.stage}</Tag>
                 </div>
 
                 <Row gutter={[16, 16]}>
@@ -164,14 +170,28 @@ export default function ProcurementDetailPage() {
 
             <main className="mx-auto max-w-7xl px-8 py-10">
               <section>
-                <Title level={2} className="!mb-5">实时数据</Title>
+                <Title level={2} className="!mb-5">参团概览</Title>
                 <Row gutter={[16, 16]}>
                   <Col xs={24} sm={12} lg={5}><Card><Statistic title="参采企业" value={activity.participatingCount} suffix="家" /></Card></Col>
                   <Col xs={24} sm={12} lg={5}><Card><Statistic title="归集需求" value={activity.demandQuantity} suffix={activity.unit} /></Card></Col>
                   <Col xs={24} sm={12} lg={5}><Card><Statistic title="最小成团量" value={activity.minGroupQuantity || activity.targetQuantity} suffix={activity.unit} /></Card></Col>
                   <Col xs={24} sm={12} lg={5}><Card><Statistic title="集采单价" value={activity.groupPrice || 0} prefix="¥" /></Card></Col>
-                  <Col xs={24} sm={12} lg={4}><Card><Statistic title="已生成订单" value={activity.masterOrderId ? 1 : 0} suffix="笔" /></Card></Col>
+                  <Col xs={24} sm={12} lg={4}><Card><Statistic title="成团进度" value={groupProgress(activity)} suffix="%" prefix={<ClockCircleOutlined />} /></Card></Col>
                 </Row>
+              </section>
+
+              <section className="mt-10">
+                <Title level={2} className="!mb-5">集采流程</Title>
+                <Card>
+                  <Steps
+                    current={currentStep}
+                    items={processStages.map((stage) => ({
+                      title: stage.title,
+                      description: stage.description,
+                      icon: stage.icon,
+                    }))}
+                  />
+                </Card>
               </section>
 
               <section className="mt-10">
@@ -216,6 +236,7 @@ export default function ProcurementDetailPage() {
                         <div className="flex justify-between"><Text type="secondary">集采价</Text><Text strong>¥{activity.groupPrice || 0}</Text></div>
                         <div className="flex justify-between"><Text type="secondary">成团量</Text><Text strong>{activity.minGroupQuantity || 0}{activity.unit || '吨'}</Text></div>
                         <div className="flex justify-between"><Text type="secondary">已归集</Text><Text strong>{activity.demandQuantity || 0}{activity.unit || '吨'}</Text></div>
+                        <div className="flex justify-between"><Text type="secondary">截止时间</Text><Text strong>{activity.endedAt ? new Date(activity.endedAt).toLocaleString('zh-CN') : '-'}</Text></div>
                       </Space>
                     </Card>
                   </Col>
@@ -223,64 +244,14 @@ export default function ProcurementDetailPage() {
               </section>
 
               <section className="mt-10">
-                <Title level={2} className="!mb-5">集采全流程进度</Title>
-                <Card>
-                  <Steps
-                    current={stageIndexMap[activity.stage] || 0}
-                    items={processStages.map((stage, index) => ({
-                      title: stage.title,
-                      icon: stage.icon,
-                      description: `${index + 1}`,
-                    }))}
-                  />
-                </Card>
-              </section>
-
-              <section className="mt-10">
                 <Row gutter={[24, 24]}>
                   <Col xs={24} lg={16}>
-                    <Card title="第一阶段：集采筹备与发起" extra={<Tag color="blue">牵头方操作</Tag>}>
-                      <Steps size="small" current={0} className="mb-8" items={subStages.map((title, index) => ({ title, description: `${index + 1}` }))} />
-
-                      <Form layout="vertical">
-                        <Title level={4}>1 集采基础信息</Title>
-                        <Row gutter={16}>
-                          <Col xs={24} md={12}><Form.Item label="集采品类"><Segmented block options={['大宗商品', '工业品']} value={activity.category} /></Form.Item></Col>
-                          <Col xs={24} md={12}><Form.Item label="采购标的"><Input value={activity.target} readOnly /></Form.Item></Col>
-                          <Col xs={24} md={8}><Form.Item label="需求总量"><Input value={formatQuantity(activity.targetQuantity, activity.unit)} readOnly /></Form.Item></Col>
-                          <Col xs={24} md={8}><Form.Item label="预算区间"><Input value={activity.budgetDisplay} readOnly /></Form.Item></Col>
-                          <Col xs={24} md={8}><Form.Item label="交货周期（天）"><InputNumber value={activity.deliveryDays} className="w-full" readOnly /></Form.Item></Col>
-                          <Col span={24}><Form.Item label="交货地点"><Input value={activity.region} readOnly /></Form.Item></Col>
-                        </Row>
-
-                        <Title level={4}>2 集采规则设定</Title>
-                        <Row gutter={16}>
-                          <Col xs={24} md={8}><Form.Item label="拼单门槛（家）"><InputNumber value={10} className="w-full" readOnly /></Form.Item></Col>
-                          <Col xs={24} md={8}><Form.Item label="金额门槛"><Input value={activity.budgetDisplay} readOnly /></Form.Item></Col>
-                          <Col xs={24} md={8}><Form.Item label="报价方式"><Select value={activity.quoteMode} options={[{ label: activity.quoteMode, value: activity.quoteMode }]} /></Form.Item></Col>
-                          <Col xs={24} md={8}><Form.Item label="评审标准"><Select value={activity.evaluationMode} options={[{ label: activity.evaluationMode, value: activity.evaluationMode }]} /></Form.Item></Col>
-                        </Row>
-
-                        <Title level={4}>3 资质文件上传</Title>
-                        <Row gutter={16}>
-                          {(activity.documents.length > 0 ? activity.documents : ['牵头方授权书', '集采计划说明']).map((document) => (
-                            <Col key={document} xs={24} md={12}>
-                              <Form.Item label={document}>
-                                <Upload.Dragger beforeUpload={() => false} maxCount={1}>
-                                  <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-                                  <p className="ant-upload-text">点击上传</p>
-                                </Upload.Dragger>
-                              </Form.Item>
-                            </Col>
-                          ))}
-                        </Row>
-
-                        <Title level={4}>4 AI需求校验</Title>
-                        <Space>
-                          <Button icon={<AuditOutlined />}>启动AI校验</Button>
-                          <Button type="primary" icon={<CheckCircleOutlined />}>提交集采需求</Button>
-                        </Space>
-                      </Form>
+                    <Card title="流程记录" extra={<Tag color="blue">平台留痕</Tag>}>
+                      {activity.logs.length > 0 ? (
+                        <Timeline items={activity.logs.map((log) => ({ children: log.content, color: log.color }))} />
+                      ) : (
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无流程记录" />
+                      )}
                     </Card>
                   </Col>
 
@@ -297,8 +268,18 @@ export default function ProcurementDetailPage() {
                         </Space>
                       </Card>
 
-                      <Card title="活动日志">
-                        <Timeline items={activity.logs.map((log) => ({ children: log.content, color: log.color }))} />
+                      <Card title="下一步">
+                        {canJoin ? (
+                          <Space direction="vertical">
+                            <Text strong><ShoppingCartOutlined /> 填写参团数量和收货地址</Text>
+                            <Text type="secondary">参团后管理端会在截止或主动结束时统一生成母子订单。</Text>
+                          </Space>
+                        ) : (
+                          <Space direction="vertical">
+                            <Text strong><FileDoneOutlined /> {activity.masterOrderId ? '等待订单履约' : '等待管理端处理'}</Text>
+                            <Text type="secondary">{activity.masterOrderNo || '达到成团条件后，平台会生成对应订单。'}</Text>
+                          </Space>
+                        )}
                       </Card>
                     </Space>
                   </Col>
