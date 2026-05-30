@@ -534,6 +534,11 @@ export const marketService = {
     return mapList(response.data, mapProcurement)
   },
 
+  listMyProcurements: async (params?: MarketListParams) => {
+    const response = await api.get<ApiResponse<BackendListResponse<BackendProcurementActivity>>, ApiResponse<BackendListResponse<BackendProcurementActivity>>>('/procurements/mine', { params })
+    return mapList(response.data, mapProcurement)
+  },
+
   getProcurement: async (id: number) => {
     const response = await api.get<ApiResponse<BackendProcurementActivity>, ApiResponse<BackendProcurementActivity>>(`/procurements/${id}`)
     return mapProcurement(response.data)

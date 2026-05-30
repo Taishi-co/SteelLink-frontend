@@ -26,6 +26,7 @@ const EnterpriseIntroPage = lazy(() => import('@/pages/EnterpriseIntro'))
 const ProcurementPage = lazy(() => import('@/pages/Procurement'))
 const BiddingPage = lazy(() => import('@/pages/Bidding'))
 const BiddingModulePage = lazy(() => import('@/pages/BiddingModule'))
+const GroupProcurementModulePage = lazy(() => import('@/pages/GroupProcurementModule'))
 const ProcurementDetailPage = lazy(() => import('@/pages/ProcurementDetail'))
 const PersonalWorkspacePage = lazy(() => import('@/pages/PersonalWorkspace'))
 const NotificationsPage = lazy(() => import('@/pages/Notifications'))
@@ -100,6 +101,7 @@ export function AppRouter() {
         <Route path="market" element={lazyPage(<DashboardAccessGate><DashboardMarket /></DashboardAccessGate>)} />
         <Route path="services" element={lazyPage(<DashboardAccessGate><DashboardServices /></DashboardAccessGate>)} />
         <Route path="bidding" element={lazyPage(<DashboardAccessGate services={['procurement']}><BiddingModulePage /></DashboardAccessGate>)} />
+        <Route path="procurements" element={lazyPage(<DashboardAccessGate services={['procurement']}><GroupProcurementModulePage /></DashboardAccessGate>)} />
         <Route path="orders" element={lazyPage(<DashboardAccessGate services={['procurement', 'sales']}><OrdersPage /></DashboardAccessGate>)} />
         <Route path="orders/:id" element={lazyPage(<DashboardAccessGate services={['procurement', 'sales']}><OrderDetailPage /></DashboardAccessGate>)} />
         <Route path="notifications" element={lazyPage(<NotificationsPage />)} />

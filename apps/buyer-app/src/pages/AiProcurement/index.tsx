@@ -11,7 +11,9 @@ import {
   LoginOutlined,
   MessageOutlined,
   ReloadOutlined,
+  SendOutlined,
   ShoppingCartOutlined,
+  TeamOutlined,
   TruckOutlined,
 } from '@ant-design/icons'
 import { getBuyerToken } from '@/services/auth'
@@ -1101,19 +1103,27 @@ function renderStepContent(props: {
   if (activeStep === 2) {
     return (
       <Card title="选择召回商品">
-        <Card size="small" className="mb-4" title="可选集采订单">
+        <Card
+          size="small"
+          className="mb-4"
+          title={<Space><TeamOutlined /> 可选集采订单</Space>}
+          extra={<Tag color="green">先参团，再成单</Tag>}
+        >
           {groupProcurements.length > 0 ? (
             <Space direction="vertical" size="middle" className="w-full">
               {groupProcurements.map((item) => (
                 <div key={item.id} className="grid gap-3 rounded border border-green-100 bg-green-50 p-4 md:grid-cols-[1fr_auto] md:items-center">
                   <div>
-                    <Text strong>{item.title}</Text>
-                    <div className="mt-1 text-sm text-gray-600">
-                      {item.productName || item.target} · 集采价 ¥{item.groupPrice || 0} / {item.unit || '吨'} · 已归集 {item.demandQuantity || 0}{item.unit || '吨'}
+                    <Space wrap className="mb-1">
+                      <Text strong>{item.title}</Text>
+                      <Tag color="green">参团中</Tag>
+                    </Space>
+                    <div className="text-sm text-gray-600">
+                      {item.productName || item.target} · 集采价 ¥{item.groupPrice || 0} / {item.unit || '吨'} · 成团量 {item.minGroupQuantity || 0}{item.unit || '吨'} · 已归集 {item.demandQuantity || 0}{item.unit || '吨'}
                     </div>
                   </div>
                   <Link to={`/procurement/${item.id}`}>
-                    <Button type="primary">去参团</Button>
+                    <Button type="primary" icon={<ShoppingCartOutlined />}>去参团</Button>
                   </Link>
                 </div>
               ))}
@@ -1121,7 +1131,7 @@ function renderStepContent(props: {
           ) : (
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <Text type="secondary">当前品类暂无进行中的集采，可向管理端提交发起申请，或继续选择现货商品生成订单。</Text>
-              <Button loading={groupRequesting} onClick={() => void props.onRequestGroupProcurement()}>
+              <Button icon={<SendOutlined />} loading={groupRequesting} onClick={() => void props.onRequestGroupProcurement()}>
                 申请发起集采
               </Button>
             </div>

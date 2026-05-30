@@ -19,6 +19,7 @@ import {
   ArrowRightOutlined,
   CloudServerOutlined,
   MailOutlined,
+  TeamOutlined,
 } from '@ant-design/icons'
 import { clearBuyerSession, hasEnterpriseAccess, openSellerCenter, openServiceWorkbench } from '@/services/auth'
 import { useUserStore } from '@/stores'
@@ -44,6 +45,12 @@ const allNavItems: NavItem[] = [
     key: '/dashboard/bidding',
     icon: <RiseOutlined />,
     label: '竞价管理',
+    services: ['procurement'],
+  },
+  {
+    key: '/dashboard/procurements',
+    icon: <TeamOutlined />,
+    label: '我的集采',
     services: ['procurement'],
   },
   {
