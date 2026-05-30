@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Button, Card, Col, Empty, Form, Input, InputNumber, Row, Segmented, Select, Space, Spin, Statistic, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
+import { Alert, Button, Card, Checkbox, Col, Empty, Form, Input, InputNumber, Row, Segmented, Select, Space, Spin, Statistic, Steps, Tag, Timeline, Typography, Upload, message } from 'antd'
 import {
   ArrowLeftOutlined,
   AuditOutlined,
@@ -54,7 +54,9 @@ export default function ProcurementDetailPage() {
   const params = useParams()
   const activityID = Number(params.id)
   const [loading, setLoading] = useState(true)
+  const [joinLoading, setJoinLoading] = useState(false)
   const [activity, setActivity] = useState<ProcurementActivity | null>(null)
+  const [joinForm] = Form.useForm<{ quantity: number; contact_name: string; contact_phone: string; delivery_address: string; agreement_signed: boolean; remark?: string }>()
 
   const loadData = useCallback(async () => {
     if (!activityID) {
@@ -75,6 +77,29 @@ export default function ProcurementDetailPage() {
     void loadData()
   }, [loadData])
 
+  const handleJoin = async () => {
+    if (!activity) return
+    setJoinLoading(true)
+    try {
+      const values = await joinForm.validateFields()
+      const updated = await marketService.joinProcurement(activity.id, {
+        quantity: values.quantity,
+        contact_name: values.contact_name,
+        contact_phone: values.contact_phone,
+        delivery_address: values.delivery_address,
+        agreement_signed: values.agreement_signed,
+        remark: values.remark,
+      })
+      setActivity(updated)
+      message.success('已参与本次集采')
+    } catch (error) {
+      const maybe = error as { response?: { data?: { message?: string } } }
+      message.error(maybe.response?.data?.message || '参团失败，请确认企业认证和集采状态')
+    } finally {
+      setJoinLoading(false)
+    }
+  }
+
   if (!loading && !activity) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -93,12 +118,13 @@ export default function ProcurementDetailPage() {
   const previewItems = activity ? [
     { label: '品类', value: activity.category },
     { label: '采购标的', value: activity.target },
-    { label: '需求总量', value: formatQuantity(activity.targetQuantity, activity.unit) },
-    { label: '预算区间', value: activity.budgetDisplay },
+    { label: '集采单价', value: activity.groupPrice > 0 ? `¥${activity.groupPrice.toLocaleString('zh-CN')} / ${activity.unit || '吨'}` : '待卖家确认' },
+    { label: '最小成团量', value: formatQuantity(activity.minGroupQuantity || activity.targetQuantity, activity.unit) },
     { label: '交货周期', value: `${activity.deliveryDays}天` },
-    { label: '报价方式', value: activity.quoteMode },
-    { label: '评审标准', value: activity.evaluationMode },
+    { label: '卖家', value: activity.sellerName || '-' },
+    { label: '截止时间', value: activity.endedAt ? new Date(activity.endedAt).toLocaleString('zh-CN') : activity.openDate },
   ] : []
+  const canJoin = activity?.status === 'active' && (!activity.endedAt || new Date(activity.endedAt).getTime() > Date.now())
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -129,8 +155,8 @@ export default function ProcurementDetailPage() {
 
                 <Row gutter={[16, 16]}>
                   <Col xs={24} md={6}><Card><Text type="secondary">集采品类</Text><div className="mt-2 text-xl font-semibold">{activity.category}</div></Card></Col>
-                  <Col xs={24} md={6}><Card><Text type="secondary">目标数量</Text><div className="mt-2 text-xl font-semibold">{formatQuantity(activity.targetQuantity, activity.unit)}</div></Card></Col>
-                  <Col xs={24} md={6}><Card><Text type="secondary">预算区间</Text><div className="mt-2 text-xl font-semibold">{activity.budgetDisplay}</div></Card></Col>
+                  <Col xs={24} md={6}><Card><Text type="secondary">集采价格</Text><div className="mt-2 text-xl font-semibold">{activity.groupPrice > 0 ? `¥${activity.groupPrice}` : '待确认'}</div></Card></Col>
+                  <Col xs={24} md={6}><Card><Text type="secondary">成团门槛</Text><div className="mt-2 text-xl font-semibold">{formatQuantity(activity.minGroupQuantity || activity.targetQuantity, activity.unit)}</div></Card></Col>
                   <Col xs={24} md={6}><Card><Text type="secondary">当前阶段</Text><div className="mt-2 text-xl font-semibold">{activity.stage}</div></Card></Col>
                 </Row>
               </div>
@@ -142,9 +168,57 @@ export default function ProcurementDetailPage() {
                 <Row gutter={[16, 16]}>
                   <Col xs={24} sm={12} lg={5}><Card><Statistic title="参采企业" value={activity.participatingCount} suffix="家" /></Card></Col>
                   <Col xs={24} sm={12} lg={5}><Card><Statistic title="归集需求" value={activity.demandQuantity} suffix={activity.unit} /></Card></Col>
-                  <Col xs={24} sm={12} lg={5}><Card><Statistic title="入围供应商" value={activity.qualifiedSuppliers} suffix="家" /></Card></Col>
-                  <Col xs={24} sm={12} lg={5}><Card><Statistic title="收到报价" value={activity.quoteCount} suffix="份" /></Card></Col>
-                  <Col xs={24} sm={12} lg={4}><Card><Statistic title="已签合同" value={activity.contractCount} suffix="份" /></Card></Col>
+                  <Col xs={24} sm={12} lg={5}><Card><Statistic title="最小成团量" value={activity.minGroupQuantity || activity.targetQuantity} suffix={activity.unit} /></Card></Col>
+                  <Col xs={24} sm={12} lg={5}><Card><Statistic title="集采单价" value={activity.groupPrice || 0} prefix="¥" /></Card></Col>
+                  <Col xs={24} sm={12} lg={4}><Card><Statistic title="已生成订单" value={activity.masterOrderId ? 1 : 0} suffix="笔" /></Card></Col>
+                </Row>
+              </section>
+
+              <section className="mt-10">
+                <Row gutter={[24, 24]}>
+                  <Col xs={24} lg={14}>
+                    <Card title="参与集采">
+                      {canJoin ? (
+                        <Form form={joinForm} layout="vertical" initialValues={{ quantity: activity.minGroupQuantity || 1, agreement_signed: false }}>
+                          <Row gutter={16}>
+                            <Col xs={24} md={8}>
+                              <Form.Item name="quantity" label={`参团数量（${activity.unit || '吨'}）`} rules={[{ required: true, message: '请输入参团数量' }]}>
+                                <InputNumber min={0.01} className="w-full" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={8}><Form.Item name="contact_name" label="收货联系人" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                            <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                            <Col xs={24}><Form.Item name="delivery_address" label="收货地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                            <Col xs={24}><Form.Item name="remark" label="备注"><Input.TextArea rows={2} /></Form.Item></Col>
+                            <Col xs={24}>
+                              <Form.Item name="agreement_signed" valuePropName="checked" rules={[{ validator: (_, value) => value ? Promise.resolve() : Promise.reject(new Error('请先签署集采协议')) }]}>
+                                <Checkbox>我已阅读并签署本次集采协议，确认按集采价格和平台规则参团</Checkbox>
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          <Button type="primary" loading={joinLoading} onClick={() => void handleJoin()}>确认参团</Button>
+                        </Form>
+                      ) : (
+                        <Alert
+                          type={activity.status === 'order_created' ? 'success' : 'info'}
+                          showIcon
+                          message={activity.status === 'order_created' ? '本次集采已生成订单' : '当前集采暂不可参团'}
+                          description={activity.status === 'pending_seller' ? '卖家尚未确认价格和成团规则。' : activity.endedAt ? `截止时间：${new Date(activity.endedAt).toLocaleString('zh-CN')}` : undefined}
+                        />
+                      )}
+                    </Card>
+                  </Col>
+                  <Col xs={24} lg={10}>
+                    <Card title="参团规则">
+                      <Space direction="vertical" className="w-full">
+                        <div className="flex justify-between"><Text type="secondary">卖家</Text><Text strong>{activity.sellerName || '-'}</Text></div>
+                        <div className="flex justify-between"><Text type="secondary">商品</Text><Text strong>{activity.productName || activity.target}</Text></div>
+                        <div className="flex justify-between"><Text type="secondary">集采价</Text><Text strong>¥{activity.groupPrice || 0}</Text></div>
+                        <div className="flex justify-between"><Text type="secondary">成团量</Text><Text strong>{activity.minGroupQuantity || 0}{activity.unit || '吨'}</Text></div>
+                        <div className="flex justify-between"><Text type="secondary">已归集</Text><Text strong>{activity.demandQuantity || 0}{activity.unit || '吨'}</Text></div>
+                      </Space>
+                    </Card>
+                  </Col>
                 </Row>
               </section>
 

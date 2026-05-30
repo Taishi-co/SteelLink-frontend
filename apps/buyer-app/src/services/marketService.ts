@@ -170,6 +170,14 @@ export interface ProcurementActivity {
   title: string
   leaderName: string
   status: string
+  productId: number
+  productNo: string
+  productName: string
+  sellerEnterpriseId: number
+  sellerName: string
+  groupPrice: number
+  minGroupQuantity: number
+  maxGroupQuantity: number
   category: string
   target: string
   targetQuantity: number
@@ -190,7 +198,40 @@ export interface ProcurementActivity {
   quoteMode: string
   evaluationMode: string
   documents: string[]
+  adminRemark: string
+  sellerRemark: string
+  source: string
+  startedAt?: string
+  endedAt?: string
+  sellerRespondedAt?: string
+  closedAt?: string
+  masterOrderId: number
+  masterOrderNo: string
+  participants: ProcurementParticipant[]
   logs: ProcurementLog[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProcurementParticipant {
+  id: number
+  activityId: number
+  buyerEnterpriseId: number
+  buyerUserId: number
+  buyerName: string
+  quantity: number
+  unit: string
+  unitPrice: number
+  totalAmount: number
+  contactName: string
+  contactPhone: string
+  deliveryAddress: string
+  agreementSigned: boolean
+  agreementSignedAt?: string
+  status: string
+  childOrderId: number
+  childOrderNo: string
+  remark: string
   createdAt: string
   updatedAt: string
 }
@@ -201,6 +242,14 @@ interface BackendProcurementActivity {
   title: string
   leader_name: string
   status: string
+  product_id: number
+  product_no: string
+  product_name: string
+  seller_enterprise_id: number
+  seller_name: string
+  group_price: number
+  min_group_quantity: number
+  max_group_quantity: number
   category: string
   target: string
   target_quantity: number
@@ -221,9 +270,61 @@ interface BackendProcurementActivity {
   quote_mode: string
   evaluation_mode: string
   documents: string[] | null
+  admin_remark: string
+  seller_remark: string
+  source: string
+  started_at?: string
+  ended_at?: string
+  seller_responded_at?: string
+  closed_at?: string
+  master_order_id: number
+  master_order_no: string
+  participants?: BackendProcurementParticipant[]
   logs?: BackendProcurementLog[]
   created_at: string
   updated_at: string
+}
+
+interface BackendProcurementParticipant {
+  id: number
+  activity_id: number
+  buyer_enterprise_id: number
+  buyer_user_id: number
+  buyer_name: string
+  quantity: number
+  unit: string
+  unit_price: number
+  total_amount: number
+  contact_name: string
+  contact_phone: string
+  delivery_address: string
+  agreement_signed: boolean
+  agreement_signed_at?: string
+  status: string
+  child_order_id: number
+  child_order_no: string
+  remark: string
+  created_at: string
+  updated_at: string
+}
+
+export interface JoinProcurementPayload {
+  quantity: number
+  contact_name: string
+  contact_phone: string
+  delivery_address: string
+  agreement_signed: boolean
+  remark?: string
+}
+
+export interface RequestGroupProcurementPayload {
+  source?: string
+  category: string
+  product_name: string
+  quantity: number
+  unit?: string
+  delivery_address?: string
+  remark?: string
 }
 
 export interface MarketListParams {
@@ -289,6 +390,14 @@ function mapProcurement(activity: BackendProcurementActivity): ProcurementActivi
     title: activity.title,
     leaderName: activity.leader_name,
     status: activity.status,
+    productId: activity.product_id,
+    productNo: activity.product_no,
+    productName: activity.product_name,
+    sellerEnterpriseId: activity.seller_enterprise_id,
+    sellerName: activity.seller_name,
+    groupPrice: activity.group_price,
+    minGroupQuantity: activity.min_group_quantity,
+    maxGroupQuantity: activity.max_group_quantity,
     category: activity.category,
     target: activity.target,
     targetQuantity: activity.target_quantity,
@@ -309,6 +418,37 @@ function mapProcurement(activity: BackendProcurementActivity): ProcurementActivi
     quoteMode: activity.quote_mode,
     evaluationMode: activity.evaluation_mode,
     documents: activity.documents || [],
+    adminRemark: activity.admin_remark,
+    sellerRemark: activity.seller_remark,
+    source: activity.source,
+    startedAt: activity.started_at,
+    endedAt: activity.ended_at,
+    sellerRespondedAt: activity.seller_responded_at,
+    closedAt: activity.closed_at,
+    masterOrderId: activity.master_order_id,
+    masterOrderNo: activity.master_order_no,
+    participants: (activity.participants || []).map((participant) => ({
+      id: participant.id,
+      activityId: participant.activity_id,
+      buyerEnterpriseId: participant.buyer_enterprise_id,
+      buyerUserId: participant.buyer_user_id,
+      buyerName: participant.buyer_name,
+      quantity: participant.quantity,
+      unit: participant.unit,
+      unitPrice: participant.unit_price,
+      totalAmount: participant.total_amount,
+      contactName: participant.contact_name,
+      contactPhone: participant.contact_phone,
+      deliveryAddress: participant.delivery_address,
+      agreementSigned: participant.agreement_signed,
+      agreementSignedAt: participant.agreement_signed_at,
+      status: participant.status,
+      childOrderId: participant.child_order_id,
+      childOrderNo: participant.child_order_no,
+      remark: participant.remark,
+      createdAt: participant.created_at,
+      updatedAt: participant.updated_at,
+    })),
     logs: (activity.logs || []).map((log) => ({
       id: log.id,
       content: log.content,
@@ -397,5 +537,15 @@ export const marketService = {
   getProcurement: async (id: number) => {
     const response = await api.get<ApiResponse<BackendProcurementActivity>, ApiResponse<BackendProcurementActivity>>(`/procurements/${id}`)
     return mapProcurement(response.data)
+  },
+
+  joinProcurement: async (id: number, payload: JoinProcurementPayload) => {
+    const response = await api.post<ApiResponse<BackendProcurementActivity>, ApiResponse<BackendProcurementActivity>>(`/procurements/${id}/join`, payload)
+    return mapProcurement(response.data)
+  },
+
+  requestGroupProcurement: async (payload: RequestGroupProcurementPayload) => {
+    const response = await api.post<ApiResponse<unknown>, ApiResponse<unknown>>('/procurements/requests', payload)
+    return response.data
   },
 }

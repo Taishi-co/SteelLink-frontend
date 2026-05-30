@@ -11,6 +11,7 @@ const OrdersPage = lazy(() => import('@/pages/Orders'))
 const ProductsPage = lazy(() => import('@/pages/Products'))
 const WarehousesPage = lazy(() => import('@/pages/Warehouses'))
 const BiddingPage = lazy(() => import('@/pages/Bidding'))
+const GroupProcurementPage = lazy(() => import('@/pages/GroupProcurement'))
 const SettingsPage = lazy(() => import('@/pages/Settings'))
 const FulfillmentPage = lazy(() => import('@/pages/Fulfillment'))
 const NotificationsPage = lazy(() => import('@/pages/Notifications'))
@@ -65,6 +66,7 @@ export function AppRouter() {
               <Route path="products" element={lazyPage(<ProductsPage />)} />
               <Route path="warehouses" element={lazyPage(<WarehousesPage />)} />
               <Route path="bidding" element={lazyPage(<BiddingPage />)} />
+              <Route path="group-procurement" element={lazyPage(<GroupProcurementPage />)} />
               <Route path="orders" element={lazyPage(<OrdersPage />)} />
               <Route path="notifications" element={lazyPage(<NotificationsPage />)} />
               <Route path="fulfillment" element={lazyPage(<FulfillmentPage />)} />
