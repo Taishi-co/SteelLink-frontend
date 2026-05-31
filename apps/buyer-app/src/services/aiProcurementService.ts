@@ -24,6 +24,8 @@ export interface ParsedInstruction {
   delivery_address_source?: 'manual' | 'buyer_warehouse' | string
   delivery_warehouse_id?: number
   delivery_warehouse_name?: string
+  contact_name?: string
+  contact_phone?: string
 }
 
 export interface MatchedProduct {

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Alert, Button, Card, Col, Empty, Progress, Row, Space, Spin, Statistic, Tag, Typography, message } from 'antd'
-import { ArrowRightOutlined, ClockCircleOutlined, FileDoneOutlined, HomeOutlined, ShoppingCartOutlined, TeamOutlined } from '@ant-design/icons'
+import { ArrowRightOutlined, ClockCircleOutlined, FileDoneOutlined, HomeOutlined, MailOutlined, ShoppingCartOutlined, TeamOutlined } from '@ant-design/icons'
 import { marketService } from '@/services/marketService'
-import type { ProcurementActivity, ProcurementParticipant } from '@/services/marketService'
+import type { ProcurementActivity, ProcurementInvitation, ProcurementParticipant } from '@/services/marketService'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -74,12 +74,18 @@ function getErrorMessage(error: unknown, fallback: string) {
 export default function GroupProcurementModulePage() {
   const [loading, setLoading] = useState(true)
   const [activities, setActivities] = useState<ProcurementActivity[]>([])
+  const [invitations, setInvitations] = useState<ProcurementInvitation[]>([])
+  const [acceptingId, setAcceptingId] = useState<number | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await marketService.listMyProcurements({ page: 1, page_size: 50 })
+      const [result, invitationResult] = await Promise.all([
+        marketService.listMyProcurements({ page: 1, page_size: 50 }),
+        marketService.listMyProcurementInvitations({ page: 1, page_size: 50 }),
+      ])
       setActivities(result.list)
+      setInvitations(invitationResult.list)
     } catch (error) {
       message.error(getErrorMessage(error, '我的集采加载失败'))
     } finally {
@@ -90,6 +96,36 @@ export default function GroupProcurementModulePage() {
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  const handleAcceptInvitation = async (invitation: ProcurementInvitation) => {
+    const request = invitation.request
+    if (!request) {
+      message.error('邀请缺少原始申请信息')
+      return
+    }
+    setAcceptingId(invitation.id)
+    try {
+      await marketService.acceptProcurementInvitation(invitation.id, {
+        quantity: request.quantity,
+        contact_name: request.contactName,
+        contact_phone: request.contactPhone,
+        delivery_address_source: request.deliveryAddressSource === 'warehouse' ? 'warehouse' : 'manual',
+        dest_warehouse_service_id: request.destWarehouseServiceId,
+        delivery_address: request.deliveryAddress,
+        delivery_method: request.deliveryMethod,
+        payment_method: request.paymentMethod,
+        delivery_note: request.deliveryNote,
+        agreement_signed: true,
+        remark: request.remark,
+      })
+      message.success('已接受集采邀请并参团')
+      await loadData()
+    } catch (error) {
+      message.error(getErrorMessage(error, '接受邀请失败，请确认集采状态和企业认证'))
+    } finally {
+      setAcceptingId(null)
+    }
+  }
 
   const stats = useMemo(() => {
     const active = activities.filter((item) => item.status === 'active').length
@@ -122,8 +158,67 @@ export default function GroupProcurementModulePage() {
             <Col xs={24} md={6}><Card><Statistic title="已参团" value={activities.length} suffix="场" prefix={<TeamOutlined />} /></Card></Col>
             <Col xs={24} md={6}><Card><Statistic title="参团中" value={stats.active} suffix="场" prefix={<ClockCircleOutlined />} /></Card></Col>
             <Col xs={24} md={6}><Card><Statistic title="已成单" value={stats.ordered} suffix="场" prefix={<FileDoneOutlined />} /></Card></Col>
-            <Col xs={24} md={6}><Card><Statistic title="参团金额" value={stats.amount} prefix="¥" precision={2} /></Card></Col>
+            <Col xs={24} md={6}><Card><Statistic title="待处理邀请" value={invitations.filter((item) => item.status === 'pending').length} suffix="条" prefix={<MailOutlined />} /></Card></Col>
           </Row>
+
+          <section className="mt-8">
+            <div className="mb-5 flex items-center justify-between">
+              <Title level={2} className="!mb-0">集采邀请</Title>
+              <Tag>{invitations.length} 条</Tag>
+            </div>
+            {invitations.length > 0 ? (
+              <Row gutter={[16, 16]}>
+                {invitations.map((invitation) => {
+                  const activity = invitation.activity
+                  const request = invitation.request
+                  return (
+                    <Col key={invitation.id} xs={24} lg={12}>
+                      <Card className="h-full">
+                        <Space direction="vertical" size="middle" className="w-full">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <Text type="secondary">{invitation.invitationNo}</Text>
+                              <Title level={4} className="!mb-1 !mt-2">{activity?.title || request?.productName || '集采邀请'}</Title>
+                              <Text type="secondary">{request?.category || activity?.category || '-'} · 意向 {formatQuantity(request?.quantity || 0, request?.unit || activity?.unit || '吨')}</Text>
+                            </div>
+                            <Tag color={invitation.status === 'pending' ? 'orange' : invitation.status === 'accepted' ? 'green' : 'default'}>
+                              {invitation.status === 'pending' ? '待确认' : invitation.status === 'accepted' ? '已接受' : invitation.status}
+                            </Tag>
+                          </div>
+                          <div className="rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                            <div>{request?.contactName || '-'} {request?.contactPhone || ''}</div>
+                            <div className="mt-1">{request?.deliveryAddress || '-'}</div>
+                            <div className="mt-1">期望价：{request?.targetPrice ? `${formatMoney(request.targetPrice)} / ${request.unit || '吨'}` : '-'}</div>
+                          </div>
+                          <Space wrap>
+                            {activity ? (
+                              <Link to={`/procurement/${activity.id}`}>
+                                <Button icon={<ArrowRightOutlined />}>查看集采</Button>
+                              </Link>
+                            ) : null}
+                            {invitation.status === 'pending' ? (
+                              <Button
+                                type="primary"
+                                icon={<ShoppingCartOutlined />}
+                                loading={acceptingId === invitation.id}
+                                onClick={() => void handleAcceptInvitation(invitation)}
+                              >
+                                确认参团
+                              </Button>
+                            ) : null}
+                          </Space>
+                        </Space>
+                      </Card>
+                    </Col>
+                  )
+                })}
+              </Row>
+            ) : (
+              <Card>
+                <Empty description="暂无集采邀请" />
+              </Card>
+            )}
+          </section>
 
           <section className="mt-8">
             <div className="mb-5 flex items-center justify-between">

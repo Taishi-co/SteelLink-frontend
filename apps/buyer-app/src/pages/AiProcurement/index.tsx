@@ -81,6 +81,8 @@ const defaultParsed: ParsedInstruction = {
   delivery_address_source: 'manual',
   delivery_warehouse_id: undefined,
   delivery_warehouse_name: '',
+  contact_name: '',
+  contact_phone: '',
 }
 
 function formatMoney(value?: number) {
@@ -205,6 +207,8 @@ function mergeParsedInstruction(base: ParsedInstruction, values: Partial<ParsedI
     delivery_address_source: values.delivery_address_source ?? base.delivery_address_source,
     delivery_warehouse_id: values.delivery_warehouse_id ?? base.delivery_warehouse_id,
     delivery_warehouse_name: String(values.delivery_warehouse_name ?? base.delivery_warehouse_name ?? '').trim(),
+    contact_name: String(values.contact_name ?? base.contact_name ?? '').trim(),
+    contact_phone: String(values.contact_phone ?? base.contact_phone ?? '').trim(),
   }
 }
 
@@ -494,13 +498,29 @@ export default function AiProcurementPage() {
     }
     setGroupRequesting(true)
     try {
+      const orderValues = orderForm.getFieldsValue()
+      const contactName = orderValues.contact_name || parsedForRequest.contact_name
+      const contactPhone = orderValues.contact_phone || parsedForRequest.contact_phone
+      const deliveryAddress = orderValues.delivery_address || parsedForRequest.delivery_address
+      if (!contactName || !contactPhone || !deliveryAddress) {
+        message.warning('请先补全收货联系人、联系电话和收货地址')
+        return
+      }
       await marketService.requestGroupProcurement({
         source: 'ai',
+        ai_procurement_id: currentProcurement?.id,
         category: parsedForRequest.category,
         product_name: parsedForRequest.product_name,
         quantity: parsedForRequest.quantity,
         unit: parsedForRequest.unit,
-        delivery_address: parsedForRequest.delivery_address,
+        contact_name: contactName,
+        contact_phone: contactPhone,
+        delivery_address_source: parsedForRequest.delivery_address_source === 'buyer_warehouse' ? 'warehouse' : 'manual',
+        dest_warehouse_service_id: parsedForRequest.delivery_warehouse_id,
+        delivery_address: deliveryAddress,
+        delivery_method: orderValues.delivery_method || '平台协同配送',
+        payment_method: orderValues.payment_method || '线上合同 + 对公转账',
+        delivery_note: orderValues.delivery_note,
         remark: `AI采购申请发起集采：${prompt}`,
       })
       message.success('已向管理端提交集采申请')
@@ -1083,6 +1103,16 @@ function renderStepContent(props: {
                     })
                   }}
                 />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="contact_name" label="收货联系人" rules={[{ required: true, message: '请输入收货联系人' }]}>
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="contact_phone" label="联系电话" rules={[{ required: true, message: '请输入联系电话' }]}>
+                <Input />
               </Form.Item>
             </Col>
             <Col xs={24}>
