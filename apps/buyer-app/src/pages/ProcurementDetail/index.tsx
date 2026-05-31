@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Alert, Button, Card, Checkbox, Col, Empty, Form, Input, InputNumber, Row, Space, Spin, Statistic, Steps, Tag, Timeline, Typography, message } from 'antd'
+import { Alert, Button, Card, Checkbox, Col, Empty, Form, Input, InputNumber, Radio, Row, Select, Space, Spin, Statistic, Steps, Tag, Timeline, Typography, message } from 'antd'
 import {
   ArrowLeftOutlined,
   CheckCircleOutlined,
@@ -13,13 +13,14 @@ import {
 } from '@ant-design/icons'
 import { marketService } from '@/services/marketService'
 import type { ProcurementActivity } from '@/services/marketService'
+import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
 
 const { Title, Paragraph, Text } = Typography
 
 const processStages = [
   { title: '平台发起', description: '管理端选择商品', icon: <FormOutlined /> },
   { title: '卖家确认', description: '价格和成团规则', icon: <CheckCircleOutlined /> },
-  { title: '买家参团', description: '签协议和收货地址', icon: <TeamOutlined /> },
+  { title: '买家参团', description: '签协议和交易信息', icon: <TeamOutlined /> },
   { title: '管理成单', description: '生成母子订单', icon: <FileDoneOutlined /> },
   { title: '订单履约', description: '按订单流转', icon: <ShopOutlined /> },
 ]
@@ -56,13 +57,48 @@ function groupProgress(activity: ProcurementActivity) {
   return Math.min(100, Math.round((activity.demandQuantity / threshold) * 100))
 }
 
+function warehouseAddress(item?: WarehouseServiceItem) {
+  if (!item) return ''
+  return [item.province, item.city, item.district, item.address].filter(Boolean).join('')
+}
+
+function deliveryMethodText(value?: string) {
+  if (value === 'self') return '自行安排物流'
+  if (value === 'platform_logistics') return '平台物流'
+  return value || '-'
+}
+
+function paymentMethodText(value?: string) {
+  if (value === 'offline') return '线下转账'
+  if (value === 'online') return '平台线上支付'
+  return value || '-'
+}
+
+type DeliveryAddressSource = 'manual' | 'warehouse'
+
+interface JoinFormValues {
+  quantity: number
+  contact_name: string
+  contact_phone: string
+  delivery_address_source: DeliveryAddressSource
+  dest_warehouse_service_id?: number
+  delivery_address: string
+  delivery_method?: string
+  payment_method?: string
+  delivery_note?: string
+  agreement_signed: boolean
+  remark?: string
+}
+
 export default function ProcurementDetailPage() {
   const params = useParams()
   const activityID = Number(params.id)
   const [loading, setLoading] = useState(true)
   const [joinLoading, setJoinLoading] = useState(false)
   const [activity, setActivity] = useState<ProcurementActivity | null>(null)
-  const [joinForm] = Form.useForm<{ quantity: number; contact_name: string; contact_phone: string; delivery_address: string; agreement_signed: boolean; remark?: string }>()
+  const [warehouses, setWarehouses] = useState<WarehouseServiceItem[]>([])
+  const [joinForm] = Form.useForm<JoinFormValues>()
+  const deliveryAddressSource = Form.useWatch('delivery_address_source', joinForm) || 'manual'
 
   const loadData = useCallback(async () => {
     if (!activityID) {
@@ -94,16 +130,36 @@ export default function ProcurementDetailPage() {
     void loadData()
   }, [loadData])
 
+  useEffect(() => {
+    let mounted = true
+    serviceOfferService.listWarehouses({ page: 1, page_size: 100, status: 2 })
+      .then((response) => {
+        if (mounted) setWarehouses(response.data.list ?? [])
+      })
+      .catch(() => {
+        if (mounted) setWarehouses([])
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
   const handleJoin = async () => {
     if (!activity) return
     setJoinLoading(true)
     try {
       const values = await joinForm.validateFields()
+      const destWarehouseServiceId = Number(values.dest_warehouse_service_id || 0)
       const updated = await marketService.joinProcurement(activity.id, {
         quantity: values.quantity,
         contact_name: values.contact_name,
         contact_phone: values.contact_phone,
+        delivery_address_source: values.delivery_address_source || (destWarehouseServiceId > 0 ? 'warehouse' : 'manual'),
+        dest_warehouse_service_id: destWarehouseServiceId > 0 ? destWarehouseServiceId : undefined,
         delivery_address: values.delivery_address,
+        delivery_method: values.delivery_method,
+        payment_method: values.payment_method,
+        delivery_note: values.delivery_note,
         agreement_signed: values.agreement_signed,
         remark: values.remark,
       })
@@ -220,6 +276,10 @@ export default function ProcurementDetailPage() {
                             <Space direction="vertical" size={4}>
                               <Text>参团量：{formatQuantity(myParticipant.quantity, myParticipant.unit || activity.unit)}，金额：¥{myParticipant.totalAmount.toLocaleString('zh-CN')}</Text>
                               <Text type="secondary">收货信息：{myParticipant.contactName} {myParticipant.contactPhone}，{myParticipant.deliveryAddress}</Text>
+                              {myParticipant.destWarehouseName ? (
+                                <Text type="secondary">收货仓库：{myParticipant.destWarehouseName}，{myParticipant.destWarehouseAddress || myParticipant.deliveryAddress}</Text>
+                              ) : null}
+                              <Text type="secondary">配送/付款：{deliveryMethodText(myParticipant.deliveryMethod)}，{paymentMethodText(myParticipant.paymentMethod)}</Text>
                               <Text type="secondary">{myParticipant.childOrderNo ? `子订单：${myParticipant.childOrderNo}` : '集采截止并成团后，平台会生成对应子订单。'}</Text>
                             </Space>
                           )}
@@ -234,7 +294,17 @@ export default function ProcurementDetailPage() {
                           )}
                         />
                       ) : canJoin ? (
-                        <Form form={joinForm} layout="vertical" initialValues={{ quantity: activity.minGroupQuantity || 1, agreement_signed: false }}>
+                        <Form
+                          form={joinForm}
+                          layout="vertical"
+                          initialValues={{
+                            quantity: activity.minGroupQuantity || 1,
+                            delivery_address_source: 'manual',
+                            delivery_method: 'platform_logistics',
+                            payment_method: 'online',
+                            agreement_signed: false,
+                          }}
+                        >
                           <Row gutter={16}>
                             <Col xs={24} md={8}>
                               <Form.Item name="quantity" label={`参团数量（${activity.unit || '吨'}）`} rules={[{ required: true, message: '请输入参团数量' }]}>
@@ -243,7 +313,77 @@ export default function ProcurementDetailPage() {
                             </Col>
                             <Col xs={24} md={8}><Form.Item name="contact_name" label="收货联系人" rules={[{ required: true }]}><Input /></Form.Item></Col>
                             <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                            <Col xs={24}><Form.Item name="delivery_address" label="收货地址" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                            <Col xs={24}>
+                              <Form.Item name="delivery_address_source" label="收货地址类型">
+                                <Radio.Group
+                                  onChange={(event) => {
+                                    if (event.target.value === 'manual') {
+                                      joinForm.setFieldsValue({ dest_warehouse_service_id: undefined })
+                                    }
+                                  }}
+                                >
+                                  <Radio value="manual">自填地址</Radio>
+                                  <Radio value="warehouse">平台仓库</Radio>
+                                </Radio.Group>
+                              </Form.Item>
+                            </Col>
+                            {deliveryAddressSource === 'warehouse' ? (
+                              <Col xs={24}>
+                                <Form.Item
+                                  name="dest_warehouse_service_id"
+                                  label="收货仓库"
+                                  rules={[{ required: true, message: '请选择平台仓库' }]}
+                                >
+                                  <Select
+                                    placeholder="选择平台已审核仓库作为收货地址"
+                                    options={warehouses.map((item) => ({
+                                      value: item.id,
+                                      label: `${item.warehouse_name} · ${warehouseAddress(item) || item.city || '-'}`,
+                                    }))}
+                                    onChange={(value) => {
+                                      const selected = warehouses.find((item) => item.id === value)
+                                      joinForm.setFieldsValue({
+                                        delivery_address_source: 'warehouse',
+                                        delivery_address: warehouseAddress(selected),
+                                      })
+                                    }}
+                                  />
+                                </Form.Item>
+                                {warehouses.length === 0 ? (
+                                  <Alert type="warning" showIcon message="暂无可选平台仓库" description="可以先切换为自填地址参团，后续订单详情页仍可选择目的地仓库。" className="mb-4" />
+                                ) : null}
+                              </Col>
+                            ) : null}
+                            <Col xs={24}>
+                              <Form.Item
+                                name="delivery_address"
+                                label="收货地址"
+                                rules={[{ required: true, message: '请输入收货地址或选择平台仓库' }]}
+                              >
+                                <Input placeholder="请输入详细收货地址，或选择平台仓库后自动填入" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                              <Form.Item name="delivery_method" label="配送方式">
+                                <Select
+                                  options={[
+                                    { value: 'platform_logistics', label: '平台物流' },
+                                    { value: 'self', label: '自行安排物流' },
+                                  ]}
+                                />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                              <Form.Item name="payment_method" label="付款方式">
+                                <Select
+                                  options={[
+                                    { value: 'online', label: '平台线上支付' },
+                                    { value: 'offline', label: '线下转账' },
+                                  ]}
+                                />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24}><Form.Item name="delivery_note" label="配送备注"><Input.TextArea rows={2} /></Form.Item></Col>
                             <Col xs={24}><Form.Item name="remark" label="备注"><Input.TextArea rows={2} /></Form.Item></Col>
                             <Col xs={24}>
                               <Form.Item name="agreement_signed" valuePropName="checked" rules={[{ validator: (_, value) => value ? Promise.resolve() : Promise.reject(new Error('请先签署集采协议')) }]}>
