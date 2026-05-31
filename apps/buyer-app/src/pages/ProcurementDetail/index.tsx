@@ -146,9 +146,16 @@ export default function ProcurementDetailPage() {
 
   const handleJoin = async () => {
     if (!activity) return
+    const values = await joinForm.validateFields().catch((error: unknown) => {
+      const maybe = error as { errorFields?: Array<{ errors?: string[] }> }
+      const firstMessage = maybe.errorFields?.find((field) => field.errors?.length)?.errors?.[0]
+      if (firstMessage) message.warning(firstMessage)
+      return undefined
+    })
+    if (!values) return
+
     setJoinLoading(true)
     try {
-      const values = await joinForm.validateFields()
       const destWarehouseServiceId = Number(values.dest_warehouse_service_id || 0)
       const updated = await marketService.joinProcurement(activity.id, {
         quantity: values.quantity,
@@ -311,8 +318,8 @@ export default function ProcurementDetailPage() {
                                 <InputNumber min={0.01} className="w-full" />
                               </Form.Item>
                             </Col>
-                            <Col xs={24} md={8}><Form.Item name="contact_name" label="收货联系人" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                            <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                            <Col xs={24} md={8}><Form.Item name="contact_name" label="收货联系人" rules={[{ required: true, message: '请输入收货联系人' }]}><Input /></Form.Item></Col>
+                            <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true, message: '请输入联系电话' }]}><Input /></Form.Item></Col>
                             <Col xs={24}>
                               <Form.Item name="delivery_address_source" label="收货地址类型">
                                 <Radio.Group
