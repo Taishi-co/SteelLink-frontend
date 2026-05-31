@@ -1,15 +1,36 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Card, Row, Col, Typography, Button, InputNumber, Space, Divider, Descriptions, Tabs, message, Spin, Tag } from 'antd'
-import { ShoppingCartOutlined, HeartOutlined, ShareAltOutlined } from '@ant-design/icons'
+import { Card, Row, Col, Typography, Button, InputNumber, Space, Divider, Descriptions, Tabs, message, Spin, Tag, Modal, Form, Input, Radio, Select } from 'antd'
+import { ShoppingCartOutlined, HeartOutlined, ShareAltOutlined, TeamOutlined, SendOutlined } from '@ant-design/icons'
 import { getErrorMessage, getErrorStatus } from '@steellink/shared/utils'
+import { marketService } from '@/services/marketService'
 import { orderService } from '@/services/orderService'
 import { productService } from '@/services/productService'
+import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
 import { useCartStore } from '@/stores/cartStore'
 import { useFavoriteStore } from '@/stores/favoriteStore'
 
 const { Title, Paragraph, Text } = Typography
+const { TextArea } = Input
+
+interface GroupRequestFormValues {
+  quantity: number
+  target_price?: number
+  contact_name: string
+  contact_phone: string
+  delivery_address_source: 'manual' | 'warehouse'
+  dest_warehouse_service_id?: number
+  delivery_address: string
+  delivery_method?: string
+  payment_method?: string
+  delivery_note?: string
+  remark?: string
+}
+
+function warehouseAddress(item: WarehouseServiceItem) {
+  return [item.province, item.city, item.district, item.address].filter(Boolean).join('')
+}
 
 export default function ProductDetailPage() {
   const { id: productId } = useParams<{ id: string }>()
@@ -18,6 +39,9 @@ export default function ProductDetailPage() {
   const [activeTab, setActiveTab] = useState('specs')
   const [submitting, setSubmitting] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
+  const [groupRequestOpen, setGroupRequestOpen] = useState(false)
+  const [groupRequesting, setGroupRequesting] = useState(false)
+  const [groupRequestForm] = Form.useForm<GroupRequestFormValues>()
 
   const { addItem: addToCart } = useCartStore()
   const { addFavorite, removeByProduct, checkFavorite } = useFavoriteStore()
@@ -29,6 +53,11 @@ export default function ProductDetailPage() {
       return response.data
     },
     enabled: Boolean(productId),
+  })
+
+  const { data: warehouseResult } = useQuery({
+    queryKey: ['approved-warehouses-for-group-request'],
+    queryFn: async () => serviceOfferService.listWarehouses({ page: 1, page_size: 100 }),
   })
 
   useEffect(() => {
@@ -116,6 +145,62 @@ export default function ProductDetailPage() {
         return
       }
       message.error(getErrorMessage(error, '操作失败'))
+    }
+  }
+
+  const openGroupRequest = () => {
+    if (!product) return
+    groupRequestForm.setFieldsValue({
+      quantity: safeQuantity,
+      target_price: product.unitPrice,
+      delivery_address_source: 'manual',
+      delivery_method: '平台协同配送',
+      payment_method: '线上合同 + 对公转账',
+      delivery_address: '',
+    })
+    setGroupRequestOpen(true)
+  }
+
+  const handleSubmitGroupRequest = async () => {
+    if (!product) return
+    try {
+      const values = await groupRequestForm.validateFields()
+      setGroupRequesting(true)
+      await marketService.requestGroupProcurement({
+        source: 'product_detail',
+        source_product_id: product.id,
+        category: product.category,
+        sub_category: product.subCategory,
+        product_name: product.name,
+        material: product.spec?.material,
+        spec: product.spec?.spec,
+        quantity: values.quantity,
+        unit: '吨',
+        target_price: values.target_price,
+        contact_name: values.contact_name,
+        contact_phone: values.contact_phone,
+        delivery_address_source: values.delivery_address_source,
+        dest_warehouse_service_id: values.delivery_address_source === 'warehouse' ? values.dest_warehouse_service_id : undefined,
+        delivery_address: values.delivery_address,
+        delivery_method: values.delivery_method,
+        payment_method: values.payment_method,
+        delivery_note: values.delivery_note,
+        remark: values.remark,
+      })
+      message.success('已向平台提交同品类集采申请')
+      setGroupRequestOpen(false)
+    } catch (error: unknown) {
+      if (getErrorStatus(error) === 401) {
+        message.warning('请先登录后再申请集采')
+        navigate(`/login?redirect=${encodeURIComponent(`/products/${product.id}`)}`)
+        return
+      }
+      if (error && typeof error === 'object' && 'errorFields' in error) {
+        return
+      }
+      message.error(getErrorMessage(error, '集采申请提交失败'))
+    } finally {
+      setGroupRequesting(false)
     }
   }
 
@@ -275,6 +360,14 @@ export default function ProductDetailPage() {
                       >
                         {isFavorite ? '已收藏' : '收藏'}
                       </Button>
+                      <Button
+                        size="large"
+                        icon={<TeamOutlined />}
+                        onClick={openGroupRequest}
+                        className="rounded-full border-[#d0b991] bg-white px-6"
+                      >
+                        申请同品类集采
+                      </Button>
                       <Button size="large" icon={<ShareAltOutlined />} className="rounded-full px-6">
                         分享
                       </Button>
@@ -379,6 +472,103 @@ export default function ProductDetailPage() {
                   ]}
                 />
               </Card>
+
+              <Modal
+                title="申请同品类集采"
+                open={groupRequestOpen}
+                confirmLoading={groupRequesting}
+                okText="提交申请"
+                cancelText="取消"
+                okButtonProps={{ icon: <SendOutlined /> }}
+                onOk={() => void handleSubmitGroupRequest()}
+                onCancel={() => setGroupRequestOpen(false)}
+                width={760}
+                destroyOnHidden
+              >
+                <Form form={groupRequestForm} layout="vertical">
+                  <Row gutter={16}>
+                    <Col xs={24} md={8}>
+                      <Form.Item name="quantity" label="意向数量" rules={[{ required: true, message: '请输入意向数量' }]}>
+                        <InputNumber className="w-full" min={0.01} addonAfter="吨" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <Form.Item name="target_price" label="期望单价">
+                        <InputNumber className="w-full" min={0} addonBefore="¥" addonAfter="/吨" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <Form.Item name="delivery_method" label="配送方式" rules={[{ required: true, message: '请选择配送方式' }]}>
+                        <Radio.Group>
+                          <Radio value="平台协同配送">平台协同配送</Radio>
+                          <Radio value="自提">自提</Radio>
+                        </Radio.Group>
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item name="contact_name" label="收货联系人" rules={[{ required: true, message: '请输入收货联系人' }]}>
+                        <Input />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item name="contact_phone" label="联系电话" rules={[{ required: true, message: '请输入联系电话' }]}>
+                        <Input />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24}>
+                      <Form.Item name="delivery_address_source" label="收货地址类型" rules={[{ required: true, message: '请选择收货地址类型' }]}>
+                        <Radio.Group>
+                          <Radio value="manual">自填地址</Radio>
+                          <Radio value="warehouse">选择平台仓库</Radio>
+                        </Radio.Group>
+                      </Form.Item>
+                    </Col>
+                    <Form.Item noStyle shouldUpdate={(prev, next) => prev.delivery_address_source !== next.delivery_address_source}>
+                      {({ getFieldValue }) => (
+                        getFieldValue('delivery_address_source') === 'warehouse' ? (
+                          <Col xs={24}>
+                            <Form.Item name="dest_warehouse_service_id" label="平台收货仓库" rules={[{ required: true, message: '请选择平台收货仓库' }]}>
+                              <Select
+                                placeholder="选择已审核仓储资源"
+                                options={(warehouseResult?.data.list || []).map((item) => ({
+                                  label: `${item.warehouse_name} · ${warehouseAddress(item)}`,
+                                  value: item.id,
+                                }))}
+                                onChange={(value) => {
+                                  const selected = (warehouseResult?.data.list || []).find((item) => item.id === value)
+                                  if (selected) {
+                                    groupRequestForm.setFieldsValue({ delivery_address: warehouseAddress(selected) })
+                                  }
+                                }}
+                              />
+                            </Form.Item>
+                          </Col>
+                        ) : null
+                      )}
+                    </Form.Item>
+                    <Col xs={24}>
+                      <Form.Item name="delivery_address" label="收货地址" rules={[{ required: true, message: '请输入收货地址' }]}>
+                        <Input />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item name="payment_method" label="付款方式" rules={[{ required: true, message: '请输入付款方式' }]}>
+                        <Input />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item name="delivery_note" label="配送备注">
+                        <Input />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24}>
+                      <Form.Item name="remark" label="申请备注">
+                        <TextArea autoSize={{ minRows: 2, maxRows: 4 }} placeholder="可填写期望品牌、交付时间、规格偏好等" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Form>
+              </Modal>
             </>
           ) : null}
         </Spin>

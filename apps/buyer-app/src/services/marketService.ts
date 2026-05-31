@@ -346,12 +346,129 @@ export interface JoinProcurementPayload {
 
 export interface RequestGroupProcurementPayload {
   source?: string
+  source_product_id?: number
+  ai_procurement_id?: number
   category: string
+  sub_category?: string
   product_name: string
+  material?: string
+  spec?: string
   quantity: number
   unit?: string
+  target_price?: number
+  contact_name: string
+  contact_phone: string
+  delivery_address_source?: 'manual' | 'warehouse'
+  dest_warehouse_service_id?: number
   delivery_address?: string
+  delivery_method?: string
+  payment_method?: string
+  delivery_note?: string
   remark?: string
+}
+
+export interface ProcurementRequest {
+  id: number
+  requestNo: string
+  source: string
+  sourceProductId: number
+  aiProcurementId: number
+  category: string
+  subCategory: string
+  productName: string
+  material: string
+  spec: string
+  quantity: number
+  unit: string
+  targetPrice: number
+  contactName: string
+  contactPhone: string
+  deliveryAddressSource: string
+  destWarehouseServiceId: number
+  deliveryAddress: string
+  deliveryMethod: string
+  paymentMethod: string
+  deliveryNote: string
+  buyerEnterpriseId: number
+  buyerUserId: number
+  buyerName: string
+  status: string
+  activityId: number
+  remark: string
+  createdAt: string
+  updatedAt: string
+}
+
+interface BackendProcurementRequest {
+  id: number
+  request_no: string
+  source: string
+  source_product_id: number
+  ai_procurement_id: number
+  category: string
+  sub_category: string
+  product_name: string
+  material: string
+  spec: string
+  quantity: number
+  unit: string
+  target_price: number
+  contact_name: string
+  contact_phone: string
+  delivery_address_source: string
+  dest_warehouse_service_id: number
+  delivery_address: string
+  delivery_method: string
+  payment_method: string
+  delivery_note: string
+  buyer_enterprise_id: number
+  buyer_user_id: number
+  buyer_name: string
+  status: string
+  activity_id: number
+  remark: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ProcurementInvitation {
+  id: number
+  invitationNo: string
+  activityId: number
+  requestId: number
+  buyerEnterpriseId: number
+  buyerUserId: number
+  buyerName: string
+  status: string
+  participantId: number
+  remark: string
+  expiresAt?: string
+  acceptedAt?: string
+  declinedAt?: string
+  activity?: ProcurementActivity
+  request?: ProcurementRequest
+  createdAt: string
+  updatedAt: string
+}
+
+interface BackendProcurementInvitation {
+  id: number
+  invitation_no: string
+  activity_id: number
+  request_id: number
+  buyer_enterprise_id: number
+  buyer_user_id: number
+  buyer_name: string
+  status: string
+  participant_id: number
+  remark: string
+  expires_at?: string
+  accepted_at?: string
+  declined_at?: string
+  activity?: BackendProcurementActivity
+  request?: BackendProcurementRequest
+  created_at: string
+  updated_at: string
 }
 
 export interface MarketListParams {
@@ -510,6 +627,62 @@ function mapList<TBackend, TFrontend>(
   }
 }
 
+function mapProcurementRequest(item: BackendProcurementRequest): ProcurementRequest {
+  return {
+    id: item.id,
+    requestNo: item.request_no,
+    source: item.source,
+    sourceProductId: item.source_product_id,
+    aiProcurementId: item.ai_procurement_id,
+    category: item.category,
+    subCategory: item.sub_category,
+    productName: item.product_name,
+    material: item.material,
+    spec: item.spec,
+    quantity: item.quantity,
+    unit: item.unit,
+    targetPrice: item.target_price,
+    contactName: item.contact_name,
+    contactPhone: item.contact_phone,
+    deliveryAddressSource: item.delivery_address_source,
+    destWarehouseServiceId: item.dest_warehouse_service_id,
+    deliveryAddress: item.delivery_address,
+    deliveryMethod: item.delivery_method,
+    paymentMethod: item.payment_method,
+    deliveryNote: item.delivery_note,
+    buyerEnterpriseId: item.buyer_enterprise_id,
+    buyerUserId: item.buyer_user_id,
+    buyerName: item.buyer_name,
+    status: item.status,
+    activityId: item.activity_id,
+    remark: item.remark,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+  }
+}
+
+function mapProcurementInvitation(item: BackendProcurementInvitation): ProcurementInvitation {
+  return {
+    id: item.id,
+    invitationNo: item.invitation_no,
+    activityId: item.activity_id,
+    requestId: item.request_id,
+    buyerEnterpriseId: item.buyer_enterprise_id,
+    buyerUserId: item.buyer_user_id,
+    buyerName: item.buyer_name,
+    status: item.status,
+    participantId: item.participant_id,
+    remark: item.remark,
+    expiresAt: item.expires_at,
+    acceptedAt: item.accepted_at,
+    declinedAt: item.declined_at,
+    activity: item.activity ? mapProcurement(item.activity) : undefined,
+    request: item.request ? mapProcurementRequest(item.request) : undefined,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+  }
+}
+
 export const marketService = {
   getBiddingStats: async () => {
     const response = await api.get<ApiResponse<BackendBiddingStats>, ApiResponse<BackendBiddingStats>>('/biddings/stats')
@@ -588,7 +761,22 @@ export const marketService = {
   },
 
   requestGroupProcurement: async (payload: RequestGroupProcurementPayload) => {
-    const response = await api.post<ApiResponse<unknown>, ApiResponse<unknown>>('/procurements/requests', payload)
-    return response.data
+    const response = await api.post<ApiResponse<BackendProcurementRequest>, ApiResponse<BackendProcurementRequest>>('/procurements/requests', payload)
+    return mapProcurementRequest(response.data)
+  },
+
+  listMyProcurementRequests: async (params?: MarketListParams) => {
+    const response = await api.get<ApiResponse<BackendListResponse<BackendProcurementRequest>>, ApiResponse<BackendListResponse<BackendProcurementRequest>>>('/procurements/requests/mine', { params })
+    return mapList(response.data, mapProcurementRequest)
+  },
+
+  listMyProcurementInvitations: async (params?: MarketListParams) => {
+    const response = await api.get<ApiResponse<BackendListResponse<BackendProcurementInvitation>>, ApiResponse<BackendListResponse<BackendProcurementInvitation>>>('/procurements/invitations/mine', { params })
+    return mapList(response.data, mapProcurementInvitation)
+  },
+
+  acceptProcurementInvitation: async (id: number, payload: JoinProcurementPayload) => {
+    const response = await api.post<ApiResponse<BackendProcurementActivity>, ApiResponse<BackendProcurementActivity>>(`/procurements/invitations/${id}/accept`, payload)
+    return mapProcurement(response.data)
   },
 }
