@@ -225,7 +225,18 @@ export interface ProcurementParticipant {
   totalAmount: number
   contactName: string
   contactPhone: string
+  deliveryAddressSource?: string
+  destWarehouseServiceId?: number
+  destWarehouseEnterpriseId?: number
+  destWarehouseName?: string
+  destWarehouseProvince?: string
+  destWarehouseCity?: string
+  destWarehouseDistrict?: string
+  destWarehouseAddress?: string
   deliveryAddress: string
+  deliveryMethod?: string
+  paymentMethod?: string
+  deliveryNote?: string
   agreementSigned: boolean
   agreementSignedAt?: string
   status: string
@@ -297,7 +308,18 @@ interface BackendProcurementParticipant {
   total_amount: number
   contact_name: string
   contact_phone: string
+  delivery_address_source?: string
+  dest_warehouse_service_id?: number
+  dest_warehouse_enterprise_id?: number
+  dest_warehouse_name?: string
+  dest_warehouse_province?: string
+  dest_warehouse_city?: string
+  dest_warehouse_district?: string
+  dest_warehouse_address?: string
   delivery_address: string
+  delivery_method?: string
+  payment_method?: string
+  delivery_note?: string
   agreement_signed: boolean
   agreement_signed_at?: string
   status: string
@@ -312,7 +334,12 @@ export interface JoinProcurementPayload {
   quantity: number
   contact_name: string
   contact_phone: string
+  delivery_address_source?: 'manual' | 'warehouse'
+  dest_warehouse_service_id?: number
   delivery_address: string
+  delivery_method?: string
+  payment_method?: string
+  delivery_note?: string
   agreement_signed: boolean
   remark?: string
 }
@@ -439,7 +466,18 @@ function mapProcurement(activity: BackendProcurementActivity): ProcurementActivi
       totalAmount: participant.total_amount,
       contactName: participant.contact_name,
       contactPhone: participant.contact_phone,
+      deliveryAddressSource: participant.delivery_address_source,
+      destWarehouseServiceId: participant.dest_warehouse_service_id,
+      destWarehouseEnterpriseId: participant.dest_warehouse_enterprise_id,
+      destWarehouseName: participant.dest_warehouse_name,
+      destWarehouseProvince: participant.dest_warehouse_province,
+      destWarehouseCity: participant.dest_warehouse_city,
+      destWarehouseDistrict: participant.dest_warehouse_district,
+      destWarehouseAddress: participant.dest_warehouse_address,
       deliveryAddress: participant.delivery_address,
+      deliveryMethod: participant.delivery_method,
+      paymentMethod: participant.payment_method,
+      deliveryNote: participant.delivery_note,
       agreementSigned: participant.agreement_signed,
       agreementSignedAt: participant.agreement_signed_at,
       status: participant.status,
