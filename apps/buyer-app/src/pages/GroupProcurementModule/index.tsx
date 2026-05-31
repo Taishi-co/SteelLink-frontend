@@ -42,6 +42,18 @@ function formatMoney(value: number) {
   return `¥${Number(value || 0).toLocaleString('zh-CN')}`
 }
 
+function deliveryMethodText(value?: string) {
+  if (value === 'self') return '自行安排物流'
+  if (value === 'platform_logistics') return '平台物流'
+  return value || '-'
+}
+
+function paymentMethodText(value?: string) {
+  if (value === 'offline') return '线下转账'
+  if (value === 'online') return '平台线上支付'
+  return value || '-'
+}
+
 function formatDateTime(value?: string) {
   if (!value) return '-'
   return new Date(value).toLocaleString('zh-CN')
@@ -160,7 +172,15 @@ export default function GroupProcurementModulePage() {
                               收货信息
                             </div>
                             <Text type="secondary">{mine?.contactName || '-'} {mine?.contactPhone || ''}</Text>
+                            {mine?.destWarehouseName ? (
+                              <div className="mt-1 text-sm text-gray-500">平台仓库：{mine.destWarehouseName} · {mine.destWarehouseAddress || mine.deliveryAddress || '-'}</div>
+                            ) : null}
                             <div className="mt-1 text-sm text-gray-500">{mine?.deliveryAddress || '-'}</div>
+                            {(mine?.deliveryMethod || mine?.paymentMethod) ? (
+                              <div className="mt-1 text-sm text-gray-500">
+                                配送/付款：{deliveryMethodText(mine.deliveryMethod)} / {paymentMethodText(mine.paymentMethod)}
+                              </div>
+                            ) : null}
                           </div>
 
                           <Space wrap>
