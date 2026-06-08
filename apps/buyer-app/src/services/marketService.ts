@@ -132,24 +132,6 @@ export interface SubmitBiddingQuotePayload {
   remark?: string
 }
 
-export interface ProcurementStats {
-  activityCount: number
-  preparingCount: number
-  successCount: number
-  totalTransaction: number
-  participatingCompany: number
-  demandQuantity: number
-}
-
-interface BackendProcurementStats {
-  activity_count: number
-  preparing_count: number
-  success_count: number
-  total_transaction: number
-  participating_company: number
-  demand_quantity: number
-}
-
 export interface ProcurementLog {
   id: number
   content: string
@@ -162,186 +144,6 @@ interface BackendProcurementLog {
   content: string
   color: string
   created_at: string
-}
-
-export interface ProcurementActivity {
-  id: number
-  procurementNo: string
-  title: string
-  leaderName: string
-  status: string
-  productId: number
-  productNo: string
-  productName: string
-  sellerEnterpriseId: number
-  sellerName: string
-  groupPrice: number
-  minGroupQuantity: number
-  maxGroupQuantity: number
-  category: string
-  target: string
-  targetQuantity: number
-  unit: string
-  budgetMin: number
-  budgetMax: number
-  budgetDisplay: string
-  stage: string
-  progress: number
-  region: string
-  openDate: string
-  participatingCount: number
-  demandQuantity: number
-  qualifiedSuppliers: number
-  quoteCount: number
-  contractCount: number
-  deliveryDays: number
-  quoteMode: string
-  evaluationMode: string
-  documents: string[]
-  adminRemark: string
-  sellerRemark: string
-  source: string
-  startedAt?: string
-  endedAt?: string
-  sellerRespondedAt?: string
-  closedAt?: string
-  masterOrderId: number
-  masterOrderNo: string
-  participants: ProcurementParticipant[]
-  logs: ProcurementLog[]
-  createdAt: string
-  updatedAt: string
-}
-
-export interface ProcurementParticipant {
-  id: number
-  activityId: number
-  buyerEnterpriseId: number
-  buyerUserId: number
-  buyerName: string
-  quantity: number
-  unit: string
-  unitPrice: number
-  totalAmount: number
-  contactName: string
-  contactPhone: string
-  deliveryAddressSource?: string
-  destWarehouseServiceId?: number
-  destWarehouseEnterpriseId?: number
-  destWarehouseName?: string
-  destWarehouseProvince?: string
-  destWarehouseCity?: string
-  destWarehouseDistrict?: string
-  destWarehouseAddress?: string
-  deliveryAddress: string
-  deliveryMethod?: string
-  paymentMethod?: string
-  deliveryNote?: string
-  agreementSigned: boolean
-  agreementSignedAt?: string
-  status: string
-  childOrderId: number
-  childOrderNo: string
-  remark: string
-  createdAt: string
-  updatedAt: string
-}
-
-interface BackendProcurementActivity {
-  id: number
-  procurement_no: string
-  title: string
-  leader_name: string
-  status: string
-  product_id: number
-  product_no: string
-  product_name: string
-  seller_enterprise_id: number
-  seller_name: string
-  group_price: number
-  min_group_quantity: number
-  max_group_quantity: number
-  category: string
-  target: string
-  target_quantity: number
-  unit: string
-  budget_min: number
-  budget_max: number
-  budget_display: string
-  stage: string
-  progress: number
-  region: string
-  open_date: string
-  participating_count: number
-  demand_quantity: number
-  qualified_suppliers: number
-  quote_count: number
-  contract_count: number
-  delivery_days: number
-  quote_mode: string
-  evaluation_mode: string
-  documents: string[] | null
-  admin_remark: string
-  seller_remark: string
-  source: string
-  started_at?: string
-  ended_at?: string
-  seller_responded_at?: string
-  closed_at?: string
-  master_order_id: number
-  master_order_no: string
-  participants?: BackendProcurementParticipant[]
-  logs?: BackendProcurementLog[]
-  created_at: string
-  updated_at: string
-}
-
-interface BackendProcurementParticipant {
-  id: number
-  activity_id: number
-  buyer_enterprise_id: number
-  buyer_user_id: number
-  buyer_name: string
-  quantity: number
-  unit: string
-  unit_price: number
-  total_amount: number
-  contact_name: string
-  contact_phone: string
-  delivery_address_source?: string
-  dest_warehouse_service_id?: number
-  dest_warehouse_enterprise_id?: number
-  dest_warehouse_name?: string
-  dest_warehouse_province?: string
-  dest_warehouse_city?: string
-  dest_warehouse_district?: string
-  dest_warehouse_address?: string
-  delivery_address: string
-  delivery_method?: string
-  payment_method?: string
-  delivery_note?: string
-  agreement_signed: boolean
-  agreement_signed_at?: string
-  status: string
-  child_order_id: number
-  child_order_no: string
-  remark: string
-  created_at: string
-  updated_at: string
-}
-
-export interface JoinProcurementPayload {
-  quantity: number
-  contact_name: string
-  contact_phone: string
-  delivery_address_source?: 'manual' | 'warehouse'
-  dest_warehouse_service_id?: number
-  delivery_address: string
-  delivery_method?: string
-  payment_method?: string
-  delivery_note?: string
-  agreement_signed: boolean
-  remark?: string
 }
 
 export interface RequestGroupProcurementPayload {
@@ -429,26 +231,6 @@ interface BackendProcurementRequest {
   remark: string
   created_at: string
   updated_at: string
-}
-
-export interface ProcurementInvitation {
-  id: number
-  invitationNo: string
-  activityId: number
-  requestId: number
-  buyerEnterpriseId: number
-  buyerUserId: number
-  buyerName: string
-  status: string
-  participantId: number
-  remark: string
-  expiresAt?: string
-  acceptedAt?: string
-  declinedAt?: string
-  activity?: ProcurementActivity
-  request?: ProcurementRequest
-  createdAt: string
-  updatedAt: string
 }
 
 export interface ProcurementProjectEnrollment {
@@ -621,26 +403,6 @@ interface BackendProcurementProject {
   updated_at: string
 }
 
-interface BackendProcurementInvitation {
-  id: number
-  invitation_no: string
-  activity_id: number
-  request_id: number
-  buyer_enterprise_id: number
-  buyer_user_id: number
-  buyer_name: string
-  status: string
-  participant_id: number
-  remark: string
-  expires_at?: string
-  accepted_at?: string
-  declined_at?: string
-  activity?: BackendProcurementActivity
-  request?: BackendProcurementRequest
-  created_at: string
-  updated_at: string
-}
-
 export interface MarketListParams {
   page?: number
   page_size?: number
@@ -697,94 +459,6 @@ function mapBiddingQuote(quote: BackendBiddingQuote): BiddingQuote {
   }
 }
 
-function mapProcurement(activity: BackendProcurementActivity): ProcurementActivity {
-  return {
-    id: activity.id,
-    procurementNo: activity.procurement_no,
-    title: activity.title,
-    leaderName: activity.leader_name,
-    status: activity.status,
-    productId: activity.product_id,
-    productNo: activity.product_no,
-    productName: activity.product_name,
-    sellerEnterpriseId: activity.seller_enterprise_id,
-    sellerName: activity.seller_name,
-    groupPrice: activity.group_price,
-    minGroupQuantity: activity.min_group_quantity,
-    maxGroupQuantity: activity.max_group_quantity,
-    category: activity.category,
-    target: activity.target,
-    targetQuantity: activity.target_quantity,
-    unit: activity.unit,
-    budgetMin: activity.budget_min,
-    budgetMax: activity.budget_max,
-    budgetDisplay: activity.budget_display,
-    stage: activity.stage,
-    progress: activity.progress,
-    region: activity.region,
-    openDate: activity.open_date,
-    participatingCount: activity.participating_count,
-    demandQuantity: activity.demand_quantity,
-    qualifiedSuppliers: activity.qualified_suppliers,
-    quoteCount: activity.quote_count,
-    contractCount: activity.contract_count,
-    deliveryDays: activity.delivery_days,
-    quoteMode: activity.quote_mode,
-    evaluationMode: activity.evaluation_mode,
-    documents: activity.documents || [],
-    adminRemark: activity.admin_remark,
-    sellerRemark: activity.seller_remark,
-    source: activity.source,
-    startedAt: activity.started_at,
-    endedAt: activity.ended_at,
-    sellerRespondedAt: activity.seller_responded_at,
-    closedAt: activity.closed_at,
-    masterOrderId: activity.master_order_id,
-    masterOrderNo: activity.master_order_no,
-    participants: (activity.participants || []).map((participant) => ({
-      id: participant.id,
-      activityId: participant.activity_id,
-      buyerEnterpriseId: participant.buyer_enterprise_id,
-      buyerUserId: participant.buyer_user_id,
-      buyerName: participant.buyer_name,
-      quantity: participant.quantity,
-      unit: participant.unit,
-      unitPrice: participant.unit_price,
-      totalAmount: participant.total_amount,
-      contactName: participant.contact_name,
-      contactPhone: participant.contact_phone,
-      deliveryAddressSource: participant.delivery_address_source,
-      destWarehouseServiceId: participant.dest_warehouse_service_id,
-      destWarehouseEnterpriseId: participant.dest_warehouse_enterprise_id,
-      destWarehouseName: participant.dest_warehouse_name,
-      destWarehouseProvince: participant.dest_warehouse_province,
-      destWarehouseCity: participant.dest_warehouse_city,
-      destWarehouseDistrict: participant.dest_warehouse_district,
-      destWarehouseAddress: participant.dest_warehouse_address,
-      deliveryAddress: participant.delivery_address,
-      deliveryMethod: participant.delivery_method,
-      paymentMethod: participant.payment_method,
-      deliveryNote: participant.delivery_note,
-      agreementSigned: participant.agreement_signed,
-      agreementSignedAt: participant.agreement_signed_at,
-      status: participant.status,
-      childOrderId: participant.child_order_id,
-      childOrderNo: participant.child_order_no,
-      remark: participant.remark,
-      createdAt: participant.created_at,
-      updatedAt: participant.updated_at,
-    })),
-    logs: (activity.logs || []).map((log) => ({
-      id: log.id,
-      content: log.content,
-      color: log.color,
-      createdAt: log.created_at,
-    })),
-    createdAt: activity.created_at,
-    updatedAt: activity.updated_at,
-  }
-}
-
 function mapList<TBackend, TFrontend>(
   response: BackendListResponse<TBackend>,
   mapper: (item: TBackend) => TFrontend,
@@ -826,28 +500,6 @@ function mapProcurementRequest(item: BackendProcurementRequest): ProcurementRequ
     status: item.status,
     activityId: item.activity_id,
     remark: item.remark,
-    createdAt: item.created_at,
-    updatedAt: item.updated_at,
-  }
-}
-
-function mapProcurementInvitation(item: BackendProcurementInvitation): ProcurementInvitation {
-  return {
-    id: item.id,
-    invitationNo: item.invitation_no,
-    activityId: item.activity_id,
-    requestId: item.request_id,
-    buyerEnterpriseId: item.buyer_enterprise_id,
-    buyerUserId: item.buyer_user_id,
-    buyerName: item.buyer_name,
-    status: item.status,
-    participantId: item.participant_id,
-    remark: item.remark,
-    expiresAt: item.expires_at,
-    acceptedAt: item.accepted_at,
-    declinedAt: item.declined_at,
-    activity: item.activity ? mapProcurement(item.activity) : undefined,
-    request: item.request ? mapProcurementRequest(item.request) : undefined,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
   }
@@ -994,38 +646,6 @@ export const marketService = {
     }
   },
 
-  getProcurementStats: async () => {
-    const response = await api.get<ApiResponse<BackendProcurementStats>, ApiResponse<BackendProcurementStats>>('/procurements/stats')
-    return {
-      activityCount: response.data.activity_count,
-      preparingCount: response.data.preparing_count,
-      successCount: response.data.success_count,
-      totalTransaction: response.data.total_transaction,
-      participatingCompany: response.data.participating_company,
-      demandQuantity: response.data.demand_quantity,
-    }
-  },
-
-  listProcurements: async (params?: MarketListParams) => {
-    const response = await api.get<ApiResponse<BackendListResponse<BackendProcurementActivity>>, ApiResponse<BackendListResponse<BackendProcurementActivity>>>('/procurements', { params })
-    return mapList(response.data, mapProcurement)
-  },
-
-  listMyProcurements: async (params?: MarketListParams) => {
-    const response = await api.get<ApiResponse<BackendListResponse<BackendProcurementActivity>>, ApiResponse<BackendListResponse<BackendProcurementActivity>>>('/procurements/mine', { params })
-    return mapList(response.data, mapProcurement)
-  },
-
-  getProcurement: async (id: number) => {
-    const response = await api.get<ApiResponse<BackendProcurementActivity>, ApiResponse<BackendProcurementActivity>>(`/procurements/${id}`)
-    return mapProcurement(response.data)
-  },
-
-  joinProcurement: async (id: number, payload: JoinProcurementPayload) => {
-    const response = await api.post<ApiResponse<BackendProcurementActivity>, ApiResponse<BackendProcurementActivity>>(`/procurements/${id}/join`, payload)
-    return mapProcurement(response.data)
-  },
-
   requestGroupProcurement: async (payload: RequestGroupProcurementPayload) => {
     const response = await api.post<ApiResponse<BackendProcurementRequest>, ApiResponse<BackendProcurementRequest>>('/procurements/requests', payload)
     return mapProcurementRequest(response.data)
@@ -1034,16 +654,6 @@ export const marketService = {
   listMyProcurementRequests: async (params?: MarketListParams) => {
     const response = await api.get<ApiResponse<BackendListResponse<BackendProcurementRequest>>, ApiResponse<BackendListResponse<BackendProcurementRequest>>>('/procurements/requests/mine', { params })
     return mapList(response.data, mapProcurementRequest)
-  },
-
-  listMyProcurementInvitations: async (params?: MarketListParams) => {
-    const response = await api.get<ApiResponse<BackendListResponse<BackendProcurementInvitation>>, ApiResponse<BackendListResponse<BackendProcurementInvitation>>>('/procurements/invitations/mine', { params })
-    return mapList(response.data, mapProcurementInvitation)
-  },
-
-  acceptProcurementInvitation: async (id: number, payload: JoinProcurementPayload) => {
-    const response = await api.post<ApiResponse<BackendProcurementActivity>, ApiResponse<BackendProcurementActivity>>(`/procurements/invitations/${id}/accept`, payload)
-    return mapProcurement(response.data)
   },
 
   listProcurementProjects: async (params?: MarketListParams) => {
