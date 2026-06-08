@@ -140,7 +140,7 @@ export default function SellerGroupProcurementPage() {
   }
 
   const stats = useMemo(() => {
-    const waiting = projects.filter((item) => !item.viewerEnrollment).length
+    const waiting = projects.filter((item) => item.viewerEnrollment?.status === 'invited' || !item.viewerEnrollment).length
     const quoting = projects.filter((item) => item.status === 'quoting').length
     const awarded = projects.filter((item) => item.status === 'awarded' || item.status === 'order_created').length
     return { waiting, quoting, awarded }
@@ -184,7 +184,7 @@ export default function SellerGroupProcurementPage() {
                           </div>
                           <Space direction="vertical" align="end" size={4}>
                             <Tag color={itemMeta.color}>{itemMeta.text}</Tag>
-                            {item.viewerQuote ? <Tag color="green">已报价</Tag> : item.viewerEnrollment ? <Tag color="blue">已参与</Tag> : <Tag color="orange">待参与</Tag>}
+                            {item.viewerQuote ? <Tag color="green">已报价</Tag> : item.viewerEnrollment?.status === 'approved' ? <Tag color="blue">已参与</Tag> : <Tag color="orange">待参与</Tag>}
                           </Space>
                         </div>
 
@@ -203,8 +203,8 @@ export default function SellerGroupProcurementPage() {
                           <Alert type="warning" showIcon message="尚未确认参与，当前项目不会进入报价比较" />
                         )}
 
-                        <Button type={item.viewerEnrollment ? 'default' : 'primary'} icon={item.viewerEnrollment ? <EyeOutlined /> : <CheckOutlined />} onClick={() => void openDetail(item)}>
-                          {item.viewerEnrollment ? '查看并报价' : '确认参与'}
+                        <Button type={item.viewerEnrollment?.status === 'approved' ? 'default' : 'primary'} icon={item.viewerEnrollment?.status === 'approved' ? <EyeOutlined /> : <CheckOutlined />} onClick={() => void openDetail(item)}>
+                          {item.viewerEnrollment?.status === 'approved' ? '查看并报价' : '确认参与'}
                         </Button>
                       </Space>
                     </Card>
