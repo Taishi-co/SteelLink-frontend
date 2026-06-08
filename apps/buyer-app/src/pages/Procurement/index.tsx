@@ -1,22 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, Card, Col, Empty, Input, Progress, Row, Select, Space, Spin, Statistic, Tag, Typography, message } from 'antd'
-import { ArrowRightOutlined, CheckCircleOutlined, ClockCircleOutlined, FileDoneOutlined, FormOutlined, ReloadOutlined, SearchOutlined, ShoppingCartOutlined, TeamOutlined } from '@ant-design/icons'
+import { Button, Card, Col, Empty, Input, Row, Select, Space, Spin, Statistic, Tag, Typography, message } from 'antd'
+import { ArrowRightOutlined, FileDoneOutlined, FormOutlined, ReloadOutlined, SearchOutlined, ShopOutlined, TeamOutlined } from '@ant-design/icons'
 import { marketService } from '@/services/marketService'
-import type { ProcurementActivity } from '@/services/marketService'
+import type { ProcurementProject } from '@/services/marketService'
 
 const { Title, Paragraph, Text } = Typography
 
 const statusMeta: Record<string, { label: string; color: string }> = {
-  active: { label: '参团中', color: 'green' },
-  ended: { label: '已截止', color: 'blue' },
-  order_created: { label: '已生成订单', color: 'purple' },
-}
-
-const marketplaceStatuses = new Set(['active', 'ended', 'order_created'])
-
-function formatQuantity(value: number, unit: string) {
-  return `${value.toLocaleString('zh-CN')} ${unit || '吨'}`
+  collecting: { label: '邀约中', color: 'gold' },
+  quoting: { label: '报价中', color: 'blue' },
+  awarded: { label: '已定标', color: 'green' },
+  order_created: { label: '已转订单', color: 'purple' },
+  closed: { label: '已关闭', color: 'default' },
 }
 
 function formatDateTime(value?: string) {
@@ -24,58 +20,55 @@ function formatDateTime(value?: string) {
   return new Date(value).toLocaleString('zh-CN')
 }
 
-function groupProgress(activity: ProcurementActivity) {
-  if (activity.status === 'order_created') return 100
-  const threshold = activity.minGroupQuantity || activity.targetQuantity || 0
-  if (threshold <= 0) return activity.progress || 0
-  return Math.min(100, Math.round((activity.demandQuantity / threshold) * 100))
+function formatMoney(value?: number) {
+  if (!value) return '-'
+  return `¥${Number(value).toLocaleString('zh-CN')}`
+}
+
+function formatQuantity(value?: number, unit?: string) {
+  return `${Number(value || 0).toLocaleString('zh-CN')} ${unit || '吨'}`
 }
 
 export default function ProcurementPage() {
   const [loading, setLoading] = useState(true)
+  const [projects, setProjects] = useState<ProcurementProject[]>([])
   const [keyword, setKeyword] = useState('')
+  const [appliedKeyword, setAppliedKeyword] = useState('')
   const [status, setStatus] = useState<string | undefined>()
   const [category, setCategory] = useState<string | undefined>()
-  const [appliedKeyword, setAppliedKeyword] = useState('')
-  const [appliedCategory, setAppliedCategory] = useState('')
-  const [activities, setActivities] = useState<ProcurementActivity[]>([])
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const listResult = await marketService.listProcurements({
+      const response = await marketService.listProcurementProjects({
         page: 1,
         page_size: 50,
         keyword: appliedKeyword,
         status,
-        category: appliedCategory || undefined,
+        category,
       })
-      setActivities(listResult.list.filter((item) => marketplaceStatuses.has(item.status)))
-    } catch (error) {
-      message.error('集采大厅数据加载失败，请确认后端服务已启动')
+      setProjects(response.list)
+    } catch {
+      message.error('集采项目加载失败，请确认后端服务已启动')
     } finally {
       setLoading(false)
     }
-  }, [appliedCategory, appliedKeyword, status])
+  }, [appliedKeyword, category, status])
 
   useEffect(() => {
     void loadData()
   }, [loadData])
 
-  const activeCount = activities.filter((item) => item.status === 'active').length
-  const orderCreatedCount = activities.filter((item) => item.status === 'order_created').length
-  const demandQuantity = activities.reduce((sum, item) => sum + Number(item.demandQuantity || 0), 0)
-  const participatingCompany = activities.reduce((sum, item) => sum + Number(item.participatingCount || 0), 0)
-  const overviewStats = [
-    { label: '可参团集采', value: activeCount, suffix: '场', icon: <ShoppingCartOutlined />, color: 'text-green-600' },
-    { label: '已归集需求', value: demandQuantity, suffix: '吨', icon: <ClockCircleOutlined />, color: 'text-gold-600' },
-    { label: '参团企业', value: participatingCompany, suffix: '家', icon: <TeamOutlined />, color: 'text-purple-600' },
-    { label: '已成单集采', value: orderCreatedCount, suffix: '场', icon: <FileDoneOutlined />, color: 'text-blue-600' },
-  ]
+  const stats = useMemo(() => {
+    const quoting = projects.filter((item) => item.status === 'quoting').length
+    const awarded = projects.filter((item) => item.status === 'awarded' || item.status === 'order_created').length
+    const demand = projects.reduce((sum, item) => sum + Number(item.demandQuantity || 0), 0)
+    const suppliers = projects.reduce((sum, item) => sum + Number(item.quotedSupplierCount || 0), 0)
+    return { quoting, awarded, demand, suppliers }
+  }, [projects])
 
   const applyFilters = () => {
     setAppliedKeyword(keyword.trim())
-    setAppliedCategory((category || '').trim())
   }
 
   const resetFilters = () => {
@@ -83,7 +76,6 @@ export default function ProcurementPage() {
     setAppliedKeyword('')
     setStatus(undefined)
     setCategory(undefined)
-    setAppliedCategory('')
   }
 
   return (
@@ -92,29 +84,23 @@ export default function ProcurementPage() {
         <div className="mx-auto max-w-7xl px-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <Tag color="blue" className="mb-4">集采活动大厅</Tag>
+              <Tag color="blue" className="mb-4">集采项目大厅</Tag>
               <Title level={1} className="!mb-3">集采大厅</Title>
               <Paragraph className="max-w-3xl text-lg text-gray-500 !mb-0">
-                展示卖家已确认并公开到商城的集采活动。买家可查看集采价、成团门槛和截止时间，签署协议后填写收货信息参与集采。
+                这里展示平台已归并的集采项目。买家可以查看归集需求、卖家报价进度和定标结果，决定是否继续提交采购申请。
               </Paragraph>
             </div>
             <Link to="/ai-procurement">
-              <Button type="primary" icon={<FormOutlined />}>AI采购申请集采</Button>
+              <Button type="primary" icon={<FormOutlined />}>发起采购申请</Button>
             </Link>
           </div>
 
           <Spin spinning={loading}>
             <Row gutter={[16, 16]} className="mt-8">
-              {overviewStats.map((item) => (
-                <Col key={item.label} xs={24} sm={12} lg={6}>
-                  <Card>
-                    <Space align="start" className="w-full justify-between">
-                      <Statistic title={item.label} value={item.value} suffix={item.suffix} />
-                      <span className={`text-3xl ${item.color}`}>{item.icon}</span>
-                    </Space>
-                  </Card>
-                </Col>
-              ))}
+              <Col xs={24} sm={12} lg={6}><Card><Statistic title="报价中项目" value={stats.quoting} suffix="个" prefix={<ShopOutlined />} /></Card></Col>
+              <Col xs={24} sm={12} lg={6}><Card><Statistic title="已归集需求" value={stats.demand} suffix="吨" prefix={<TeamOutlined />} /></Card></Col>
+              <Col xs={24} sm={12} lg={6}><Card><Statistic title="有效报价商家" value={stats.suppliers} suffix="家" prefix={<ShopOutlined />} /></Card></Col>
+              <Col xs={24} sm={12} lg={6}><Card><Statistic title="已定标项目" value={stats.awarded} suffix="个" prefix={<FileDoneOutlined />} /></Card></Col>
             </Row>
           </Spin>
         </div>
@@ -126,25 +112,23 @@ export default function ProcurementPage() {
             <Input.Search
               allowClear
               prefix={<SearchOutlined />}
-              placeholder="搜索标题、编号、商品、卖家"
+              placeholder="搜索项目编号、标题、商品"
               className="lg:max-w-md"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
-              onSearch={(value) => {
-                setAppliedKeyword(value.trim())
-                setAppliedCategory((category || '').trim())
-              }}
+              onSearch={applyFilters}
             />
             <Select
-              className="lg:w-40"
+              className="lg:w-44"
               allowClear
-              placeholder="集采状态"
+              placeholder="项目状态"
               value={status}
               onChange={setStatus}
               options={[
-                { label: '参团中', value: 'active' },
-                { label: '已截止', value: 'ended' },
-                { label: '已生成订单', value: 'order_created' },
+                { label: '邀约中', value: 'collecting' },
+                { label: '报价中', value: 'quoting' },
+                { label: '已定标', value: 'awarded' },
+                { label: '已转订单', value: 'order_created' },
               ]}
             />
             <Input
@@ -161,40 +145,42 @@ export default function ProcurementPage() {
         </Card>
 
         <Spin spinning={loading}>
-          {activities.length > 0 ? (
+          {projects.length > 0 ? (
             <Row gutter={[20, 20]}>
-              {activities.map((activity) => {
-                const meta = statusMeta[activity.status] || { label: activity.status, color: 'default' }
+              {projects.map((project) => {
+                const meta = statusMeta[project.status] || { label: project.status, color: 'default' }
                 return (
-                  <Col key={activity.id} xs={24} lg={12}>
+                  <Col key={project.id} xs={24} lg={12}>
                     <Card hoverable className="h-full">
                       <div className="flex h-full flex-col gap-5">
                         <div className="flex items-start justify-between gap-4">
                           <div>
-                            <Text type="secondary">{activity.procurementNo}</Text>
-                            <Title level={3} className="!mb-2 !mt-2">{activity.title}</Title>
-                            <Paragraph className="text-gray-500 !mb-0">{activity.productName || activity.target} · 卖家：{activity.sellerName || '-'}</Paragraph>
+                            <Text type="secondary">{project.projectNo}</Text>
+                            <Title level={3} className="!mb-2 !mt-2">{project.title}</Title>
+                            <Paragraph className="text-gray-500 !mb-0">{project.productName || '-'} · {project.category || '-'}</Paragraph>
                           </div>
                           <Tag color={meta.color}>{meta.label}</Tag>
                         </div>
+
                         <Row gutter={[12, 12]}>
-                          <Col span={12}><Text type="secondary">集采品类</Text><div className="mt-1 font-semibold">{activity.category}</div></Col>
-                          <Col span={12}><Text type="secondary">采购标的</Text><div className="mt-1 font-semibold">{activity.target}</div></Col>
-                          <Col span={12}><Text type="secondary">成团门槛</Text><div className="mt-1 font-semibold">{formatQuantity(activity.minGroupQuantity || activity.targetQuantity, activity.unit)}</div></Col>
-                          <Col span={12}><Text type="secondary">集采价</Text><div className="mt-1 font-semibold text-red-500">{activity.groupPrice ? `¥${activity.groupPrice.toLocaleString('zh-CN')}` : activity.budgetDisplay}</div></Col>
-                          <Col span={12}><Text type="secondary">当前阶段</Text><div className="mt-1 font-semibold">{activity.stage}</div></Col>
-                          <Col span={12}><Text type="secondary">截止时间</Text><div className="mt-1 font-semibold">{activity.endedAt ? formatDateTime(activity.endedAt) : activity.openDate || '-'}</div></Col>
+                          <Col span={12}><Text type="secondary">需求总量</Text><div className="mt-1 font-semibold">{formatQuantity(project.demandQuantity, project.unit)}</div></Col>
+                          <Col span={12}><Text type="secondary">采购企业</Text><div className="mt-1 font-semibold">{project.buyerEnterpriseCount} 家</div></Col>
+                          <Col span={12}><Text type="secondary">目标价格</Text><div className="mt-1 font-semibold">{formatMoney(project.targetPrice)}</div></Col>
+                          <Col span={12}><Text type="secondary">有效报价</Text><div className="mt-1 font-semibold">{project.quotedSupplierCount} 家</div></Col>
+                          <Col span={12}><Text type="secondary">报价截止</Text><div className="mt-1 font-semibold">{formatDateTime(project.quoteDeadline)}</div></Col>
+                          <Col span={12}><Text type="secondary">收货地</Text><div className="mt-1 font-semibold">{project.deliveryAddress || '-'}</div></Col>
                         </Row>
-                        <Progress percent={groupProgress(activity)} format={(percent) => `${percent}%成团`} />
-                        <Row gutter={[12, 12]}>
-                          <Col span={8}><Statistic title="参采企业" value={activity.participatingCount} suffix="家" /></Col>
-                          <Col span={8}><Statistic title="归集需求" value={activity.demandQuantity} suffix={activity.unit} /></Col>
-                          <Col span={8}><Statistic title="成单状态" value={activity.masterOrderId ? '已成单' : '未成单'} prefix={activity.masterOrderId ? <CheckCircleOutlined /> : <ShoppingCartOutlined />} /></Col>
-                        </Row>
-                        <Link to={`/procurement/${activity.id}`} className="mt-auto">
-                          <Button type={activity.status === 'active' ? 'primary' : 'default'} icon={<ArrowRightOutlined />}>
-                            {activity.status === 'active' ? '签署协议并参团' : '查看集采进度'}
-                          </Button>
+
+                        <div className="rounded border border-gray-100 bg-gray-50 p-3">
+                          <Space size="large" wrap>
+                            <Text>需求单数：{project.buyerRequestCount}</Text>
+                            <Text>邀约卖家：{project.invitedSupplierCount}</Text>
+                            <Text>定标价：{project.awardUnitPrice ? formatMoney(project.awardUnitPrice) : '待定'}</Text>
+                          </Space>
+                        </div>
+
+                        <Link to={`/procurement/${project.id}`} className="mt-auto">
+                          <Button type="primary" icon={<ArrowRightOutlined />}>查看项目详情</Button>
                         </Link>
                       </div>
                     </Card>
@@ -204,11 +190,9 @@ export default function ProcurementPage() {
             </Row>
           ) : (
             <Card>
-              <Empty
-                description="暂无符合条件的公开集采"
-              >
+              <Empty description="暂无符合条件的集采项目">
                 <Link to="/ai-procurement">
-                  <Button type="primary" icon={<FormOutlined />}>通过 AI 采购申请集采</Button>
+                  <Button type="primary" icon={<FormOutlined />}>去发起采购申请</Button>
                 </Link>
               </Empty>
             </Card>

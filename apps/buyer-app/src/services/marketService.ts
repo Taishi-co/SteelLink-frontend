@@ -451,6 +451,176 @@ export interface ProcurementInvitation {
   updatedAt: string
 }
 
+export interface ProcurementProjectEnrollment {
+  id: number
+  projectId: number
+  sellerEnterpriseId: number
+  sellerUserId: number
+  sellerName: string
+  productId: number
+  productNo: string
+  productName: string
+  status: string
+  remark: string
+  reviewedBy: number
+  reviewedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProcurementProjectQuote {
+  id: number
+  projectId: number
+  enrollmentId: number
+  sellerEnterpriseId: number
+  sellerUserId: number
+  sellerName: string
+  productId: number
+  productNo: string
+  productName: string
+  unitPrice: number
+  supplyQuantity: number
+  unit: string
+  deliveryDays: number
+  deliveryWarehouse: string
+  taxIncluded: boolean
+  taxRate: number
+  paymentTerms: string
+  remark: string
+  isLatest: boolean
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProcurementProject {
+  id: number
+  projectNo: string
+  title: string
+  status: string
+  category: string
+  subCategory: string
+  productName: string
+  material: string
+  spec: string
+  targetQuantity: number
+  demandQuantity: number
+  unit: string
+  targetPrice: number
+  deliveryAddress: string
+  buyerRequestCount: number
+  buyerEnterpriseCount: number
+  invitedSupplierCount: number
+  quotedSupplierCount: number
+  quoteDeadline?: string
+  awardedAt?: string
+  orderedAt?: string
+  awardQuoteId: number
+  awardSupplierId: number
+  awardSupplierName: string
+  awardProductId: number
+  awardProductNo: string
+  awardProductName: string
+  awardUnitPrice: number
+  awardDeliveryDays: number
+  orderId: number
+  orderNo: string
+  adminRemark: string
+  requests: ProcurementRequest[]
+  enrollments: ProcurementProjectEnrollment[]
+  quotes: ProcurementProjectQuote[]
+  logs: ProcurementLog[]
+  viewerEnrollment?: ProcurementProjectEnrollment
+  viewerQuote?: ProcurementProjectQuote
+  createdAt: string
+  updatedAt: string
+}
+
+interface BackendProcurementProjectEnrollment {
+  id: number
+  project_id: number
+  seller_enterprise_id: number
+  seller_user_id: number
+  seller_name: string
+  product_id: number
+  product_no: string
+  product_name: string
+  status: string
+  remark: string
+  reviewed_by: number
+  reviewed_at?: string
+  created_at: string
+  updated_at: string
+}
+
+interface BackendProcurementProjectQuote {
+  id: number
+  project_id: number
+  enrollment_id: number
+  seller_enterprise_id: number
+  seller_user_id: number
+  seller_name: string
+  product_id: number
+  product_no: string
+  product_name: string
+  unit_price: number
+  supply_quantity: number
+  unit: string
+  delivery_days: number
+  delivery_warehouse: string
+  tax_included: boolean
+  tax_rate: number
+  payment_terms: string
+  remark: string
+  is_latest: boolean
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+interface BackendProcurementProject {
+  id: number
+  project_no: string
+  title: string
+  status: string
+  category: string
+  sub_category: string
+  product_name: string
+  material: string
+  spec: string
+  target_quantity: number
+  demand_quantity: number
+  unit: string
+  target_price: number
+  delivery_address: string
+  buyer_request_count: number
+  buyer_enterprise_count: number
+  invited_supplier_count: number
+  quoted_supplier_count: number
+  quote_deadline?: string
+  awarded_at?: string
+  ordered_at?: string
+  award_quote_id: number
+  award_supplier_id: number
+  award_supplier_name: string
+  award_product_id: number
+  award_product_no: string
+  award_product_name: string
+  award_unit_price: number
+  award_delivery_days: number
+  order_id: number
+  order_no: string
+  admin_remark: string
+  requests?: BackendProcurementRequest[]
+  enrollments?: BackendProcurementProjectEnrollment[]
+  quotes?: BackendProcurementProjectQuote[]
+  logs?: BackendProcurementLog[]
+  viewer_enrollment?: BackendProcurementProjectEnrollment
+  viewer_quote?: BackendProcurementProjectQuote
+  created_at: string
+  updated_at: string
+}
+
 interface BackendProcurementInvitation {
   id: number
   invitation_no: string
@@ -683,6 +853,102 @@ function mapProcurementInvitation(item: BackendProcurementInvitation): Procureme
   }
 }
 
+function mapProcurementProjectEnrollment(item: BackendProcurementProjectEnrollment): ProcurementProjectEnrollment {
+  return {
+    id: item.id,
+    projectId: item.project_id,
+    sellerEnterpriseId: item.seller_enterprise_id,
+    sellerUserId: item.seller_user_id,
+    sellerName: item.seller_name,
+    productId: item.product_id,
+    productNo: item.product_no,
+    productName: item.product_name,
+    status: item.status,
+    remark: item.remark,
+    reviewedBy: item.reviewed_by,
+    reviewedAt: item.reviewed_at,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+  }
+}
+
+function mapProcurementProjectQuote(item: BackendProcurementProjectQuote): ProcurementProjectQuote {
+  return {
+    id: item.id,
+    projectId: item.project_id,
+    enrollmentId: item.enrollment_id,
+    sellerEnterpriseId: item.seller_enterprise_id,
+    sellerUserId: item.seller_user_id,
+    sellerName: item.seller_name,
+    productId: item.product_id,
+    productNo: item.product_no,
+    productName: item.product_name,
+    unitPrice: item.unit_price,
+    supplyQuantity: item.supply_quantity,
+    unit: item.unit,
+    deliveryDays: item.delivery_days,
+    deliveryWarehouse: item.delivery_warehouse,
+    taxIncluded: item.tax_included,
+    taxRate: item.tax_rate,
+    paymentTerms: item.payment_terms,
+    remark: item.remark,
+    isLatest: item.is_latest,
+    status: item.status,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+  }
+}
+
+function mapProcurementProject(item: BackendProcurementProject): ProcurementProject {
+  return {
+    id: item.id,
+    projectNo: item.project_no,
+    title: item.title,
+    status: item.status,
+    category: item.category,
+    subCategory: item.sub_category,
+    productName: item.product_name,
+    material: item.material,
+    spec: item.spec,
+    targetQuantity: item.target_quantity,
+    demandQuantity: item.demand_quantity,
+    unit: item.unit,
+    targetPrice: item.target_price,
+    deliveryAddress: item.delivery_address,
+    buyerRequestCount: item.buyer_request_count,
+    buyerEnterpriseCount: item.buyer_enterprise_count,
+    invitedSupplierCount: item.invited_supplier_count,
+    quotedSupplierCount: item.quoted_supplier_count,
+    quoteDeadline: item.quote_deadline,
+    awardedAt: item.awarded_at,
+    orderedAt: item.ordered_at,
+    awardQuoteId: item.award_quote_id,
+    awardSupplierId: item.award_supplier_id,
+    awardSupplierName: item.award_supplier_name,
+    awardProductId: item.award_product_id,
+    awardProductNo: item.award_product_no,
+    awardProductName: item.award_product_name,
+    awardUnitPrice: item.award_unit_price,
+    awardDeliveryDays: item.award_delivery_days,
+    orderId: item.order_id,
+    orderNo: item.order_no,
+    adminRemark: item.admin_remark,
+    requests: (item.requests || []).map(mapProcurementRequest),
+    enrollments: (item.enrollments || []).map(mapProcurementProjectEnrollment),
+    quotes: (item.quotes || []).map(mapProcurementProjectQuote),
+    logs: (item.logs || []).map((log) => ({
+      id: log.id,
+      content: log.content,
+      color: log.color,
+      createdAt: log.created_at,
+    })),
+    viewerEnrollment: item.viewer_enrollment ? mapProcurementProjectEnrollment(item.viewer_enrollment) : undefined,
+    viewerQuote: item.viewer_quote ? mapProcurementProjectQuote(item.viewer_quote) : undefined,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+  }
+}
+
 export const marketService = {
   getBiddingStats: async () => {
     const response = await api.get<ApiResponse<BackendBiddingStats>, ApiResponse<BackendBiddingStats>>('/biddings/stats')
@@ -778,5 +1044,20 @@ export const marketService = {
   acceptProcurementInvitation: async (id: number, payload: JoinProcurementPayload) => {
     const response = await api.post<ApiResponse<BackendProcurementActivity>, ApiResponse<BackendProcurementActivity>>(`/procurements/invitations/${id}/accept`, payload)
     return mapProcurement(response.data)
+  },
+
+  listProcurementProjects: async (params?: MarketListParams) => {
+    const response = await api.get<ApiResponse<BackendListResponse<BackendProcurementProject>>, ApiResponse<BackendListResponse<BackendProcurementProject>>>('/procurements/projects', { params })
+    return mapList(response.data, mapProcurementProject)
+  },
+
+  listMyProcurementProjects: async (params?: MarketListParams) => {
+    const response = await api.get<ApiResponse<BackendListResponse<BackendProcurementProject>>, ApiResponse<BackendListResponse<BackendProcurementProject>>>('/procurements/projects/mine', { params })
+    return mapList(response.data, mapProcurementProject)
+  },
+
+  getProcurementProject: async (id: number) => {
+    const response = await api.get<ApiResponse<BackendProcurementProject>, ApiResponse<BackendProcurementProject>>(`/procurements/projects/${id}`)
+    return mapProcurementProject(response.data)
   },
 }
