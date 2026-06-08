@@ -1,192 +1,78 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Alert, Button, Card, Checkbox, Col, Empty, Form, Input, InputNumber, Radio, Row, Select, Space, Spin, Statistic, Steps, Tag, Timeline, Typography, message } from 'antd'
-import {
-  ArrowLeftOutlined,
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  FileDoneOutlined,
-  FormOutlined,
-  ShopOutlined,
-  ShoppingCartOutlined,
-  TeamOutlined,
-} from '@ant-design/icons'
+import { Alert, Button, Card, Col, Descriptions, Empty, List, Row, Space, Spin, Statistic, Steps, Tag, Timeline, Typography, message } from 'antd'
+import { ArrowLeftOutlined, CheckCircleOutlined, FileDoneOutlined, FormOutlined, ShopOutlined, TeamOutlined } from '@ant-design/icons'
 import { marketService } from '@/services/marketService'
-import type { ProcurementActivity } from '@/services/marketService'
-import { serviceOfferService, type WarehouseServiceItem } from '@/services/serviceOfferService'
+import type { ProcurementProject } from '@/services/marketService'
 
 const { Title, Paragraph, Text } = Typography
 
 const processStages = [
-  { title: '平台发起', description: '管理端选择商品', icon: <FormOutlined /> },
-  { title: '卖家确认', description: '价格和成团规则', icon: <CheckCircleOutlined /> },
-  { title: '买家参团', description: '签协议和交易信息', icon: <TeamOutlined /> },
-  { title: '管理成单', description: '生成母子订单', icon: <FileDoneOutlined /> },
-  { title: '订单履约', description: '按订单流转', icon: <ShopOutlined /> },
+  { title: '需求归集', description: '采购需求汇总', icon: <FormOutlined /> },
+  { title: '卖家报名', description: '受邀卖家确认参与', icon: <TeamOutlined /> },
+  { title: '卖家报价', description: '提交最新有效报价', icon: <ShopOutlined /> },
+  { title: '平台定标', description: '选择中标供应商', icon: <CheckCircleOutlined /> },
+  { title: '生成订单', description: '转入商城订单', icon: <FileDoneOutlined /> },
 ]
 
-const statusMeta: Record<string, { color: string; text: string }> = {
-  pending_seller: { color: 'gold', text: '待卖家确认' },
-  active: { color: 'green', text: '参团中' },
-  ended: { color: 'blue', text: '已截止' },
-  order_created: { color: 'purple', text: '已生成订单' },
-  seller_rejected: { color: 'red', text: '卖家拒绝' },
-  closed: { color: 'default', text: '已关闭' },
+const statusMeta: Record<string, { label: string; color: string; step: number }> = {
+  collecting: { label: '邀约中', color: 'gold', step: 0 },
+  quoting: { label: '报价中', color: 'blue', step: 2 },
+  awarded: { label: '已定标', color: 'green', step: 3 },
+  order_created: { label: '已转订单', color: 'purple', step: 4 },
+  closed: { label: '已关闭', color: 'default', step: 4 },
 }
 
-function formatQuantity(value: number, unit: string) {
-  return `${value.toLocaleString('zh-CN')} ${unit || '吨'}`
+function formatDateTime(value?: string) {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('zh-CN')
 }
 
-function statusTag(status: string) {
-  const meta = statusMeta[status] || { color: 'default', text: status || '-' }
-  return <Tag color={meta.color}>{meta.text}</Tag>
+function formatMoney(value?: number) {
+  if (!value) return '-'
+  return `¥${Number(value).toLocaleString('zh-CN')}`
 }
 
-function flowStep(status: string) {
-  if (status === 'pending_seller' || status === 'seller_rejected') return 1
-  if (status === 'active' || status === 'ended') return 2
-  if (status === 'order_created') return 4
-  return 0
-}
-
-function groupProgress(activity: ProcurementActivity) {
-  if (activity.status === 'order_created') return 100
-  const threshold = activity.minGroupQuantity || activity.targetQuantity || 0
-  if (threshold <= 0) return activity.progress || 0
-  return Math.min(100, Math.round((activity.demandQuantity / threshold) * 100))
-}
-
-function warehouseAddress(item?: WarehouseServiceItem) {
-  if (!item) return ''
-  return [item.province, item.city, item.district, item.address].filter(Boolean).join('')
-}
-
-function deliveryMethodText(value?: string) {
-  if (value === 'self') return '自行安排物流'
-  if (value === 'platform_logistics') return '平台物流'
-  return value || '-'
-}
-
-function paymentMethodText(value?: string) {
-  if (value === 'offline') return '线下转账'
-  if (value === 'online') return '平台线上支付'
-  return value || '-'
-}
-
-type DeliveryAddressSource = 'manual' | 'warehouse'
-
-interface JoinFormValues {
-  quantity: number
-  contact_name: string
-  contact_phone: string
-  delivery_address_source: DeliveryAddressSource
-  dest_warehouse_service_id?: number
-  delivery_address: string
-  delivery_method?: string
-  payment_method?: string
-  delivery_note?: string
-  agreement_signed: boolean
-  remark?: string
+function formatQuantity(value?: number, unit?: string) {
+  return `${Number(value || 0).toLocaleString('zh-CN')} ${unit || '吨'}`
 }
 
 export default function ProcurementDetailPage() {
   const params = useParams()
-  const activityID = Number(params.id)
+  const projectId = Number(params.id)
   const [loading, setLoading] = useState(true)
-  const [joinLoading, setJoinLoading] = useState(false)
-  const [activity, setActivity] = useState<ProcurementActivity | null>(null)
-  const [warehouses, setWarehouses] = useState<WarehouseServiceItem[]>([])
-  const [joinForm] = Form.useForm<JoinFormValues>()
-  const deliveryAddressSource = Form.useWatch('delivery_address_source', joinForm) || 'manual'
+  const [project, setProject] = useState<ProcurementProject | null>(null)
 
   const loadData = useCallback(async () => {
-    if (!activityID) {
+    if (!projectId) {
       setLoading(false)
       return
     }
     setLoading(true)
     try {
-      const publicActivity = await marketService.getProcurement(activityID)
-      let nextActivity = publicActivity
-      try {
-        const mine = await marketService.listMyProcurements({ page: 1, page_size: 20, keyword: publicActivity.procurementNo })
-        const joined = mine.list.find((item) => item.id === publicActivity.id)
-        if (joined?.participants?.length) {
-          nextActivity = { ...publicActivity, participants: joined.participants }
-        }
-      } catch {
-        // Public detail should remain usable for anonymous visitors.
-      }
-      setActivity(nextActivity)
-    } catch (error) {
-      message.error('集采活动详情加载失败，请确认后端服务已启动')
+      setProject(await marketService.getProcurementProject(projectId))
+    } catch {
+      message.error('集采项目详情加载失败，请确认后端服务已启动')
     } finally {
       setLoading(false)
     }
-  }, [activityID])
+  }, [projectId])
 
   useEffect(() => {
     void loadData()
   }, [loadData])
 
-  useEffect(() => {
-    let mounted = true
-    serviceOfferService.listWarehouses({ page: 1, page_size: 100, status: 2 })
-      .then((response) => {
-        if (mounted) setWarehouses(response.data.list ?? [])
-      })
-      .catch(() => {
-        if (mounted) setWarehouses([])
-      })
-    return () => {
-      mounted = false
-    }
-  }, [])
+  const quoteRanking = useMemo(
+    () => [...(project?.quotes || [])].sort((a, b) => a.unitPrice - b.unitPrice),
+    [project],
+  )
 
-  const handleJoin = async () => {
-    if (!activity) return
-    const values = await joinForm.validateFields().catch((error: unknown) => {
-      const maybe = error as { errorFields?: Array<{ errors?: string[] }> }
-      const firstMessage = maybe.errorFields?.find((field) => field.errors?.length)?.errors?.[0]
-      if (firstMessage) message.warning(firstMessage)
-      return undefined
-    })
-    if (!values) return
-
-    setJoinLoading(true)
-    try {
-      const destWarehouseServiceId = Number(values.dest_warehouse_service_id || 0)
-      const updated = await marketService.joinProcurement(activity.id, {
-        quantity: values.quantity,
-        contact_name: values.contact_name,
-        contact_phone: values.contact_phone,
-        delivery_address_source: values.delivery_address_source || (destWarehouseServiceId > 0 ? 'warehouse' : 'manual'),
-        dest_warehouse_service_id: destWarehouseServiceId > 0 ? destWarehouseServiceId : undefined,
-        delivery_address: values.delivery_address,
-        delivery_method: values.delivery_method,
-        payment_method: values.payment_method,
-        delivery_note: values.delivery_note,
-        agreement_signed: values.agreement_signed,
-        remark: values.remark,
-      })
-      setActivity(updated)
-      joinForm.resetFields()
-      message.success('已参与本次集采')
-    } catch (error) {
-      const maybe = error as { response?: { data?: { message?: string } } }
-      message.error(maybe.response?.data?.message || '参团失败，请确认企业认证和集采状态')
-    } finally {
-      setJoinLoading(false)
-    }
-  }
-
-  if (!loading && !activity) {
+  if (!loading && !project) {
     return (
       <div className="min-h-screen bg-gray-50">
         <main className="mx-auto max-w-5xl px-8 py-12">
           <Card>
-            <Empty description="集采活动不存在" />
+            <Empty description="集采项目不存在" />
             <div className="mt-6 text-center">
               <Link to="/procurement"><Button type="primary">返回集采大厅</Button></Link>
             </div>
@@ -196,23 +82,12 @@ export default function ProcurementDetailPage() {
     )
   }
 
-  const previewItems = activity ? [
-    { label: '品类', value: activity.category },
-    { label: '采购标的', value: activity.target },
-    { label: '集采单价', value: activity.groupPrice > 0 ? `¥${activity.groupPrice.toLocaleString('zh-CN')} / ${activity.unit || '吨'}` : '待卖家确认' },
-    { label: '最小成团量', value: formatQuantity(activity.minGroupQuantity || activity.targetQuantity, activity.unit) },
-    { label: '交货周期', value: `${activity.deliveryDays}天` },
-    { label: '卖家', value: activity.sellerName || '-' },
-    { label: '截止时间', value: activity.endedAt ? new Date(activity.endedAt).toLocaleString('zh-CN') : activity.openDate },
-  ] : []
-  const myParticipant = activity?.participants?.[0]
-  const canJoin = activity?.status === 'active' && !myParticipant && (!activity.endedAt || new Date(activity.endedAt).getTime() > Date.now())
-  const currentStep = activity ? flowStep(activity.status) : 0
+  const meta = project ? statusMeta[project.status] || { label: project.status, color: 'default', step: 0 } : statusMeta.collecting
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Spin spinning={loading}>
-        {activity ? (
+        {project ? (
           <>
             <section className="bg-white py-10">
               <div className="mx-auto max-w-7xl px-8">
@@ -223,44 +98,32 @@ export default function ProcurementDetailPage() {
                 <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <Space className="mb-4" size="small" wrap>
-                      <Tag color="blue">平台集采</Tag>
-                      {statusTag(activity.status)}
-                      {activity.masterOrderNo ? <Tag color="purple">母订单 {activity.masterOrderNo}</Tag> : null}
+                      <Tag color="blue">平台集采项目</Tag>
+                      <Tag color={meta.color}>{meta.label}</Tag>
+                      {project.orderNo ? <Tag color="purple">订单 {project.orderNo}</Tag> : null}
                     </Space>
-                    <Title level={1} className="!mb-3">{activity.title}</Title>
+                    <Title level={1} className="!mb-3">{project.title}</Title>
                     <Paragraph className="text-lg text-gray-500 !mb-0">
-                      编号：{activity.procurementNo} | 商品：{activity.productName || activity.target} | 卖家：{activity.sellerName || '-'}
+                      项目编号：{project.projectNo} | 商品：{project.productName || '-'} | 品类：{project.category || '-'}
                     </Paragraph>
                   </div>
-                  <Tag color="green" className="px-4 py-2 text-base">{activity.stage}</Tag>
                 </div>
 
                 <Row gutter={[16, 16]}>
-                  <Col xs={24} md={6}><Card><Text type="secondary">集采品类</Text><div className="mt-2 text-xl font-semibold">{activity.category}</div></Card></Col>
-                  <Col xs={24} md={6}><Card><Text type="secondary">集采价格</Text><div className="mt-2 text-xl font-semibold">{activity.groupPrice > 0 ? `¥${activity.groupPrice}` : '待确认'}</div></Card></Col>
-                  <Col xs={24} md={6}><Card><Text type="secondary">成团门槛</Text><div className="mt-2 text-xl font-semibold">{formatQuantity(activity.minGroupQuantity || activity.targetQuantity, activity.unit)}</div></Card></Col>
-                  <Col xs={24} md={6}><Card><Text type="secondary">当前阶段</Text><div className="mt-2 text-xl font-semibold">{activity.stage}</div></Card></Col>
+                  <Col xs={24} md={6}><Card><Statistic title="需求总量" value={project.demandQuantity} suffix={project.unit || '吨'} /></Card></Col>
+                  <Col xs={24} md={6}><Card><Statistic title="采购企业" value={project.buyerEnterpriseCount} suffix="家" /></Card></Col>
+                  <Col xs={24} md={6}><Card><Statistic title="有效报价" value={project.quotedSupplierCount} suffix="家" /></Card></Col>
+                  <Col xs={24} md={6}><Card><Statistic title="定标价格" value={project.awardUnitPrice || 0} prefix="¥" /></Card></Col>
                 </Row>
               </div>
             </section>
 
             <main className="mx-auto max-w-7xl px-8 py-10">
               <section>
-                <Title level={2} className="!mb-5">参团概览</Title>
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} sm={12} lg={5}><Card><Statistic title="参采企业" value={activity.participatingCount} suffix="家" /></Card></Col>
-                  <Col xs={24} sm={12} lg={5}><Card><Statistic title="归集需求" value={activity.demandQuantity} suffix={activity.unit} /></Card></Col>
-                  <Col xs={24} sm={12} lg={5}><Card><Statistic title="最小成团量" value={activity.minGroupQuantity || activity.targetQuantity} suffix={activity.unit} /></Card></Col>
-                  <Col xs={24} sm={12} lg={5}><Card><Statistic title="集采单价" value={activity.groupPrice || 0} prefix="¥" /></Card></Col>
-                  <Col xs={24} sm={12} lg={4}><Card><Statistic title="成团进度" value={groupProgress(activity)} suffix="%" prefix={<ClockCircleOutlined />} /></Card></Col>
-                </Row>
-              </section>
-
-              <section className="mt-10">
-                <Title level={2} className="!mb-5">集采流程</Title>
+                <Title level={2} className="!mb-5">项目流程</Title>
                 <Card>
                   <Steps
-                    current={currentStep}
+                    current={meta.step}
                     items={processStages.map((stage) => ({
                       title: stage.title,
                       description: stage.description,
@@ -272,203 +135,94 @@ export default function ProcurementDetailPage() {
 
               <section className="mt-10">
                 <Row gutter={[24, 24]}>
-                  <Col xs={24} lg={14}>
-                    <Card title="参与集采">
-                      {myParticipant ? (
-                        <Alert
-                          type="success"
-                          showIcon
-                          message="已参与本次集采"
-                          description={(
-                            <Space direction="vertical" size={4}>
-                              <Text>参团量：{formatQuantity(myParticipant.quantity, myParticipant.unit || activity.unit)}，金额：¥{myParticipant.totalAmount.toLocaleString('zh-CN')}</Text>
-                              <Text type="secondary">收货信息：{myParticipant.contactName} {myParticipant.contactPhone}，{myParticipant.deliveryAddress}</Text>
-                              {myParticipant.destWarehouseName ? (
-                                <Text type="secondary">收货仓库：{myParticipant.destWarehouseName}，{myParticipant.destWarehouseAddress || myParticipant.deliveryAddress}</Text>
-                              ) : null}
-                              <Text type="secondary">配送/付款：{deliveryMethodText(myParticipant.deliveryMethod)}，{paymentMethodText(myParticipant.paymentMethod)}</Text>
-                              <Text type="secondary">{myParticipant.childOrderNo ? `子订单：${myParticipant.childOrderNo}` : '集采截止并成团后，平台会生成对应子订单。'}</Text>
-                            </Space>
-                          )}
-                          action={myParticipant.childOrderId ? (
-                            <Link to={`/dashboard/orders/${myParticipant.childOrderId}`}>
-                              <Button size="small" type="primary">查看子订单</Button>
-                            </Link>
-                          ) : (
-                            <Link to="/dashboard/procurements">
-                              <Button size="small">我的集采</Button>
-                            </Link>
-                          )}
-                        />
-                      ) : canJoin ? (
-                        <Form
-                          form={joinForm}
-                          layout="vertical"
-                          initialValues={{
-                            quantity: activity.minGroupQuantity || 1,
-                            delivery_address_source: 'manual',
-                            delivery_method: 'platform_logistics',
-                            payment_method: 'online',
-                            agreement_signed: false,
-                          }}
-                        >
-                          <Row gutter={16}>
-                            <Col xs={24} md={8}>
-                              <Form.Item name="quantity" label={`参团数量（${activity.unit || '吨'}）`} rules={[{ required: true, message: '请输入参团数量' }]}>
-                                <InputNumber min={0.01} className="w-full" />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={24} md={8}><Form.Item name="contact_name" label="收货联系人" rules={[{ required: true, message: '请输入收货联系人' }]}><Input /></Form.Item></Col>
-                            <Col xs={24} md={8}><Form.Item name="contact_phone" label="联系电话" rules={[{ required: true, message: '请输入联系电话' }]}><Input /></Form.Item></Col>
-                            <Col xs={24}>
-                              <Form.Item name="delivery_address_source" label="收货地址类型">
-                                <Radio.Group
-                                  onChange={(event) => {
-                                    if (event.target.value === 'manual') {
-                                      joinForm.setFieldsValue({ dest_warehouse_service_id: undefined })
-                                    }
-                                  }}
-                                >
-                                  <Radio value="manual">自填地址</Radio>
-                                  <Radio value="warehouse">平台仓库</Radio>
-                                </Radio.Group>
-                              </Form.Item>
-                            </Col>
-                            {deliveryAddressSource === 'warehouse' ? (
-                              <Col xs={24}>
-                                <Form.Item
-                                  name="dest_warehouse_service_id"
-                                  label="收货仓库"
-                                  rules={[{ required: true, message: '请选择平台仓库' }]}
-                                >
-                                  <Select
-                                    placeholder="选择平台已审核仓库作为收货地址"
-                                    options={warehouses.map((item) => ({
-                                      value: item.id,
-                                      label: `${item.warehouse_name} · ${warehouseAddress(item) || item.city || '-'}`,
-                                    }))}
-                                    onChange={(value) => {
-                                      const selected = warehouses.find((item) => item.id === value)
-                                      joinForm.setFieldsValue({
-                                        delivery_address_source: 'warehouse',
-                                        delivery_address: warehouseAddress(selected),
-                                      })
-                                    }}
-                                  />
-                                </Form.Item>
-                                {warehouses.length === 0 ? (
-                                  <Alert type="warning" showIcon message="暂无可选平台仓库" description="可以先切换为自填地址参团，后续订单详情页仍可选择目的地仓库。" className="mb-4" />
-                                ) : null}
-                              </Col>
-                            ) : null}
-                            <Col xs={24}>
-                              <Form.Item
-                                name="delivery_address"
-                                label="收货地址"
-                                rules={[{ required: true, message: '请输入收货地址或选择平台仓库' }]}
-                              >
-                                <Input placeholder="请输入详细收货地址，或选择平台仓库后自动填入" />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={24} md={12}>
-                              <Form.Item name="delivery_method" label="配送方式">
-                                <Select
-                                  options={[
-                                    { value: 'platform_logistics', label: '平台物流' },
-                                    { value: 'self', label: '自行安排物流' },
-                                  ]}
-                                />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={24} md={12}>
-                              <Form.Item name="payment_method" label="付款方式">
-                                <Select
-                                  options={[
-                                    { value: 'online', label: '平台线上支付' },
-                                    { value: 'offline', label: '线下转账' },
-                                  ]}
-                                />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={24}><Form.Item name="delivery_note" label="配送备注"><Input.TextArea rows={2} /></Form.Item></Col>
-                            <Col xs={24}><Form.Item name="remark" label="备注"><Input.TextArea rows={2} /></Form.Item></Col>
-                            <Col xs={24}>
-                              <Form.Item name="agreement_signed" valuePropName="checked" rules={[{ validator: (_, value) => value ? Promise.resolve() : Promise.reject(new Error('请先签署集采协议')) }]}>
-                                <Checkbox>我已阅读并签署本次集采协议，确认按集采价格和平台规则参团</Checkbox>
-                              </Form.Item>
-                            </Col>
-                          </Row>
-                          <Button type="primary" loading={joinLoading} onClick={() => void handleJoin()}>确认参团</Button>
-                        </Form>
-                      ) : (
-                        <Alert
-                          type={activity.status === 'order_created' ? 'success' : 'info'}
-                          showIcon
-                          message={activity.status === 'order_created' ? '本次集采已生成订单' : '当前集采暂不可参团'}
-                          description={activity.status === 'pending_seller' ? '卖家尚未确认价格和成团规则。' : activity.endedAt ? `截止时间：${new Date(activity.endedAt).toLocaleString('zh-CN')}` : undefined}
-                        />
-                      )}
+                  <Col xs={24} lg={15}>
+                    <Card title="项目概览">
+                      <Descriptions bordered column={2} size="small">
+                        <Descriptions.Item label="商品名称">{project.productName || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="材质/规格">{[project.material, project.spec].filter(Boolean).join(' / ') || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="目标价格">{formatMoney(project.targetPrice)}</Descriptions.Item>
+                        <Descriptions.Item label="报价截止">{formatDateTime(project.quoteDeadline)}</Descriptions.Item>
+                        <Descriptions.Item label="收货地址" span={2}>{project.deliveryAddress || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="中标供应商">{project.awardSupplierName || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="中标交期">{project.awardDeliveryDays ? `${project.awardDeliveryDays} 天` : '-'}</Descriptions.Item>
+                        <Descriptions.Item label="平台备注" span={2}>{project.adminRemark || '-'}</Descriptions.Item>
+                      </Descriptions>
                     </Card>
-                  </Col>
-                  <Col xs={24} lg={10}>
-                    <Card title="参团规则">
-                      <Space direction="vertical" className="w-full">
-                        <div className="flex justify-between"><Text type="secondary">卖家</Text><Text strong>{activity.sellerName || '-'}</Text></div>
-                        <div className="flex justify-between"><Text type="secondary">商品</Text><Text strong>{activity.productName || activity.target}</Text></div>
-                        <div className="flex justify-between"><Text type="secondary">集采价</Text><Text strong>¥{activity.groupPrice || 0}</Text></div>
-                        <div className="flex justify-between"><Text type="secondary">成团量</Text><Text strong>{activity.minGroupQuantity || 0}{activity.unit || '吨'}</Text></div>
-                        <div className="flex justify-between"><Text type="secondary">已归集</Text><Text strong>{activity.demandQuantity || 0}{activity.unit || '吨'}</Text></div>
-                        <div className="flex justify-between"><Text type="secondary">截止时间</Text><Text strong>{activity.endedAt ? new Date(activity.endedAt).toLocaleString('zh-CN') : '-'}</Text></div>
-                      </Space>
-                    </Card>
-                  </Col>
-                </Row>
-              </section>
 
-              <section className="mt-10">
-                <Row gutter={[24, 24]}>
-                  <Col xs={24} lg={16}>
-                    <Card title="流程记录" extra={<Tag color="blue">平台留痕</Tag>}>
-                      {activity.logs.length > 0 ? (
-                        <Timeline items={activity.logs.map((log) => ({ children: log.content, color: log.color }))} />
-                      ) : (
-                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无流程记录" />
-                      )}
-                    </Card>
-                  </Col>
-
-                  <Col xs={24} lg={8}>
-                    <Space direction="vertical" size="large" className="w-full">
-                      <Card title="集采预览">
-                        <Space direction="vertical" size="middle" className="w-full">
-                          {previewItems.map((item) => (
-                            <div key={item.label} className="flex items-center justify-between rounded border border-gray-100 p-3">
-                              <Text type="secondary">{item.label}</Text>
-                              <Text strong>{item.value}</Text>
+                    <Card title="采购需求明细" className="mt-6">
+                      <List
+                        dataSource={project.requests}
+                        locale={{ emptyText: '暂无归集的采购需求' }}
+                        renderItem={(item) => (
+                          <List.Item>
+                            <div className="w-full">
+                              <div className="flex items-center justify-between gap-3">
+                                <Space wrap>
+                                  <Text strong>{item.requestNo}</Text>
+                                  <Tag>{item.buyerName || `企业 ${item.buyerEnterpriseId}`}</Tag>
+                                </Space>
+                                <Text>{formatQuantity(item.quantity, item.unit)}</Text>
+                              </div>
+                              <div className="mt-2 text-sm text-gray-500">
+                                联系人：{item.contactName || '-'} {item.contactPhone || ''}，收货地：{item.deliveryAddress || '-'}
+                              </div>
                             </div>
-                          ))}
-                        </Space>
-                      </Card>
-
-                      <Card title="下一步">
-                        {myParticipant ? (
-                          <Space direction="vertical">
-                            <Text strong><CheckCircleOutlined /> 已完成参团</Text>
-                            <Text type="secondary">{myParticipant.childOrderNo ? `子订单：${myParticipant.childOrderNo}` : '等待集采截止或平台主动结束后生成子订单。'}</Text>
-                          </Space>
-                        ) : canJoin ? (
-                          <Space direction="vertical">
-                            <Text strong><ShoppingCartOutlined /> 填写参团数量和收货地址</Text>
-                            <Text type="secondary">参团后管理端会在截止或主动结束时统一生成母子订单。</Text>
-                          </Space>
-                        ) : (
-                          <Space direction="vertical">
-                            <Text strong><FileDoneOutlined /> {activity.masterOrderId ? '等待订单履约' : '等待管理端处理'}</Text>
-                            <Text type="secondary">{activity.masterOrderNo || '达到成团条件后，平台会生成对应订单。'}</Text>
-                          </Space>
+                          </List.Item>
                         )}
-                      </Card>
-                    </Space>
+                      />
+                    </Card>
+                  </Col>
+
+                  <Col xs={24} lg={9}>
+                    <Card title="报价看板">
+                      {quoteRanking.length > 0 ? (
+                        <List
+                          dataSource={quoteRanking}
+                          renderItem={(item, index) => (
+                            <List.Item>
+                              <div className="w-full">
+                                <div className="flex items-center justify-between gap-3">
+                                  <Space wrap>
+                                    <Tag color={index === 0 ? 'green' : 'default'}>#{index + 1}</Tag>
+                                    <Text strong>{item.sellerName}</Text>
+                                  </Space>
+                                  <Text strong>{formatMoney(item.unitPrice)}</Text>
+                                </div>
+                                <div className="mt-2 text-sm text-gray-500">
+                                  供货量：{formatQuantity(item.supplyQuantity, item.unit)}，交期：{item.deliveryDays} 天
+                                </div>
+                              </div>
+                            </List.Item>
+                          )}
+                        />
+                      ) : (
+                        <Empty description="卖家尚未提交有效报价" />
+                      )}
+                    </Card>
+
+                    <Card title="项目动态" className="mt-6">
+                      <Timeline
+                        items={(project.logs || []).map((item) => ({
+                          color: item.color || 'blue',
+                          children: (
+                            <div>
+                              <div>{item.content}</div>
+                              <div className="text-xs text-gray-400">{formatDateTime(item.createdAt)}</div>
+                            </div>
+                          ),
+                        }))}
+                      />
+                    </Card>
+
+                    {project.awardSupplierName ? (
+                      <Alert
+                        className="mt-6"
+                        type={project.orderNo ? 'success' : 'info'}
+                        showIcon
+                        message={project.orderNo ? '项目已转商城订单' : '项目已完成定标'}
+                        description={`中标供应商：${project.awardSupplierName}，中标价：${formatMoney(project.awardUnitPrice)}`}
+                      />
+                    ) : null}
                   </Col>
                 </Row>
               </section>
