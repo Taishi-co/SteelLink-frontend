@@ -102,74 +102,6 @@ export interface SubmitBiddingQuotePayload {
   remark?: string
 }
 
-export interface ProcurementActivity {
-  id: number
-  procurementNo: string
-  title: string
-  status: string
-  productId: number
-  productNo: string
-  productName: string
-  sellerEnterpriseId: number
-  sellerName: string
-  groupPrice: number
-  minGroupQuantity: number
-  maxGroupQuantity: number
-  category: string
-  target: string
-  targetQuantity: number
-  unit: string
-  demandQuantity: number
-  participatingCount: number
-  deliveryDays: number
-  adminRemark: string
-  sellerRemark: string
-  endedAt?: string
-  masterOrderId: number
-  masterOrderNo: string
-  createdAt: string
-  updatedAt: string
-}
-
-interface BackendProcurementActivity {
-  id: number
-  procurement_no: string
-  title: string
-  status: string
-  product_id: number
-  product_no: string
-  product_name: string
-  seller_enterprise_id: number
-  seller_name: string
-  group_price: number
-  min_group_quantity: number
-  max_group_quantity: number
-  category: string
-  target: string
-  target_quantity: number
-  unit: string
-  demand_quantity: number
-  participating_count: number
-  delivery_days: number
-  admin_remark: string
-  seller_remark: string
-  ended_at?: string
-  master_order_id: number
-  master_order_no: string
-  created_at: string
-  updated_at: string
-}
-
-export interface RespondProcurementPayload {
-  accepted: boolean
-  group_price?: number
-  min_group_quantity?: number
-  max_group_quantity?: number
-  ended_at?: string
-  delivery_days?: number
-  remark?: string
-}
-
 export interface ProcurementProjectEnrollment {
   id: number
   projectId: number
@@ -398,37 +330,6 @@ function mapBidding(activity: BackendBiddingActivity): BiddingActivity {
   }
 }
 
-function mapProcurement(activity: BackendProcurementActivity): ProcurementActivity {
-  return {
-    id: activity.id,
-    procurementNo: activity.procurement_no,
-    title: activity.title,
-    status: activity.status,
-    productId: activity.product_id,
-    productNo: activity.product_no,
-    productName: activity.product_name,
-    sellerEnterpriseId: activity.seller_enterprise_id,
-    sellerName: activity.seller_name,
-    groupPrice: activity.group_price,
-    minGroupQuantity: activity.min_group_quantity,
-    maxGroupQuantity: activity.max_group_quantity,
-    category: activity.category,
-    target: activity.target,
-    targetQuantity: activity.target_quantity,
-    unit: activity.unit,
-    demandQuantity: activity.demand_quantity,
-    participatingCount: activity.participating_count,
-    deliveryDays: activity.delivery_days,
-    adminRemark: activity.admin_remark,
-    sellerRemark: activity.seller_remark,
-    endedAt: activity.ended_at,
-    masterOrderId: activity.master_order_id,
-    masterOrderNo: activity.master_order_no,
-    createdAt: activity.created_at,
-    updatedAt: activity.updated_at,
-  }
-}
-
 function mapProcurementProjectEnrollment(item: BackendProcurementProjectEnrollment): ProcurementProjectEnrollment {
   return {
     id: item.id,
@@ -532,16 +433,6 @@ export const marketService = {
   submitBiddingQuote: async (id: number, payload: SubmitBiddingQuotePayload) => {
     const response = await api.post<ApiResponse<BackendBiddingActivity>, ApiResponse<BackendBiddingActivity>>(`/biddings/${id}/quotes`, payload)
     return mapBidding(response.data)
-  },
-
-  listProcurements: async () => {
-    const response = await api.get<ApiResponse<BackendListResponse<BackendProcurementActivity>>, ApiResponse<BackendListResponse<BackendProcurementActivity>>>('/procurements/seller/mine', { params: { page: 1, page_size: 50 } })
-    return response.data.list.map(mapProcurement)
-  },
-
-  respondProcurement: async (id: number, payload: RespondProcurementPayload) => {
-    const response = await api.post<ApiResponse<BackendProcurementActivity>, ApiResponse<BackendProcurementActivity>>(`/procurements/${id}/seller-response`, payload)
-    return mapProcurement(response.data)
   },
 
   listProcurementProjects: async () => {

@@ -21,7 +21,7 @@ import { aiProcurementService } from '@/services/aiProcurementService'
 import { categoryService, fallbackProductCategories, type ProductCategory } from '@/services/categoryService'
 import { serviceOfferService } from '@/services/serviceOfferService'
 import { supplyDemandService } from '@/services/supplyDemandService'
-import { marketService, type ProcurementActivity } from '@/services/marketService'
+import { marketService, type ProcurementProject } from '@/services/marketService'
 import type {
   AIProcurementInfo,
   AIProcurementParseResult,
@@ -254,7 +254,7 @@ export default function AiProcurementPage() {
   const [mine, setMine] = useState<AIProcurementInfo[]>([])
   const [warehouses, setWarehouses] = useState<WarehouseServiceItem[]>([])
   const [categories, setCategories] = useState<ProductCategory[]>(fallbackProductCategories)
-  const [groupProcurements, setGroupProcurements] = useState<ProcurementActivity[]>([])
+  const [groupProcurements, setGroupProcurements] = useState<ProcurementProject[]>([])
   const [groupRequesting, setGroupRequesting] = useState(false)
   const isLoggedIn = Boolean(getBuyerToken())
 
@@ -384,13 +384,16 @@ export default function AiProcurementPage() {
       const confirmedParsed = mergeParsedInstruction(confirmed.parsed, parsedForRequest)
       instructionForm.setFieldsValue(confirmedParsed)
       const matched = await aiProcurementService.matchProducts(confirmedParsed)
-      const activeGroups = await marketService.listProcurements({ page: 1, page_size: 6, category: confirmedParsed.category, status: 'active' })
+      const projectResponse = await marketService.listProcurementProjects({ page: 1, page_size: 12, category: confirmedParsed.category })
+      const activeGroups = projectResponse.list
+        .filter((item) => item.status === 'collecting' || item.status === 'quoting')
+        .slice(0, 6)
       updateResult({
         parsed: confirmedParsed,
         matched_products: matched.matched_products,
         stages: matched.stages,
       })
-      setGroupProcurements(activeGroups.list)
+      setGroupProcurements(activeGroups)
       setSelectedProducts([])
       navigate('/ai-procurement/2')
       message.success('参数已确认，商品召回完成')
@@ -944,7 +947,7 @@ function StepPage({
   result: AIProcurementParseResult | null
   currentProcurement: AIProcurementInfo | null
   selectedProducts: MatchedProduct[]
-  groupProcurements: ProcurementActivity[]
+  groupProcurements: ProcurementProject[]
   groupRequesting: boolean
   selectedFinanceServiceId?: number
   onSelectedFinanceServiceChange: (id?: number) => void
@@ -1024,7 +1027,7 @@ function renderStepContent(props: {
   result: AIProcurementParseResult
   currentProcurement: AIProcurementInfo | null
   selectedProducts: MatchedProduct[]
-  groupProcurements: ProcurementActivity[]
+  groupProcurements: ProcurementProject[]
   groupRequesting: boolean
   selectedFinanceServiceId?: number
   onSelectedFinanceServiceChange: (id?: number) => void
@@ -1136,7 +1139,7 @@ function renderStepContent(props: {
         <Card
           size="small"
           className="mb-4"
-          title={<Space><TeamOutlined /> 可选集采订单</Space>}
+          title={<Space><TeamOutlined /> 可选集采项目</Space>}
           extra={<Tag color="green">先参团，再成单</Tag>}
         >
           {groupProcurements.length > 0 ? (
@@ -1146,14 +1149,14 @@ function renderStepContent(props: {
                   <div>
                     <Space wrap className="mb-1">
                       <Text strong>{item.title}</Text>
-                      <Tag color="green">参团中</Tag>
+                      <Tag color={item.status === 'quoting' ? 'blue' : 'gold'}>{item.status === 'quoting' ? '报价中' : '邀约中'}</Tag>
                     </Space>
                     <div className="text-sm text-gray-600">
-                      {item.productName || item.target} · 集采价 ¥{item.groupPrice || 0} / {item.unit || '吨'} · 成团量 {item.minGroupQuantity || 0}{item.unit || '吨'} · 已归集 {item.demandQuantity || 0}{item.unit || '吨'}
+                      {item.productName || '-'} · 需求量 {item.demandQuantity || 0}{item.unit || '吨'} · 采购企业 {item.buyerEnterpriseCount || 0} 家 · 有效报价 {item.quotedSupplierCount || 0} 家
                     </div>
                   </div>
                   <Link to={`/procurement/${item.id}`}>
-                    <Button type="primary" icon={<ShoppingCartOutlined />}>去参团</Button>
+                    <Button type="primary" icon={<ShoppingCartOutlined />}>查看项目</Button>
                   </Link>
                 </div>
               ))}
