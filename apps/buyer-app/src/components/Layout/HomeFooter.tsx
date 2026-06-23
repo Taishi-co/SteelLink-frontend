@@ -22,17 +22,17 @@ export default function HomeFooter() {
               </div>
             </div>
             <p className="max-w-sm text-[#5f6b61]">
-              专业产业资源协同平台，为钢铁行业提供现货交易、竞价采购、仓储物流和供应链金融等一站式解决方案。
+              面向产业集群的大宗商品交易与供应链协同平台，提供现货采购、联合集采、仓储物流协同和供应链金融衔接等服务能力。
             </p>
           </Col>
           <Col xs={12} md={6} lg={4}>
             <Text className="mb-4 block font-bold text-[#17221b]">平台服务</Text>
             <Space direction="vertical">
-              <Link to="/mall" className="text-[#5f6b61] hover:text-[#9f5f23]">现货商城</Link>
+              <Link to="/mall" className="text-[#5f6b61] hover:text-[#9f5f23]">现货采购商城</Link>
               <Link to="/matching" className="text-[#5f6b61] hover:text-[#9f5f23]">供求信息</Link>
-              <Link to="/ai-procurement" className="text-[#5f6b61] hover:text-[#9f5f23]">AI采购</Link>
+              <Link to="/ai-procurement" className="text-[#5f6b61] hover:text-[#9f5f23]">AI智能采购</Link>
               <Link to="/bidding" className="text-[#5f6b61] hover:text-[#9f5f23]">竞价交易</Link>
-              <Link to="/procurement" className="text-[#5f6b61] hover:text-[#9f5f23]">集采大厅</Link>
+              <Link to="/procurement" className="text-[#5f6b61] hover:text-[#9f5f23]">联合集采大厅</Link>
             </Space>
           </Col>
           <Col xs={12} md={6} lg={4}>
@@ -54,14 +54,14 @@ export default function HomeFooter() {
           <Col xs={12} md={6} lg={4}>
             <Text className="mb-4 block font-bold text-[#17221b]">联系方式</Text>
             <Space direction="vertical">
-              <Text className="text-[#5f6b61]">客服热线：400-888-8888</Text>
-              <Text className="text-[#5f6b61]">工作时间：9:00-18:00</Text>
-              <Text className="text-[#5f6b61]">邮箱：contact@recolink.com</Text>
+              <Text className="text-[#5f6b61]">平台服务咨询：400-888-8888</Text>
+              <Text className="text-[#5f6b61]">工作时间：工作日 9:00-18:00</Text>
+              <Text className="text-[#5f6b61]">商务与合作：contact@recolink.com</Text>
             </Space>
           </Col>
         </Row>
         <div className="mt-10 border-t border-[#eadcc7] pt-8 text-center text-[#7a847a]">
-          <p>© 2026 锐联产业协同平台 RecoLink. All rights reserved.</p>
+          <p>© 2026 锐联产业协同平台 RecoLink. 面向产业集群的大宗商品交易与供应链协同服务平台。</p>
         </div>
       </div>
     </AntFooter>

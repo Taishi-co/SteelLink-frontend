@@ -30,6 +30,21 @@ function getCategoryIcon(category: string) {
   return categoryIcons[category] || '钢'
 }
 
+const sourcingGuide = [
+  {
+    title: '第一步：明确采购范围',
+    description: '先按品类、规格、仓库和价格筛选现货，快速确认本次采购是否可直接成交。',
+  },
+  {
+    title: '第二步：核验交付条件',
+    description: '重点关注库存量、起订量和交付仓信息，确认是否满足项目排产或区域调拨要求。',
+  },
+  {
+    title: '第三步：衔接履约与融资',
+    description: '如需仓储、物流或供应链金融支持，可在下单后继续接入平台服务，形成完整履约闭环。',
+  },
+]
+
 export default function MallPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -79,19 +94,24 @@ export default function MallPage() {
             <Col xs={24} lg={14}>
               <Space wrap className="mb-5">
                 <Tag className="border-[#d6ba8c] bg-[#fff3df] px-4 py-1 text-[#9f5f23]">锐联产业协同平台 RecoLink</Tag>
-                <Tag className="border-[#bfd2c4] bg-[#edf6ef] px-4 py-1 text-[#2f6b49]">真实库存 · 审核商品</Tag>
+                <Tag className="border-[#bfd2c4] bg-[#edf6ef] px-4 py-1 text-[#2f6b49]">审核商品 · 真实库存 · 在线履约</Tag>
               </Space>
               <Title className="!mb-4 !text-5xl !font-black !leading-tight !text-[#17221b]">
-                现货商城
+                现货采购商城
               </Title>
               <Paragraph className="!mb-7 max-w-2xl !text-base !leading-7 !text-[#5f6b61]">
-                聚合审核通过的钢材现货，按品类、仓库、库存和价格快速筛选。下单后进入合同、仓储、物流和资金服务闭环。
+                面向采购企业集中展示审核通过的大宗商品现货资源。用户可按品类、仓库、库存和价格快速筛选商品，并在成交后衔接合同、仓储、物流和供应链金融流程。
               </Paragraph>
+              <Space wrap className="mb-7">
+                <Tag className="rounded-full border-[#eadcc7] bg-white px-4 py-1 text-[#6b4a2b]">适合现货直采与项目补货</Tag>
+                <Tag className="rounded-full border-[#eadcc7] bg-white px-4 py-1 text-[#6b4a2b]">支持后续接入集采与询报价</Tag>
+                <Tag className="rounded-full border-[#eadcc7] bg-white px-4 py-1 text-[#6b4a2b]">支持仓储物流与融资协同</Tag>
+              </Space>
               <Search
                 size="large"
                 allowClear
                 enterButton={<Button type="primary" icon={<SearchOutlined />} className="bg-[#214332] hover:!bg-[#2d5a43]">搜索</Button>}
-                placeholder="搜索商品名称、钢厂、规格或编号"
+                placeholder="搜索商品名称、钢厂、规格、材质或编号"
                 className="max-w-2xl"
                 onSearch={(value) => navigate(`/products${value ? `?keyword=${encodeURIComponent(value)}` : ''}`)}
               />
@@ -101,16 +121,16 @@ export default function MallPage() {
                 <div className="mb-5 flex items-center justify-between">
                   <div>
                     <Text className="text-xs font-bold uppercase tracking-[0.24em] text-[#a4662c]">Market Snapshot</Text>
-                    <Title level={4} className="!mb-0 !mt-1">商城概览</Title>
+                    <Title level={4} className="!mb-0 !mt-1">采购概览</Title>
                   </div>
                   <ShopOutlined className="rounded-2xl bg-[#214332] p-3 text-xl text-[#f3c17c]" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    ['已上架商品', `${products.length || '--'}`],
-                    ['可选品类', `${mallCategories.length || '--'}`],
-                    ['交易方式', '现货直采'],
-                    ['履约支持', '仓储物流'],
+                    ['当前展示商品', `${products.length || '--'}`],
+                    ['覆盖品类', `${mallCategories.length || '--'}`],
+                    ['采购模式', '现货直采 / 询报价衔接'],
+                    ['后续能力', '仓储物流 / 供应链金融'],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-2xl bg-[#f8f0e4] p-4">
                       <Text className="block text-sm text-[#7a847a]">{label}</Text>
@@ -127,13 +147,22 @@ export default function MallPage() {
       <div className="mx-auto max-w-7xl px-6 py-10 md:px-10">
         <Spin spinning={loading}>
           <section className="mb-12">
+            <div className="mb-8 grid gap-4 lg:grid-cols-3">
+              {sourcingGuide.map((item, index) => (
+                <Card key={item.title} className="rounded-[24px] border-[#eadcc7] bg-[#fffaf1] shadow-sm">
+                  <Text className="text-xs font-bold uppercase tracking-[0.24em] text-[#a4662c]">Guide 0{index + 1}</Text>
+                  <Title level={5} className="!mb-3 !mt-3 !font-black">{item.title}</Title>
+                  <Paragraph className="!mb-0 !text-[#5f6b61]">{item.description}</Paragraph>
+                </Card>
+              ))}
+            </div>
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
                 <Text className="text-sm font-bold uppercase tracking-[0.28em] text-[#a4662c]">Categories</Text>
                 <Title level={3} className="!mb-0 !mt-2 !font-black">品类导航</Title>
               </div>
               <Link to="/products" className="font-semibold text-[#9f5f23]">
-                全部商品 <ArrowRightOutlined />
+                查看全部商品 <ArrowRightOutlined />
               </Link>
             </div>
             {mallCategories.length > 0 ? (
@@ -167,10 +196,10 @@ export default function MallPage() {
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
                 <Text className="text-sm font-bold uppercase tracking-[0.28em] text-[#a4662c]">Featured</Text>
-                <Title level={3} className="!mb-0 !mt-2 !font-black">热门现货</Title>
+                <Title level={3} className="!mb-0 !mt-2 !font-black">重点推荐现货</Title>
               </div>
               <Link to="/products" className="font-semibold text-[#9f5f23]">
-                查看更多 <ArrowRightOutlined />
+                进入完整商品库 <ArrowRightOutlined />
               </Link>
             </div>
 
@@ -189,7 +218,7 @@ export default function MallPage() {
                         </div>
                         <Space className="mb-3" wrap>
                           <Tag color="green">{product.category}</Tag>
-                          {product.availableQty >= product.minOrderQty && product.minOrderQty > 0 ? <Tag color="gold">可下单</Tag> : null}
+                          {product.availableQty >= product.minOrderQty && product.minOrderQty > 0 ? <Tag color="gold">可直接下单</Tag> : null}
                         </Space>
                         <Title level={5} className="!mb-2 !text-base line-clamp-2">
                           {product.name}
@@ -221,8 +250,8 @@ export default function MallPage() {
                 <Space align="center">
                   <FireOutlined className="text-3xl text-[#f3c17c]" />
                   <div>
-                    <Title level={3} className="!mb-1 !text-white">需要更精准的采购匹配？</Title>
-                    <Paragraph className="!mb-0 !text-white/70">使用 AI采购或供求信息，把规格、价格、仓库和资金需求一次提交。</Paragraph>
+                    <Title level={3} className="!mb-1 !text-white">需要更精细的采购方案？</Title>
+                    <Paragraph className="!mb-0 !text-white/70">如标准现货无法完全满足项目要求，可继续使用 AI 智能采购或发布供求信息，补充规格、价格区间、交付仓和融资需求。</Paragraph>
                   </div>
                 </Space>
               </Col>
@@ -232,7 +261,7 @@ export default function MallPage() {
                     <Button size="large" className="rounded-full border-white/30 bg-white text-[#214332]">AI采购</Button>
                   </Link>
                   <Link to="/matching">
-                    <Button size="large" className="rounded-full border-white/30 bg-white/10 text-white hover:!border-white hover:!bg-white/20 hover:!text-white">发布供求</Button>
+                    <Button size="large" className="rounded-full border-white/30 bg-white/10 text-white hover:!border-white hover:!bg-white/20 hover:!text-white">发布采购线索</Button>
                   </Link>
                 </Space>
               </Col>
