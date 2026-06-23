@@ -108,26 +108,26 @@ export default function LoginPage() {
       <div className="w-full max-w-[1080px] grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8 items-center">
         <section className="text-slate-900">
           <div className="inline-flex items-center rounded-full border border-white/70 bg-white/70 px-4 py-1 text-sm font-medium text-blue-700 shadow-sm">
-            RecoLink 采购平台
+            RecoLink 买家中心
           </div>
           <h1 className="mt-6 text-4xl font-black leading-tight text-slate-900">
-            在线询价、一键下单、全程可追踪
+            面向产业采购场景的在线交易入口
           </h1>
           <Paragraph className="mt-5 max-w-[620px] text-base leading-7 text-slate-600">
-            RecoLink 为钢材采购方提供一站式在线交易服务。浏览商品、比价下单、合同签署到提货确认，全流程线上完成。
+            RecoLink 为采购企业提供现货选货、询报价协同、订单履约追踪和供应链金融衔接能力。登录后可统一管理商品浏览、订单推进和企业工作台权限。
           </Paragraph>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="rounded-2xl bg-white/85 p-4 shadow-sm ring-1 ring-white/60">
-              <div className="text-sm text-slate-500">海量商品</div>
-              <div className="mt-2 text-lg font-semibold">多品类钢材现货</div>
+              <div className="text-sm text-slate-500">采购选货</div>
+              <div className="mt-2 text-lg font-semibold">多品类现货集中展示</div>
             </div>
             <div className="rounded-2xl bg-white/85 p-4 shadow-sm ring-1 ring-white/60">
-              <div className="text-sm text-slate-500">透明报价</div>
-              <div className="mt-2 text-lg font-semibold">实时价格可比对</div>
+              <div className="text-sm text-slate-500">协同决策</div>
+              <div className="mt-2 text-lg font-semibold">询报价与履约状态可追踪</div>
             </div>
             <div className="rounded-2xl bg-white/85 p-4 shadow-sm ring-1 ring-white/60">
-              <div className="text-sm text-slate-500">订单追踪</div>
-              <div className="mt-2 text-lg font-semibold">全流程状态可见</div>
+              <div className="text-sm text-slate-500">金融衔接</div>
+              <div className="mt-2 text-lg font-semibold">支持后续接入融资服务</div>
             </div>
           </div>
         </section>
@@ -135,7 +135,7 @@ export default function LoginPage() {
         <Card className="rounded-3xl border-0 shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
           <div className="mb-6">
             <div className="text-2xl font-bold text-slate-900">买家登录</div>
-            <Text type="secondary">登录后即可浏览商品、下单采购</Text>
+            <Text type="secondary">登录后可查看商品、发起采购并进入企业工作台</Text>
           </div>
 
           <Tabs
